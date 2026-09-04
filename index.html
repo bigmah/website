@@ -1,0 +1,1826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bigmah</title>
+<meta name="description" content="bigmah — working on pullspace.dev. Interested in retro game preservation and static recompilation.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦀</text></svg>">
+
+<script>
+  // Runs before first paint so the correct theme is already on <html> — no flash.
+  (function () {
+    var saved;
+    try { saved = localStorage.getItem('theme'); } catch (e) {}
+    var system = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.dataset.theme = saved || system;
+  })();
+</script>
+
+<style>
+  /* ---------- theme ---------- */
+
+  :root {
+    --bg: #000;
+    --fg: #ededed;
+    --dim: #b8b8b8;
+    --muted: #6b6b6b;
+    --faint: #4a4a4a;
+    --accent: #d2643a;
+    --accent-soft: rgba(210, 100, 58, 0.55);
+    --line: rgba(255, 255, 255, 0.09);
+    --line-strong: rgba(255, 255, 255, 0.2);
+    --icon: #555;
+    --panel: #0a0a0a;
+    --bar: rgba(255, 255, 255, 0.025);
+    --shadow: rgba(0, 0, 0, 0.6);
+    --card-tint: rgba(255, 255, 255, 0.012);
+    --dot: rgba(255, 255, 255, 0.055);
+    --cube: #6b62a8;
+    --cube-hover: #8f83d6;
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #faf9f7;
+    --fg: #1a1917;
+    --dim: #45443f;
+    --muted: #6e6c66;
+    --faint: #a8a5a0;
+    --accent: #b8502a;
+    --accent-soft: rgba(184, 80, 42, 0.45);
+    --line: rgba(0, 0, 0, 0.12);
+    --line-strong: rgba(0, 0, 0, 0.28);
+    --icon: #8a8882;
+    --panel: #fff;
+    --bar: rgba(0, 0, 0, 0.02);
+    --shadow: rgba(0, 0, 0, 0.18);
+    --card-tint: rgba(0, 0, 0, 0.015);
+    --dot: rgba(0, 0, 0, 0.07);
+    --cube: #5f56a3;
+    --cube-hover: #443c84;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { font-size: 18px; }
+  html, body { margin: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.78rem;
+    padding: 4.5rem 1.5rem 5rem;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  body.is-dragging {
+    cursor: grabbing;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* the iframe would otherwise eat the pointer mid-drag */
+  body.is-dragging iframe { pointer-events: none; }
+
+  /* ---------- toolbar ---------- */
+
+  .tools {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 100;
+  }
+
+  .tools button {
+    width: 2rem;
+    height: 2rem;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--icon);
+    cursor: pointer;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+
+  .tools button:hover,
+  .tools button:focus-visible {
+    color: var(--fg);
+    border-color: var(--line-strong);
+  }
+
+  .tools button[aria-pressed="true"] {
+    color: var(--accent);
+    border-color: var(--accent-soft);
+  }
+
+  .tools button[aria-pressed="true"]:hover { border-color: var(--accent); }
+
+  .tools button[hidden] { display: none; }
+
+  .tools svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* show the mode you'd be switching to */
+  :root[data-theme="light"] .i-sun,
+  :root:not([data-theme="light"]) .i-moon { display: none; }
+
+  /* ---------- board ---------- */
+
+  .board {
+    position: relative;
+    width: 100%;
+    max-width: 1534px;
+    margin: 0 auto;
+    opacity: 0;
+    transition: opacity 260ms ease;
+  }
+
+  .board.is-ready { opacity: 1; }
+
+  /* every half-step slot on the board, drawn whether or not a tile covers it */
+  .cells {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .cell {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    background-image: radial-gradient(var(--dot) 1px, transparent 1.5px);
+    background-size: 9px 9px;
+    transition: border-color 180ms ease, background-color 180ms ease;
+  }
+
+  /* background-color, not the shorthand — the shorthand would wipe the dots */
+  body.is-dragging .cell {
+    border-color: var(--line-strong);
+    background-color: var(--card-tint);
+  }
+
+  .ph {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    border: 1px dashed var(--accent-soft);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+    pointer-events: none;
+    transition: transform 160ms cubic-bezier(.2,.7,.3,1), width 160ms ease, height 160ms ease;
+  }
+
+  /* ---------- tiles ---------- */
+
+  .tile {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    transition:
+      transform 260ms cubic-bezier(.2,.7,.3,1),
+      width 260ms cubic-bezier(.2,.7,.3,1),
+      height 260ms cubic-bezier(.2,.7,.3,1),
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .tile:hover { border-color: var(--line-strong); }
+
+  .tile.is-drag {
+    z-index: 60;
+    /* Its own layer for the length of the drag, so moving it — and the
+       emulator riding inside it — never repaints the board underneath. */
+    will-change: transform;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+    border-color: var(--accent-soft);
+    box-shadow: 0 22px 48px -12px var(--shadow);
+  }
+
+  .tile__bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    height: 2rem;
+    padding: 0 0.7rem 0 0.45rem;
+    background: var(--bar);
+    border-bottom: 1px solid var(--line);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .tile__bar:active { cursor: grabbing; }
+
+  .tile__bar:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  /* ---------- drag hint: a hand that tugs a tile toward an open cell ---------- */
+
+  .hand {
+    position: absolute;
+    top: 0.7rem;
+    left: 48%;
+    width: 21px;
+    height: 23px;
+    z-index: 5;
+    opacity: 0;
+    pointer-events: none;
+    color: var(--fg);
+  }
+
+  .hand svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+    stroke: var(--bg);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    paint-order: stroke fill;
+  }
+
+  /* `translate` and `scale` are their own properties, so they layer on top of the
+     `transform` the layout code writes instead of fighting it */
+  .board--hint-drag:not(.board--static) .tile--drag-hint {
+    animation: tile-tug 9s 3s cubic-bezier(.4, 0, .2, 1) infinite;
+  }
+
+  .board--hint-drag:not(.board--static) .tile--drag-hint .hand {
+    animation: hand-tug 9s 3s cubic-bezier(.4, 0, .2, 1) infinite;
+  }
+
+  @keyframes tile-tug {
+    0%, 60%, 100% { translate: 0 0; scale: 1; }
+    68%           { translate: 0 0; scale: 1.02; }
+    80%, 88%      { translate: var(--drag-x, -30px) 7px; scale: 1.02; }
+    96%           { translate: 0 0; scale: 1; }
+  }
+
+  @keyframes hand-tug {
+    0%, 57%, 100% { opacity: 0; translate: 0 7px; scale: 1; }
+    64%           { opacity: 1; translate: 0 0; scale: 1; }
+    70%, 90%      { opacity: 1; translate: 0 0; scale: 0.86; }
+    96%           { opacity: 0; translate: 0 5px; scale: 1; }
+  }
+
+  /* ---------- the dots: grow / shrink the tile ---------- */
+
+  .dots {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.45rem 0.35rem;
+    margin: 0;
+    background: none;
+    border: 0;
+    border-radius: 5px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .dots i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--faint);
+    transition: background-color 160ms ease, transform 200ms cubic-bezier(.2,.7,.3,1);
+  }
+
+  .tile:hover .dots i { background: var(--icon); }
+  .tile--big .dots i { background: var(--accent-soft); }
+
+  /* the dots are their own control, so pointing at them beats the two rules
+     above — both of which are specific enough to win on source order alone */
+  .tile .dots:hover i,
+  .tile .dots:focus-visible i { background: var(--accent); }
+
+  /* they pull apart to grow the tile, and pull together to shrink it again */
+  .dots:hover i:first-child  { transform: translateX(-1px); }
+  .dots:hover i:last-child   { transform: translateX(1px); }
+  .tile--big .dots:hover i:first-child { transform: translateX(1px); }
+  .tile--big .dots:hover i:last-child  { transform: translateX(-1px); }
+
+  /* Until someone has actually used them, the dots pull apart every few seconds
+     to show they do something. First click retires the hint for good. */
+  .board--hint .dots i { animation: dot-hint 6s cubic-bezier(.4, 0, .2, 1) infinite; }
+  .board--hint .dots i:first-child  { --push: -3.5px; }
+  .board--hint .dots i:nth-child(2) { --push: 0px; }
+  .board--hint .dots i:last-child   { --push: 3.5px; }
+
+  @keyframes dot-hint {
+    0%, 66%, 100% { transform: translateX(0) scale(1); }
+    76%, 88%      { transform: translateX(var(--push)) scale(1.35); }
+  }
+
+  /* hovering, or hauling a tile around, takes precedence over the hint */
+  .dots:hover i,
+  body.is-dragging .dots i { animation: none; }
+
+  body.is-dragging .tile--drag-hint,
+  body.is-dragging .tile--drag-hint .hand { animation: none; }
+
+  .dots:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+  }
+
+  .tile__title {
+    font-size: 0.6rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tile__bar .spacer { flex: 1; }
+
+  .tile__bar a {
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .tile__body {
+    flex: 1;
+    min-height: 0;
+    padding: 1.05rem 1.1rem;
+    overflow: auto;
+  }
+
+  .tile--flush .tile__body { padding: 0; overflow: hidden; }
+
+  /* ---------- tile content ---------- */
+
+  .tile--id .tile__body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .tagline {
+    margin: 1.35rem 0 0;
+    font-size: 0.68rem;
+    line-height: 1.7;
+    color: var(--faint);
+  }
+
+  .links {
+    margin: 1.05rem 0 0;
+    display: flex;
+    gap: 0.9rem;
+  }
+
+  .links a {
+    display: inline-flex;
+    color: var(--icon);
+    padding: 0.35rem;
+    margin-left: -0.35rem;
+    border-radius: 6px;
+    transition: color 160ms ease;
+  }
+
+  .links a + a { margin-left: 0; }
+
+  .links a:hover,
+  .links a:focus-visible { color: var(--fg); }
+
+  .links svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+    fill: currentColor;
+  }
+
+  p {
+    margin: 0 0 1.1rem;
+    font-size: 0.75rem;
+    line-height: 1.9;
+    color: var(--muted);
+  }
+
+  p:last-child { margin-bottom: 0; }
+
+  .lead { color: var(--dim); }
+
+  .lead em,
+  .more em {
+    color: var(--fg);
+    font-style: normal;
+  }
+
+  /* ---------- the part you only get when the tile is big ---------- */
+
+  .more {
+    display: none;
+    margin-top: 1.15rem;
+    padding-top: 1.15rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .tile--big .more {
+    display: block;
+    animation: reveal 320ms 130ms both cubic-bezier(.2,.7,.3,1);
+  }
+
+  /* a tile can get wide; keep the line length readable */
+  .more p { max-width: 64ch; }
+
+  /* on a narrower board an enlarged tile is a smaller square, so the revealed
+     copy tightens up rather than spilling past the bottom of it */
+  @media (max-width: 1400px) {
+    .board:not(.board--static) .more p { font-size: 0.7rem; line-height: 1.8; }
+  }
+
+  @media (max-width: 1260px) {
+    .board:not(.board--static) .more p { font-size: 0.63rem; line-height: 1.75; }
+    .board:not(.board--static) .more { margin-top: 0.9rem; padding-top: 0.9rem; }
+  }
+
+  @keyframes reveal {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  a.ln {
+    color: var(--dim);
+    text-decoration: none;
+    border-bottom: 1px solid var(--accent-soft);
+    padding-bottom: 1px;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+
+  a.ln:hover,
+  a.ln:focus-visible {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  a:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: 4px;
+  }
+
+  /* project */
+
+  .project {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    text-decoration: none;
+  }
+
+  .project svg {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    color: var(--cube);
+    transition: color 160ms ease;
+  }
+
+  .project:hover svg { color: var(--cube-hover); }
+
+  .project .name {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--fg);
+    margin-bottom: 0.35rem;
+  }
+
+  .project .what {
+    display: block;
+    font-size: 0.72rem;
+    line-height: 1.75;
+    color: var(--muted);
+  }
+
+  /* emulator */
+
+  .tile--gba .tile__body {
+    background: #0f1115;
+    position: relative;
+  }
+
+  /* The emulator is laid out at a fixed width and scaled to whatever square it
+     is sitting in, so its controls stay whole instead of getting clipped. */
+  .tile--gba iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    transform-origin: 0 0;
+    transition:
+      transform 260ms cubic-bezier(.2,.7,.3,1),
+      width 260ms cubic-bezier(.2,.7,.3,1),
+      height 260ms cubic-bezier(.2,.7,.3,1);
+  }
+
+  /* ---------- gravity ---------- */
+
+  /* Rigid-body mode: the tiles leave the grid and fall through the window, so
+     they are positioned in viewport space and driven frame by frame from JS.
+     Nothing here may animate — the solver owns the transform. */
+  .board--gravity .tile {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 40;
+    transition: none;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    will-change: transform;
+  }
+
+  /* the whole tile is the handle, so nothing inside it takes the pointer —
+     not the links, not the dots, not the emulator */
+  .board--gravity .tile * { pointer-events: none; }
+
+  .board--gravity .tile.is-held { z-index: 50; cursor: grabbing; }
+
+  /* keep the grabbing cursor even when the tile is dragged out from under it */
+  body.is-holding { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+
+  /* ...except the one trip back to the grid, which gets its easing back */
+  .board--gravity-return .tile {
+    transition: transform 420ms cubic-bezier(.2, .8, .3, 1);
+    pointer-events: none;
+  }
+
+  /* ---------- stacked fallback (narrow screens / no JS) ---------- */
+
+  .board--static { max-width: 34rem; }
+
+  .board--static:not(.board--gravity) { height: auto !important; }
+
+  .board--static:not(.board--gravity) .tile {
+    position: relative;
+    transform: none !important;
+    width: auto !important;
+    height: auto !important;
+    margin-bottom: 0.85rem;
+  }
+
+  .board--static .tile__bar { cursor: default; }
+  .board--static .cells { display: none; }
+  .board--static .tile--gba .dots { display: none; }   /* nothing to reveal */
+  .board--static .ph,
+  .board--static::before { display: none; }
+  /* the iframe is absolutely positioned, so the body needs its own height here */
+  .board--static .tile--gba .tile__body { flex: none; height: 480px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    /* no nudge, so the dots just sit a little brighter until they are used */
+    .board--hint .dots:not(:hover) i { background: var(--icon); }
+  }
+</style>
+<noscript><style>
+  .board { opacity: 1; max-width: 34rem; }
+  .tile { position: relative; margin-bottom: 0.85rem; }
+  .tile__bar { cursor: default; }
+  .dots { display: none; }
+  .ph { display: none; }
+  .tile--gba .tile__body { height: 820px; }
+</style></noscript>
+</head>
+<body>
+
+<div class="tools">
+  <button class="js-gravity" type="button" aria-pressed="false" aria-label="Drop the tiles" title="Drop the tiles">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="4.4" r="2.4"/>
+      <path d="M12 9.6v6.6M9.1 13.3 12 16.2l2.9-2.9"/>
+      <path d="M4.4 20.2h15.2"/>
+    </svg>
+  </button>
+  <button class="js-reset" type="button" aria-label="Reset layout" title="Reset layout">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/>
+      <path d="M3.2 4.4v4.5h4.5"/>
+    </svg>
+  </button>
+  <button class="js-theme" type="button" aria-label="Switch theme" title="Switch theme">
+    <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.2"/>
+      <path d="M12 1.6v2.4M12 20v2.4M22.4 12H20M4 12H1.6M19.35 4.65l-1.7 1.7M6.35 17.65l-1.7 1.7M19.35 19.35l-1.7-1.7M6.35 6.35l-1.7-1.7"/>
+    </svg>
+    <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20.8 13.4A8.6 8.6 0 1 1 10.6 3.2a6.9 6.9 0 0 0 10.2 10.2Z"/>
+    </svg>
+  </button>
+</div>
+
+<div class="board" id="board">
+  <div class="cells" id="cells" aria-hidden="true"></div>
+  <div class="ph" id="ph" hidden></div>
+
+  <article class="tile tile--id" data-id="id">
+    <header class="tile__bar" tabindex="0" aria-label="bigmah tile — arrow keys nudge it half a cell, shift for a whole one">
+      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+      <span class="tile__title">bigmah</span>
+    </header>
+    <div class="tile__body">
+      <h1>bigmah</h1>
+      <nav class="links">
+        <a href="https://github.com/bigmah" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.39 1.24-3.23-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.92 1.24 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5Z"/></svg>
+        </a>
+        <a href="https://x.com/_bigmah_" target="_blank" rel="noopener noreferrer" aria-label="X" title="X">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.41l-5.8-7.58-6.64 7.58H.46l8.6-9.83L0 1.15h7.59l5.24 6.93 6.07-6.93Zm-1.29 19.5h2.04L6.49 3.24H4.3l13.31 17.41Z"/></svg>
+        </a>
+      </nav>
+      <p class="tagline">retro preservation<br>static recompilation</p>
+      <div class="more">
+        <p class="lead">interested in retro game preservation — emulation, decompilation, porting, and the rest of it. but mostly <em>static recompilation</em>.</p>
+        <p>emulation interprets a console's instructions while the game runs. decompilation rebuilds readable source from the original binary, function by function. static recompilation sits between the two — translate the machine code once, ahead of time, into a native binary.</p>
+        <p>what comes out runs on the host CPU directly, with no interpreter in the loop. the appeal is preservation: the game's original logic is kept intact while being cut loose from hardware that is quietly disappearing.</p>
+      </div>
+    </div>
+  </article>
+
+  <article class="tile" data-id="now">
+    <header class="tile__bar" tabindex="0" aria-label="now tile — arrow keys nudge it half a cell, shift for a whole one">
+      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+      <span class="tile__title">now</span>
+    </header>
+    <div class="tile__body">
+      <p>working on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> — better code review in the browser for github PRs and whatnot</p>
+      <!-- placeholder copy — swap in your own -->
+      <div class="more">
+        <p>github's review UI is fine on a twenty-line diff and comes apart on a thousand-line one. pullspace is the attempt at something better: read a pull request in the browser with the surrounding code within reach, instead of squinting at hunks in isolation.</p>
+      </div>
+    </div>
+  </article>
+
+  <article class="tile" data-id="dol">
+    <header class="tile__bar" tabindex="0" aria-label="project tile — arrow keys nudge it half a cell, shift for a whole one">
+      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+      <span class="tile__title">project</span>
+    </header>
+    <div class="tile__body">
+      <a class="project" href="https://pullspace.dev/#/bigmah/dolbundler/blob/README.md" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+          <path d="M12 2 21.5 7.25v9.5L12 22 2.5 16.75v-9.5L12 2Z" opacity=".2"/>
+          <path d="M12 2.6 20.9 7.5 12 12.4 3.1 7.5 12 2.6Z" opacity=".95"/>
+          <path d="M3.1 8.55 11.45 13.15v8.05L3.1 16.6V8.55Z" opacity=".5"/>
+          <path d="M20.9 8.55 12.55 13.15v8.05L20.9 16.6V8.55Z" opacity=".72"/>
+        </svg>
+        <span>
+          <span class="name">dolbundler</span>
+          <span class="what">gamecube static recompilation toolkit — turn GC ROMs into native macOS / iOS apps.</span>
+        </span>
+      </a>
+      <!-- placeholder copy — swap in your own -->
+      <div class="more">
+        <p>gamecube games shipped as PowerPC code inside a .dol executable on the disc. dolbundler's job is getting that code running natively on apple hardware — packaged as an app you open, rather than a ROM you hand to an emulator.</p>
+      </div>
+    </div>
+  </article>
+
+  <article class="tile tile--flush tile--gba" data-id="gba">
+    <header class="tile__bar" tabindex="0" aria-label="gba emulator tile — arrow keys nudge it half a cell, shift for a whole one">
+      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+      <span class="tile__title">gba emulator</span>
+      <span class="spacer"></span>
+      <a class="ln" href="gba.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+    </header>
+    <div class="tile__body">
+      <iframe src="gba.html" title="GBA emulator" loading="lazy" allow="fullscreen; gamepad; autoplay" allowfullscreen></iframe>
+    </div>
+  </article>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var COLS = 4;        // the board is four cells wide...
+  var ROWS = 2;        // ...and two tall, plus the half row GH adds below them
+  var SUB  = 2;        // ...and every cell splits into this many steps, so tiles can sit half-offset
+  var GAP  = 14;       // gutter, px
+  var GRID_AT = 1150;  // narrower than this the cells get cramped, so we stack
+  var KEY = 'board.v6';
+
+  // Everything below counts in steps rather than cells: a small tile is SUB
+  // steps square, a big one twice that, and the board is this many across.
+  var GW = COLS * SUB;
+  // Half a row of spare grid hangs below the last full one, so there is always
+  // somewhere to drop into without giving a whole cell of height up to it.
+  var GH = ROWS * SUB + SUB / 2;
+
+  var TILES = ['id', 'now', 'dol', 'gba'];
+
+  // where everything starts, and what the reset button goes back to: a block in
+  // the middle two columns, leaving one open column either side
+  var HOME = {
+    id:  { x: 1 * SUB, y: 0 * SUB },
+    now: { x: 2 * SUB, y: 0 * SUB },
+    dol: { x: 1 * SUB, y: 1 * SUB },
+    gba: { x: 2 * SUB, y: 1 * SUB }
+  };
+
+  var board = document.getElementById('board');
+  var ph    = document.getElementById('ph');
+  var cellLayer = document.getElementById('cells');
+  var els   = {};
+  Array.prototype.forEach.call(board.querySelectorAll('.tile'), function (el) {
+    els[el.dataset.id] = el;
+  });
+
+  var saved = readSaved();
+  var pos   = saved ? saved.pos : copy(HOME);
+  var bigId = saved ? saved.big : null;   // the one enlarged tile, or null
+  if (!valid(pos)) { pos = copy(HOME); bigId = null; }
+
+  var isStatic = false;
+
+  var HINT_KEY = 'dots.seen';
+  var hinted = bigId !== null;   // a saved big tile means they already found them
+  try { hinted = hinted || localStorage.getItem(HINT_KEY) === '1'; } catch (e) {}
+
+  var DRAG_KEY = 'drag.seen';
+  var dragHinted = false;
+  try { dragHinted = localStorage.getItem(DRAG_KEY) === '1'; } catch (e) {}
+
+  var HAND = '<svg viewBox="0 0 26 28" aria-hidden="true">' +
+    '<rect x="6.5" y="5" width="3.4" height="10" rx="1.7"/>' +
+    '<rect x="10.4" y="3.2" width="3.4" height="11.8" rx="1.7"/>' +
+    '<rect x="14.3" y="4.6" width="3.4" height="10.4" rx="1.7"/>' +
+    '<rect x="18.2" y="7" width="3.4" height="8" rx="1.7"/>' +
+    '<rect x="3.2" y="10.5" width="3.6" height="8" rx="1.8" transform="rotate(-32 5 14.5)"/>' +
+    '<path d="M6.5 12h15.1v6.5a7.55 7.55 0 0 1-15.1 0z"/>' +
+    '</svg>';
+  var handEl = null;
+
+  // Hint on a small tile that actually has an open cell beside it, and tug it
+  // that way — so the gesture points at somewhere it could really go.
+  function pickTug() {
+    var order = TILES.slice().sort(function (a, b) {
+      return (pos[a].y - pos[b].y) || (pos[a].x - pos[b].x);
+    });
+    for (var i = 0; i < order.length; i++) {
+      var id = order[i];
+      if (sizeOf(id) !== SUB) continue;
+      for (var d = -SUB; d <= SUB; d += 2 * SUB) {
+        var nx = pos[id].x + d;
+        if (nx < 0 || nx + SUB > GW) continue;
+        var spot = { x: nx, y: pos[id].y };
+        var clear = TILES.every(function (k) {
+          return k === id || !overlap(spot, SUB, pos[k], sizeOf(k));
+        });
+        if (clear) return { id: id, dir: d / SUB };
+      }
+    }
+    return null;
+  }
+
+  function showTug() {
+    TILES.forEach(function (id) { els[id].classList.remove('tile--drag-hint'); });
+    if (dragHinted || isStatic || phys) { board.classList.remove('board--hint-drag'); return; }
+
+    var pick = pickTug();
+    if (!pick) { board.classList.remove('board--hint-drag'); return; }
+
+    if (!handEl) {
+      handEl = document.createElement('div');
+      handEl.className = 'hand';
+      handEl.setAttribute('aria-hidden', 'true');
+      handEl.innerHTML = HAND;
+    }
+    var el = els[pick.id];
+    el.style.setProperty('--drag-x', (pick.dir * 30) + 'px');
+    el.appendChild(handEl);
+    el.classList.add('tile--drag-hint');
+    board.classList.add('board--hint-drag');
+  }
+
+  function retireTug() {
+    if (dragHinted) return;
+    dragHinted = true;
+    board.classList.remove('board--hint-drag');
+    TILES.forEach(function (id) { els[id].classList.remove('tile--drag-hint'); });
+    if (handEl) { handEl.remove(); handEl = null; }
+    try { localStorage.setItem(DRAG_KEY, '1'); } catch (e) {}
+  }
+
+  function retireHint() {
+    if (hinted) return;
+    hinted = true;
+    board.classList.remove('board--hint');
+    try { localStorage.setItem(HINT_KEY, '1'); } catch (e) {}
+  }
+
+  /* ---------- the grid ---------- */
+
+  function copy(p) {
+    var out = {};
+    TILES.forEach(function (id) { out[id] = { x: p[id].x, y: p[id].y }; });
+    return out;
+  }
+
+  // A tile is one cell, or two-by-two when it is the enlarged one — in steps.
+  function sizeOf(id) { return (id === bigId ? 2 : 1) * SUB; }
+
+  function onBoard(x, y, s) { return x >= 0 && y >= 0 && x + s <= GW && y + s <= GH; }
+
+  function overlap(a, as, b, bs) {
+    return a.x < b.x + bs && a.x + as > b.x && a.y < b.y + bs && a.y + as > b.y;
+  }
+
+  function valid(p) {
+    for (var i = 0; i < TILES.length; i++) {
+      var a = TILES[i];
+      if (!p[a] || !onBoard(p[a].x, p[a].y, sizeOf(a))) return false;
+      for (var j = i + 1; j < TILES.length; j++) {
+        var b = TILES[j];
+        if (overlap(p[a], sizeOf(a), p[b], sizeOf(b))) return false;
+      }
+    }
+    return true;
+  }
+
+  // Put `id` at (tx, ty) and shuffle whatever was there into the cells it just
+  // vacated. Returns the resulting arrangement, or null when it cannot be done —
+  // so only reachable positions are ever offered.
+  function tryPlace(id, tx, ty, base) {
+    var s = sizeOf(id);
+    if (!onBoard(tx, ty, s)) return null;
+
+    var next = copy(base);
+    next[id] = { x: tx, y: ty };
+
+    var moving = TILES.filter(function (k) {
+      return k !== id && overlap(next[k], sizeOf(k), next[id], s);
+    });
+    if (!moving.length) return next;
+
+    var taken = {};
+    function claim(p, n) {
+      for (var y = p.y; y < p.y + n; y++) {
+        for (var x = p.x; x < p.x + n; x++) taken[x + ',' + y] = true;
+      }
+    }
+    function open(x, y, n) {
+      if (!onBoard(x, y, n)) return false;
+      for (var j = y; j < y + n; j++) {
+        for (var i = x; i < x + n; i++) if (taken[i + ',' + j]) return false;
+      }
+      return true;
+    }
+
+    TILES.forEach(function (k) {
+      if (k !== id && moving.indexOf(k) === -1) claim(next[k], sizeOf(k));
+    });
+    claim(next[id], s);
+
+    // Rank every landing spot: the ground the dragged tile just left first, so
+    // a swap still feels like a swap, then whole cells, and only then the
+    // half-steps between them — a tile shoved aside should land somewhere tidy
+    // while tidy spots last. Half-overlaps mean the vacated ground is often
+    // only half free, so the fallback carries much more of the work now.
+    var vacated = {};
+    for (var vy = base[id].y; vy < base[id].y + s; vy += SUB) {
+      for (var vx = base[id].x; vx < base[id].x + s; vx += SUB) vacated[vx + ',' + vy] = true;
+    }
+    var slots = [];
+    for (var ay = 0; ay + SUB <= GH; ay++) {
+      for (var ax = 0; ax + SUB <= GW; ax++) {
+        slots.push({
+          x: ax, y: ay,
+          rank: vacated[ax + ',' + ay] ? 0 : (ax % SUB || ay % SUB) ? 2 : 1
+        });
+      }
+    }
+
+    for (var m = 0; m < moving.length; m++) {
+      var k = moving[m], ks = sizeOf(k), from = next[k], settled = false;
+
+      // ...and among equally tidy spots, the closest one, so nothing flies
+      // across the board just because something nudged into it.
+      slots.sort(function (a, b) {
+        return (a.rank - b.rank) ||
+          (Math.abs(a.x - from.x) + Math.abs(a.y - from.y)) -
+          (Math.abs(b.x - from.x) + Math.abs(b.y - from.y));
+      });
+
+      for (var q = 0; q < slots.length; q++) {
+        if (!open(slots[q].x, slots[q].y, ks)) continue;
+        next[k] = { x: slots[q].x, y: slots[q].y };
+        claim(next[k], ks);
+        settled = true;
+        break;
+      }
+      if (!settled) return null;
+    }
+    return next;
+  }
+
+  function readingOrder() {
+    return TILES.slice().sort(function (a, b) {
+      return (pos[a].y - pos[b].y) || (pos[a].x - pos[b].x);
+    });
+  }
+
+  /* ---------- storage ---------- */
+
+  function readSaved() {
+    var raw;
+    try { raw = localStorage.getItem(KEY); } catch (e) { return null; }
+    if (!raw) return null;
+    try {
+      var s = JSON.parse(raw);
+      if (!s || !s.pos) return null;
+      var p = {};
+      for (var i = 0; i < TILES.length; i++) {
+        var v = s.pos[TILES[i]];
+        if (!v || typeof v.x !== 'number' || typeof v.y !== 'number') return null;
+        p[TILES[i]] = { x: v.x | 0, y: v.y | 0 };
+      }
+      return { pos: p, big: TILES.indexOf(s.big) === -1 ? null : s.big };
+    } catch (e) { return null; }
+  }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ pos: pos, big: bigId })); } catch (e) {}
+  }
+
+  /* ---------- drawing ---------- */
+
+  function cellPx() {
+    return (board.clientWidth - GAP * (COLS - 1)) / COLS;
+  }
+
+  // A step is half a cell plus half a gutter, so a half-offset tile lines its
+  // edge up with the middle of its neighbour instead of drifting out of true.
+  function geo(p, s, cell) {
+    var step = (cell + GAP) / SUB;
+    return { left: p.x * step, top: p.y * step, w: s * step - GAP, h: s * step - GAP };
+  }
+
+  function place(el, g) {
+    el.style.transform = 'translate3d(' + g.left + 'px,' + g.top + 'px,0)';
+    el.style.width = g.w + 'px';
+    el.style.height = g.h + 'px';
+  }
+
+  // The backdrop is drawn a step at a time rather than a cell at a time, so it
+  // shows the half-spots a tile can actually land on. A tile always covers a
+  // whole two-by-two block of these plus the gutters inside it, offset or not.
+  var drawnCell = -1;
+
+  function drawCells(cell) {
+    var need = GW * GH;
+    if (cell === drawnCell && cellLayer.children.length === need) return;
+    drawnCell = cell;
+    while (cellLayer.children.length < need) {
+      var d = document.createElement('div');
+      d.className = 'cell';
+      cellLayer.appendChild(d);
+    }
+    while (cellLayer.children.length > need) cellLayer.removeChild(cellLayer.lastChild);
+    for (var i = 0; i < need; i++) {
+      var el = cellLayer.children[i];
+      var g = geo({ x: i % GW, y: Math.floor(i / GW) }, 1, cell);
+      el.style.transform = 'translate3d(' + g.left + 'px,' + g.top + 'px,0)';
+      el.style.width = g.w + 'px';
+      el.style.height = g.h + 'px';
+    }
+  }
+
+  // The smallest box the emulator lays itself out in without clipping its own
+  // controls. Below that it gets rendered at this size and scaled down to fit.
+  var EMU_W = 820;
+  var EMU_H = 737;
+  var EMU_MIN = 380;   // narrowest its own mobile layout fits in
+
+  // Takes the box the emulator is *heading* for. Measuring it instead would read
+  // the pre-transition size, since the tile animates between sizes.
+  function fitEmulator(w, h) {
+    var el = els.gba;
+    var frame = el && el.querySelector('iframe');
+    if (!frame) return;
+    var body = el.querySelector('.tile__body');
+
+    function native() {
+      frame.style.width = '100%';
+      frame.style.height = '100%';
+      frame.style.transform = 'none';
+    }
+
+    if (isStatic) {
+      // Stacked, the emulator gets its own mobile layout at full size — it only
+      // needs a tall enough box, and its controls wrap more as the tile narrows.
+      var bw = body.clientWidth;
+      var vw = Math.max(bw, EMU_MIN);
+      var vh = Math.round(Math.max(720, 1100 - 0.6 * vw));
+      var k = bw / vw;
+      body.style.height = Math.round(vh * k) + 'px';
+      if (k >= 1) { native(); return; }    // narrower than its layout allows
+      frame.style.width = vw + 'px';
+      frame.style.height = vh + 'px';
+      frame.style.transform = 'scale(' + k + ')';
+      return;
+    }
+
+    body.style.height = '';
+    if (w >= EMU_W) { native(); return; }   // room to spare — let it lay itself out
+
+    var scale = w / EMU_W;
+    var fh = h / scale;
+    if (fh < EMU_H) { scale = h / EMU_H; fh = EMU_H; }   // too short: fit by height
+    var inset = Math.max(0, (w - EMU_W * scale) / 2);
+
+    frame.style.width = EMU_W + 'px';
+    frame.style.height = fh + 'px';
+    frame.style.transform = 'translateX(' + inset + 'px) scale(' + scale + ')';
+  }
+
+  function render(skip, cell) {
+    if (isStatic) { fitEmulator(); return; }
+    if (cell === undefined) cell = cellPx();
+    drawCells(cell);
+
+    TILES.forEach(function (id) {
+      if (els[id] === skip) return;   // the held tile is driven by the pointer
+      place(els[id], geo(pos[id], sizeOf(id), cell));
+    });
+
+    // Down to the bottom edge of the lowest cell: GH steps, less the gutter
+    // that would have followed the last one.
+    board.style.height = (GH * (cell + GAP) / SUB - GAP) + 'px';
+
+    if (!drag) {                       // the emulator only resizes outside a drag
+      var g = geo(pos.gba, sizeOf('gba'), cell);
+      var bar = els.gba.querySelector('.tile__bar').offsetHeight;
+      fitEmulator(g.w - 2, g.h - 2 - bar);   // minus the tile border and title bar
+    }
+  }
+
+  function syncDots() {
+    TILES.forEach(function (id) {
+      var on = id === bigId;
+      var el = els[id];
+      var btn = el.querySelector('.dots');
+      el.classList.toggle('tile--big', on);
+      btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+      btn.setAttribute('aria-label', (on ? 'Collapse' : 'Expand') + ' the ' + el.querySelector('.tile__title').textContent + ' tile');
+      btn.title = on ? 'Collapse' : 'Expand';
+    });
+  }
+
+  function setMode() {
+    var next = window.innerWidth < GRID_AT;
+    // Stacked, the tiles are as wide as the window and the pile is taller than
+    // it — there is nowhere for them to fall to, so the button goes away with
+    // the board, the same as the dots on the emulator do.
+    gravBtn.hidden = next;
+    if (next === isStatic) { render(); return; }
+    isStatic = next;
+    board.classList.toggle('board--static', isStatic);
+    if (isStatic) {
+      board.style.height = '';
+      readingOrder().forEach(function (id) {
+        var el = els[id];
+        el.style.transform = '';
+        el.style.width = '';
+        el.style.height = '';
+        board.appendChild(el);
+      });
+      requestAnimationFrame(function () { fitEmulator(); });
+    } else {
+      render();
+    }
+    showTug();
+  }
+
+  /* ---------- drag ---------- */
+
+  var drag = null;
+  var moveRaf = 0;              // the one pending drag frame, if any
+  var ptr = { x: 0, y: 0 };     // the latest pointer position it will read
+
+  board.addEventListener('pointerdown', function (e) {
+    if (e.button !== 0) return;
+    if (phys) { grab(e); return; }       // under gravity you grab the tile itself
+    if (isStatic || homing) return;
+    var bar = e.target.closest('.tile__bar');
+    if (!bar || e.target.closest('a, button')) return;
+
+    var el = bar.parentElement;
+    var id = el.dataset.id;
+    if (!els[id]) return;
+
+    var g = geo(pos[id], sizeOf(id), cellPx());
+    drag = {
+      el: el, id: id,
+      sx: e.clientX, sy: e.clientY,
+      left: g.left, top: g.top,
+      w: g.w, h: g.h,
+      base: copy(pos),
+      live: false
+    };
+    bar.setPointerCapture(e.pointerId);
+  });
+
+  board.addEventListener('pointermove', function (e) {
+    if (held) {
+      if (e.pointerId !== held.id) return;
+      held.tx = e.clientX;
+      held.ty = e.clientY;
+      wake();
+      return;
+    }
+    if (!drag) return;
+    ptr.x = e.clientX;
+    ptr.y = e.clientY;
+    if (!moveRaf) moveRaf = requestAnimationFrame(dragFrame);
+  });
+
+  function dragFrame() {
+    moveRaf = 0;
+    if (!drag) return;
+    var dx = ptr.x - drag.sx;
+    var dy = ptr.y - drag.sy;
+
+    if (!drag.live) {
+      if (Math.abs(dx) + Math.abs(dy) < 4) return;   // ignore a twitchy click
+      drag.live = true;
+      retireTug();
+      document.body.classList.add('is-dragging');
+      drag.el.classList.add('is-drag');
+      ph.hidden = false;
+    }
+
+    var cell = cellPx();
+    var left = drag.left + dx;
+    var top  = drag.top + dy;
+    drag.el.style.transform = 'translate3d(' + left + 'px,' + top + 'px,0) scale(1.015)';
+
+    // Every slot the tile could actually land in, scored by how close it is to
+    // where you are holding it. Cells are square, so plain distance is fair.
+    var s = sizeOf(drag.id);
+    var best = null, bestD = Infinity, bestG = null;
+
+    for (var y = 0; y + s <= GH; y++) {
+      for (var x = 0; x + s <= GW; x++) {
+        var cand = tryPlace(drag.id, x, y, drag.base);
+        if (!cand) continue;
+        var g = geo({ x: x, y: y }, s, cell);
+        var d = Math.abs(g.left - left) + Math.abs(g.top - top);
+        if (d < bestD) { bestD = d; best = cand; bestG = g; }
+      }
+    }
+
+    if (best) {
+      pos = best;
+      render(drag.el, cell);
+      ph.style.transform = 'translate3d(' + bestG.left + 'px,' + bestG.top + 'px,0)';
+      ph.style.width = bestG.w + 'px';
+      ph.style.height = bestG.h + 'px';
+    }
+  }
+
+  function endDrag() {
+    if (!drag) return;
+    if (moveRaf) { cancelAnimationFrame(moveRaf); moveRaf = 0; }
+    var el = drag.el, live = drag.live;
+    drag = null;
+    if (!live) return;
+    el.classList.remove('is-drag');
+    document.body.classList.remove('is-dragging');
+    ph.hidden = true;
+    render();
+    save();
+  }
+
+  function letGo(e) {
+    if (held) { if (e.pointerId === held.id) drop(); return; }
+    endDrag();
+  }
+
+  board.addEventListener('pointerup', letGo);
+  board.addEventListener('pointercancel', letGo);
+
+  /* ---------- grow / shrink ---------- */
+
+  // Only one tile is ever big; enlarging a second shrinks the first.
+  function setBig(id) {
+    var was = bigId;
+    bigId = id;
+    if (!id) return true;
+
+    var next = tryPlace(id, pos[id].x, pos[id].y, pos);
+    if (!next) {                       // no room where it stands — find the closest spot
+      var bestD = Infinity;
+      for (var y = 0; y + 2 * SUB <= GH; y++) {
+        for (var x = 0; x + 2 * SUB <= GW; x++) {
+          var cand = tryPlace(id, x, y, pos);
+          if (!cand) continue;
+          var d = Math.abs(x - pos[id].x) + Math.abs(y - pos[id].y);
+          if (d < bestD) { bestD = d; next = cand; }
+        }
+      }
+    }
+    if (!next) { bigId = was; return false; }
+    pos = next;
+    return true;
+  }
+
+  board.addEventListener('click', function (e) {
+    var btn = e.target.closest('.dots');
+    if (!btn || phys) return;
+    retireHint();
+    var id = btn.closest('.tile').dataset.id;
+    if (!setBig(bigId === id ? null : id)) return;
+    syncDots();
+    render();
+    showTug();
+    save();
+  });
+
+  /* ---------- keyboard ---------- */
+
+  var STEP = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+
+  board.addEventListener('keydown', function (e) {
+    if (isStatic || phys || !(e.key in STEP)) return;
+    var bar = e.target.closest('.tile__bar');
+    if (!bar || e.target.closest('button')) return;
+    var id = bar.parentElement.dataset.id;
+    e.preventDefault();
+    var n = e.shiftKey ? SUB : 1;   // half a cell, or a whole one with shift
+    var next = tryPlace(id, pos[id].x + STEP[e.key][0] * n, pos[id].y + STEP[e.key][1] * n, pos);
+    if (!next) return;
+    pos = next;
+    render();
+    save();
+  });
+
+  /* ---------- gravity ---------- */
+
+  // Oriented boxes, sequential impulses, the window for a floor. Small enough
+  // to be a toy, honest enough that a pile of tiles actually settles.
+
+  var GRAV     = 2600;    // px/s²
+  var BOUNCE   = 0.22;    // restitution...
+  var BOUNCE_V = 240;     // ...but only above this closing speed, so piles die
+  var MU       = 0.35;    // friction
+  var ITERS    = 10;      // impulse passes per step
+  var SLOP     = 0.5;     // penetration to tolerate before pushing apart, px
+  var CORRECT  = 0.6;     // ...and the share of the rest to fix each step
+  var HZ       = 1 / 120; // fixed step: the solver wants a steady dt
+  var HOLD_PULL  = 0.3;   // share of the gap to the pointer closed each step
+  var HOLD_FORCE = 26;    // ...but never pulling harder than this many g
+  var HOLD_SPEED = 5000;  // ...nor chasing faster than this, px/s
+
+  var phys   = null;   // the running simulation
+  var homing = null;   // ...or the flight back to the grid
+  var held   = null;   // the tile currently in hand, if any
+  var gravBtn = document.querySelector('.js-gravity');
+
+  function reduced() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  // Mass from area, inertia from the rectangle formula — so the enlarged tile
+  // is genuinely the heavy one and shoulders the others aside on the way down.
+  function makeBody(el, r) {
+    var m = r.width * r.height / 20000;
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    return {
+      el: el,
+      hw: r.width / 2, hh: r.height / 2,
+      x: cx, y: cy, a: 0,
+      lx: cx, ly: cy, la: 0,   // the spot it is being judged still against
+      vx: (Math.random() - 0.5) * 180,
+      vy: 0,
+      va: (Math.random() - 0.5) * 3.2,   // enough spin that the fall reads as a tumble
+      im: 1 / m,
+      ii: 12 / (m * (r.width * r.width + r.height * r.height))
+    };
+  }
+
+  function cornersOf(b) {
+    var c = Math.cos(b.a), s = Math.sin(b.a), out = [];
+    for (var i = 0; i < 4; i++) {
+      var px = (i === 1 || i === 2) ? b.hw : -b.hw;
+      var py = i < 2 ? -b.hh : b.hh;
+      out.push({ x: b.x + px * c - py * s, y: b.y + px * s + py * c });
+    }
+    return out;
+  }
+
+  function contains(b, p) {
+    var c = Math.cos(b.a), s = Math.sin(b.a);
+    var dx = p.x - b.x, dy = p.y - b.y;
+    return Math.abs(dx * c + dy * s) < b.hw && Math.abs(dy * c - dx * s) < b.hh;
+  }
+
+  // Separating-axis test over the four face directions of a pair. Yields the
+  // axis they overlap least along — the cheapest way apart — pointed from b
+  // towards a, or null the moment any axis has them clear of each other.
+  // One normal for the whole pair matters: per-corner normals disagree once a
+  // box is deep inside another, and the solver then shoves it further in.
+  function axisOf(a, b) {
+    var ca = Math.cos(a.a), sa = Math.sin(a.a);
+    var cb = Math.cos(b.a), sb = Math.sin(b.a);
+    var axes = [ca, sa, -sa, ca, cb, sb, -sb, cb];
+    var dx = a.x - b.x, dy = a.y - b.y;
+    var best = Infinity, nx = 0, ny = 0, ra = 0, rb = 0;
+
+    for (var i = 0; i < 8; i += 2) {
+      var ux = axes[i], uy = axes[i + 1];
+      // half-width of each box as seen along this axis
+      var pa = a.hw * Math.abs(ux * ca + uy * sa) + a.hh * Math.abs(uy * ca - ux * sa);
+      var pb = b.hw * Math.abs(ux * cb + uy * sb) + b.hh * Math.abs(uy * cb - ux * sb);
+      var gap = ux * dx + uy * dy;
+      var over = pa + pb - Math.abs(gap);
+      if (over <= 0) return null;
+      if (over < best) {
+        best = over;
+        var f = gap < 0 ? -1 : 1;
+        nx = ux * f; ny = uy * f; ra = pa; rb = pb;
+      }
+    }
+    return { nx: nx, ny: ny, d: best, ra: ra, rb: rb };
+  }
+
+  // Every contact this instant: a point, a normal pointing at whatever has to
+  // be pushed out, and how far in it already is.
+  function contacts(bodies, W, H) {
+    var out = [];
+
+    // One overlap is one distance to undo, however many corners report it.
+    // Only the deepest contact of a group gets to push, or a pair touching
+    // along a whole face would spring apart at several times the right speed.
+    function group(start) {
+      var deep = -1, at = -1;
+      for (var q = start; q < out.length; q++) {
+        out[q].fix = false;
+        if (out[q].d > deep) { deep = out[q].d; at = q; }
+      }
+      if (at >= 0) out[at].fix = true;
+    }
+
+    var WALLS = [[1, 0], [-1, 0], [0, -1]];   // left, right, floor — no ceiling,
+                                             // so a tall heap spills off the top
+
+    for (var i = 0; i < bodies.length; i++) {
+      var A = bodies[i], cs = cornersOf(A), k, p, start;
+
+      for (var w = 0; w < 3; w++) {     // the walls and the floor never move
+        var nx = WALLS[w][0], ny = WALLS[w][1];
+        start = out.length;
+        for (k = 0; k < 4; k++) {
+          p = cs[k];
+          var d = w === 0 ? -p.x : w === 1 ? p.x - W : p.y - H;
+          if (d > 0) out.push({ a: A, b: null, px: p.x, py: p.y, nx: nx, ny: ny, d: d });
+        }
+        group(start);
+      }
+
+      for (var j = i + 1; j < bodies.length; j++) {
+        var B = bodies[j], ax = axisOf(A, B);
+        if (!ax) continue;
+        start = out.length;
+
+        // Boxes meet corner-first, so the corners one has pushed into the other
+        // are the contact points — depth read along the pair's shared normal.
+        var bs = cornersOf(B), found = 0;
+        for (k = 0; k < 4; k++) {
+          p = cs[k];
+          if (!contains(B, p)) continue;
+          out.push({ a: A, b: B, px: p.x, py: p.y, nx: ax.nx, ny: ax.ny,
+            d: Math.max(0, (B.x - p.x) * ax.nx + (B.y - p.y) * ax.ny + ax.rb) });
+          found++;
+        }
+        for (k = 0; k < 4; k++) {
+          p = bs[k];
+          if (!contains(A, p)) continue;
+          out.push({ a: A, b: B, px: p.x, py: p.y, nx: ax.nx, ny: ax.ny,
+            d: Math.max(0, (p.x - A.x) * ax.nx + (p.y - A.y) * ax.ny + ax.ra) });
+          found++;
+        }
+        // crossed edge-on, with no corner in either: one contact between them
+        if (!found) out.push({ a: A, b: B, px: (A.x + B.x) / 2, py: (A.y + B.y) / 2,
+          nx: ax.nx, ny: ax.ny, d: ax.d });
+        group(start);
+      }
+    }
+    return out;
+  }
+
+  var RV = { x: 0, y: 0 };   // scratch, so the solver allocates nothing
+
+  // Velocity of the contact point on A relative to the same spot on B.
+  function relVel(c) {
+    var A = c.a, B = c.b;
+    RV.x = A.vx - A.va * (c.py - A.y);
+    RV.y = A.vy + A.va * (c.px - A.x);
+    if (!B) return;
+    RV.x -= B.vx - B.va * (c.py - B.y);
+    RV.y -= B.vy + B.va * (c.px - B.x);
+  }
+
+  // How hard the pair resists an impulse along an axis, counting the spin each
+  // contact arm would pick up from it.
+  function kMass(c, nx, ny) {
+    var A = c.a, B = c.b;
+    var ra = (c.px - A.x) * ny - (c.py - A.y) * nx;
+    var k = A.im + A.ii * ra * ra;
+    if (B) {
+      var rb = (c.px - B.x) * ny - (c.py - B.y) * nx;
+      k += B.im + B.ii * rb * rb;
+    }
+    return k;
+  }
+
+  function push(c, jx, jy) {
+    var A = c.a, B = c.b;
+    A.vx += A.im * jx;
+    A.vy += A.im * jy;
+    A.va += A.ii * ((c.px - A.x) * jy - (c.py - A.y) * jx);
+    if (!B) return;
+    B.vx -= B.im * jx;
+    B.vy -= B.im * jy;
+    B.va -= B.ii * ((c.px - B.x) * jy - (c.py - B.y) * jx);
+  }
+
+  function solve(c) {
+    relVel(c);
+    var vn = RV.x * c.nx + RV.y * c.ny;
+    if (vn > 0) return;                        // already coming apart
+
+    var kn = kMass(c, c.nx, c.ny);
+    if (kn <= 0) return;
+    var e = -vn > BOUNCE_V ? BOUNCE : 0;       // a settling stack shouldn't hum
+    var jn = -(1 + e) * vn / kn;
+    push(c, jn * c.nx, jn * c.ny);
+
+    relVel(c);                                 // ...then whatever still slides
+    var tx = -c.ny, ty = c.nx;
+    var kt = kMass(c, tx, ty);
+    if (kt <= 0) return;
+    var jt = -(RV.x * tx + RV.y * ty) / kt;
+    var cap = MU * Math.abs(jn);               // Coulomb: friction can't drive
+    if (jt > cap) jt = cap; else if (jt < -cap) jt = -cap;
+    push(c, jt * tx, jt * ty);
+  }
+
+  // Impulses alone leave boxes a little sunk into each other; nudge the rest of
+  // the overlap out afterwards, minus a slop so resting contacts stay put.
+  function separate(c) {
+    if (!c.fix) return;
+    var A = c.a, B = c.b;
+    var k = A.im + (B ? B.im : 0);
+    if (k <= 0) return;
+    var m = Math.max(c.d - SLOP, 0) / k * CORRECT;
+    A.x += c.nx * m * A.im;
+    A.y += c.ny * m * A.im;
+    if (!B) return;
+    B.x -= c.nx * m * B.im;
+    B.y -= c.ny * m * B.im;
+  }
+
+  // Whatever is in hand is pulled towards the pointer by a capped force rather
+  // than moved outright, so it stays an ordinary body: it can shove the others
+  // around, and a wall or a heavy neighbour can refuse to let it through.
+  function hold(g, dt) {
+    var b = g.body;
+    var c = Math.cos(b.a), s = Math.sin(b.a);
+    var rx = g.lx * c - g.ly * s, ry = g.lx * s + g.ly * c;   // the grab arm
+
+    // The speed the held point would need to close on the pointer. Capped, or
+    // outrunning a tile builds an error that keeps growing and flings it away
+    // faster than the hand that threw it.
+    var dvx = (g.tx - (b.x + rx)) / dt * HOLD_PULL;
+    var dvy = (g.ty - (b.y + ry)) / dt * HOLD_PULL;
+    var want = Math.sqrt(dvx * dvx + dvy * dvy);
+    if (want > HOLD_SPEED) { dvx = dvx * HOLD_SPEED / want; dvy = dvy * HOLD_SPEED / want; }
+
+    var vx = dvx - (b.vx - b.va * ry);      // ...less the speed it already has
+    var vy = dvy - (b.vy + b.va * rx);
+
+    // the 2x2 mass of a point on a body that is free to spin about it
+    var k11 = b.im + b.ii * ry * ry;
+    var k12 = -b.ii * rx * ry;
+    var k22 = b.im + b.ii * rx * rx;
+    var det = k11 * k22 - k12 * k12;
+    if (!det) return;
+
+    var jx = (k22 * vx - k12 * vy) / det;
+    var jy = (k11 * vy - k12 * vx) / det;
+
+    var max = HOLD_FORCE * GRAV * dt / b.im;      // ...only ever so hard
+    var mag = Math.sqrt(jx * jx + jy * jy);
+    if (mag > max) { jx = jx * max / mag; jy = jy * max / mag; }
+
+    b.vx += b.im * jx;
+    b.vy += b.im * jy;
+    b.va += b.ii * (rx * jy - ry * jx);
+  }
+
+  function step(bodies, dt, W, H) {
+    var i, b;
+    for (i = 0; i < bodies.length; i++) {
+      b = bodies[i];
+      b.vy += GRAV * dt;
+      b.va *= 0.996;
+    }
+    if (held) hold(held, dt);       // before the contacts, so they still win
+    var cs = contacts(bodies, W, H);
+    for (i = 0; i < ITERS; i++) cs.forEach(solve);
+    for (i = 0; i < bodies.length; i++) {
+      b = bodies[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.a += b.va * dt;
+    }
+    cs.forEach(separate);
+  }
+
+  function paint(bodies) {
+    for (var i = 0; i < bodies.length; i++) {
+      var b = bodies[i];
+      b.el.style.transform = 'translate3d(' + (b.x - b.hw) + 'px,' + (b.y - b.hh) + 'px,0)' +
+        ' rotate(' + b.a + 'rad)';
+    }
+  }
+
+  // Asleep once nothing has strayed from where it was for a while. A resting
+  // contact never sits perfectly still — it hunts around by a fraction of a
+  // pixel forever — so each body is judged against an anchor it only re-pegs
+  // once it has genuinely gone somewhere, rather than frame against frame.
+  function settled(bodies) {
+    var quiet = true;
+    for (var i = 0; i < bodies.length; i++) {
+      var b = bodies[i];
+      if (Math.abs(b.x - b.lx) > 1 || Math.abs(b.y - b.ly) > 1 || Math.abs(b.a - b.la) > 0.008) {
+        b.lx = b.x; b.ly = b.y; b.la = b.a;
+        quiet = false;
+      }
+    }
+    return quiet;
+  }
+
+  function tick(now) {
+    if (!phys) return;
+    var dt = Math.min((now - phys.t) / 1000, 0.05);   // a backgrounded tab shouldn't teleport
+    phys.t = now;
+    phys.acc += dt;
+    while (phys.acc >= HZ) { step(phys.bodies, HZ, phys.W, phys.H); phys.acc -= HZ; }
+    paint(phys.bodies);
+
+    phys.still = settled(phys.bodies) ? phys.still + dt : 0;
+    phys.age += dt;
+    // Stop once the pile has come to rest — or, for the rare arrangement that
+    // never quite does, once it has had long enough that nobody is watching.
+    // Never while a tile is being held, however still it is being held.
+    if (!held && (phys.still > 0.7 || phys.age > 25)) { phys.raf = 0; return; }
+    phys.raf = requestAnimationFrame(tick);
+  }
+
+  function bounds() {
+    phys.W = document.documentElement.clientWidth;
+    phys.H = document.documentElement.clientHeight;
+  }
+
+  function wake() {
+    if (!phys || phys.raf) return;
+    phys.t = performance.now();
+    phys.acc = 0;
+    phys.still = 0;
+    phys.age = 0;
+    phys.raf = requestAnimationFrame(tick);
+  }
+
+  // Back to whatever the grid says, in whichever mode we are in now.
+  function resume() {
+    if ((window.innerWidth < GRID_AT) !== isStatic) { setMode(); return; }
+    if (isStatic) {
+      board.style.height = '';
+      readingOrder().forEach(function (id) { board.appendChild(els[id]); });
+      fitEmulator();
+    } else {
+      render();
+    }
+  }
+
+  function setGravBtn(on) {
+    gravBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    gravBtn.setAttribute('aria-label', on ? 'Put the tiles back' : 'Drop the tiles');
+    gravBtn.title = on ? 'Put the tiles back' : 'Drop the tiles';
+  }
+
+  // Take hold of a tile at the exact spot it was grabbed, in its own frame, so
+  // it hangs and swings from that corner the way a real thing would.
+  function grab(e) {
+    var el = e.target.closest('.tile');
+    if (!el) return;
+    var b = null;
+    for (var i = 0; i < phys.bodies.length; i++) {
+      if (phys.bodies[i].el === el) b = phys.bodies[i];
+    }
+    if (!b) return;
+
+    var c = Math.cos(b.a), s = Math.sin(b.a);
+    var dx = e.clientX - b.x, dy = e.clientY - b.y;
+    held = { body: b, id: e.pointerId, tx: e.clientX, ty: e.clientY,
+             lx: dx * c + dy * s, ly: dy * c - dx * s };
+    b.va *= 0.3;                 // catching it takes most of the spin out
+
+    board.setPointerCapture(e.pointerId);
+    document.body.classList.add('is-holding');
+    el.classList.add('is-held');
+    wake();
+  }
+
+  // Let go and it keeps the speed it had, so a flick throws it.
+  function drop() {
+    if (!held) return;
+    held.body.el.classList.remove('is-held');
+    held = null;
+    document.body.classList.remove('is-holding');
+    wake();
+  }
+
+  function gravityOn() {
+    land();                      // finish any flight still in the air
+    if (phys) return;
+
+    // Measure first: going fixed pulls the tiles out of flow, and in the
+    // stacked layout that would collapse the board underneath them.
+    var rects = TILES.map(function (id) { return els[id].getBoundingClientRect(); });
+    board.style.height = board.getBoundingClientRect().height + 'px';
+    board.classList.add('board--gravity');
+    board.classList.remove('board--hint');
+
+    var bodies = TILES.map(function (id, i) {
+      var el = els[id], r = rects[i];
+      el.style.width = r.width + 'px';
+      el.style.height = r.height + 'px';
+      return makeBody(el, r);
+    });
+
+    phys = { bodies: bodies, t: performance.now(), acc: 0, still: 0, age: 0, raf: 0, W: 0, H: 0 };
+    bounds();
+
+    // A shove out from the middle. The tiles start two deep and so is the heap
+    // they would otherwise fall into, landing everything more or less where it
+    // started; pushed apart, they come down beside each other instead.
+    bodies.forEach(function (b) { b.vx += b.x < phys.W / 2 ? -200 : 200; });
+    paint(bodies);               // same frame, so nothing jumps on the way in
+    phys.raf = requestAnimationFrame(tick);
+    setGravBtn(true);
+    showTug();
+  }
+
+  function gravityOff() {
+    if (!phys) return;
+    drop();
+    if (phys.raf) cancelAnimationFrame(phys.raf);
+    var bodies = phys.bodies;
+    phys = null;
+    setGravBtn(false);
+
+    // Work out where every tile belongs now — laid out, measured, but never
+    // painted there, since all of this happens inside the one task.
+    board.classList.remove('board--gravity');
+    board.style.height = '';
+    bodies.forEach(clearBox);
+    resume();
+    var home = bodies.map(function (b) { return b.el.getBoundingClientRect(); });
+
+    board.classList.toggle('board--hint', !hinted);
+    showTug();
+    if (reduced()) return;       // they are already home; no flight to watch
+
+    // ...then put them back where they fell, and let them fly to it.
+    board.classList.add('board--gravity');
+    bodies.forEach(function (b, i) {
+      b.el.style.width = home[i].width + 'px';
+      b.el.style.height = home[i].height + 'px';
+      b.el.style.transform = 'translate3d(' + (b.x - b.hw) + 'px,' + (b.y - b.hh) + 'px,0)' +
+        ' rotate(' + b.a + 'rad)';
+    });
+
+    var flight = { bodies: bodies, timer: 0 };
+    homing = flight;
+    requestAnimationFrame(function () {
+      if (homing !== flight) return;           // gravity came back on meanwhile
+      board.classList.add('board--gravity-return');
+      requestAnimationFrame(function () {
+        if (homing !== flight) return;
+        bodies.forEach(function (b, i) {
+          b.el.style.transform = 'translate3d(' + home[i].left + 'px,' + home[i].top + 'px,0)';
+        });
+        flight.timer = setTimeout(land, 460);
+      });
+    });
+  }
+
+  function clearBox(b) {
+    b.el.style.transform = '';
+    b.el.style.width = '';
+    b.el.style.height = '';
+  }
+
+  // Hand the tiles back to the grid, whether the flight finished or was cut off.
+  function land() {
+    if (!homing) return;
+    var bodies = homing.bodies;
+    clearTimeout(homing.timer);
+    homing = null;
+    board.classList.remove('board--gravity', 'board--gravity-return');
+    bodies.forEach(clearBox);
+    resume();
+  }
+
+  /* ---------- toolbar ---------- */
+
+  gravBtn.addEventListener('click', function () {
+    if (phys) gravityOff(); else gravityOn();
+  });
+
+  document.querySelector('.js-theme').addEventListener('click', function () {
+    var next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('theme', next); } catch (e) {}
+  });
+
+  document.querySelector('.js-reset').addEventListener('click', function () {
+    pos = copy(HOME);
+    bigId = null;
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    syncDots();
+    if (phys) { gravityOff(); return; }   // flies home to the layout just set
+    land();
+    resume();
+    showTug();
+  });
+
+  /* ---------- go ---------- */
+
+  var raf;
+  window.addEventListener('resize', function () {
+    if (phys) { bounds(); wake(); return; }   // the floor moved, not the layout
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(setMode);
+  });
+
+  if (!hinted) board.classList.add('board--hint');
+  syncDots();
+  setMode();
+  showTug();
+  requestAnimationFrame(function () { board.classList.add('is-ready'); });
+})();
+</script>
+
+</body>
+</html>
