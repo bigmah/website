@@ -399,12 +399,8 @@
     line-height: 1;
   }
 
-  .tagline {
-    margin: 1.35rem 0 0;
-    font-size: 0.68rem;
-    line-height: 1.7;
-    color: var(--faint);
-  }
+  /* what I am up to, sitting under the links in the same tile */
+  .now { margin: 1.3rem 0 0; }
 
   .links {
     margin: 1.05rem 0 0;
@@ -471,11 +467,13 @@
      copy tightens up rather than spilling past the bottom of it */
   @media (max-width: 1400px) {
     .board:not(.board--static) .more p { font-size: 0.7rem; line-height: 1.8; }
+    .board:not(.board--static) .now { font-size: 0.72rem; line-height: 1.8; }
   }
 
   @media (max-width: 1260px) {
     .board:not(.board--static) .more p { font-size: 0.63rem; line-height: 1.75; }
     .board:not(.board--static) .more { margin-top: 0.9rem; padding-top: 0.9rem; }
+    .board:not(.board--static) .now { font-size: 0.68rem; line-height: 1.75; margin-top: 0.95rem; }
   }
 
   @keyframes reveal {
@@ -675,24 +673,12 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.41l-5.8-7.58-6.64 7.58H.46l8.6-9.83L0 1.15h7.59l5.24 6.93 6.07-6.93Zm-1.29 19.5h2.04L6.49 3.24H4.3l13.31 17.41Z"/></svg>
         </a>
       </nav>
-      <p class="tagline">retro preservation<br>static recompilation</p>
+      <p class="now">working on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> — better code review in the browser for github PRs and whatnot</p>
       <div class="more">
         <p class="lead">interested in retro game preservation — emulation, decompilation, porting, and the rest of it. but mostly <em>static recompilation</em>.</p>
         <p>emulation interprets a console's instructions while the game runs. decompilation rebuilds readable source from the original binary, function by function. static recompilation sits between the two — translate the machine code once, ahead of time, into a native binary.</p>
         <p>what comes out runs on the host CPU directly, with no interpreter in the loop. the appeal is preservation: the game's original logic is kept intact while being cut loose from hardware that is quietly disappearing.</p>
-      </div>
-    </div>
-  </article>
-
-  <article class="tile" data-id="now">
-    <header class="tile__bar" tabindex="0" aria-label="now tile — arrow keys nudge it half a cell, shift for a whole one">
-      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
-      <span class="tile__title">now</span>
-    </header>
-    <div class="tile__body">
-      <p>working on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> — better code review in the browser for github PRs and whatnot</p>
-      <!-- placeholder copy — swap in your own -->
-      <div class="more">
+        <!-- placeholder copy — swap in your own -->
         <p>github's review UI is fine on a twenty-line diff and comes apart on a thousand-line one. pullspace is the attempt at something better: read a pull request in the browser with the surrounding code within reach, instead of squinting at hunks in isolation.</p>
       </div>
     </div>
@@ -745,7 +731,7 @@
   var SUB  = 2;        // ...and every cell splits into this many steps, so tiles can sit half-offset
   var GAP  = 14;       // gutter, px
   var GRID_AT = 1150;  // narrower than this the cells get cramped, so we stack
-  var KEY = 'board.v6';
+  var KEY = 'board.v7';
 
   // Everything below counts in steps rather than cells: a small tile is SUB
   // steps square, a big one twice that, and the board is this many across.
@@ -754,15 +740,16 @@
   // somewhere to drop into without giving a whole cell of height up to it.
   var GH = ROWS * SUB + SUB / 2;
 
-  var TILES = ['id', 'now', 'dol', 'gba'];
+  var TILES = ['id', 'dol', 'gba'];
 
   // where everything starts, and what the reset button goes back to: a block in
-  // the middle two columns, leaving one open column either side
+  // the middle two columns, leaving one open column either side. Three tiles
+  // take three corners of it in reading order — bigmah, then the project, then
+  // the emulator — and the fourth corner stays empty for whatever lands there.
   var HOME = {
     id:  { x: 1 * SUB, y: 0 * SUB },
-    now: { x: 2 * SUB, y: 0 * SUB },
-    dol: { x: 1 * SUB, y: 1 * SUB },
-    gba: { x: 2 * SUB, y: 1 * SUB }
+    dol: { x: 2 * SUB, y: 0 * SUB },
+    gba: { x: 1 * SUB, y: 1 * SUB }
   };
 
   var board = document.getElementById('board');
