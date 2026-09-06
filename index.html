@@ -500,16 +500,19 @@
     outline-offset: 4px;
   }
 
-  /* project */
+  /* project — and the llm tile's start panel, which is the same card with a
+     button where the link would be */
 
-  .project {
+  .project,
+  .start {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     text-decoration: none;
   }
 
-  .project svg {
+  .project svg,
+  .start svg {
     width: 24px;
     height: 24px;
     flex: none;
@@ -519,14 +522,16 @@
 
   .project:hover svg { color: var(--cube-hover); }
 
-  .project .name {
+  .project .name,
+  .start .name {
     display: block;
     font-size: 0.78rem;
     color: var(--fg);
     margin-bottom: 0.35rem;
   }
 
-  .project .what {
+  .project .what,
+  .start .what {
     display: block;
     font-size: 0.72rem;
     line-height: 1.75;
@@ -555,6 +560,51 @@
       transform 260ms cubic-bezier(.2,.7,.3,1),
       width 260ms cubic-bezier(.2,.7,.3,1),
       height 260ms cubic-bezier(.2,.7,.3,1);
+  }
+
+  /* llm */
+
+  /* The iframe goes in on load and the page behind it pulls 378 MB of weights
+     from beside it, cached after the first time. The card underneath is the
+     no-script fallback, so it is styled but rarely seen. */
+  .tile--llm .tile__body { background: var(--bg); }
+  .tile--llm:not(.is-live) .tile__body { overflow: auto; }
+
+  .tile--llm iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  .start {
+    align-items: flex-start;
+    padding: 1.05rem 1.1rem;
+  }
+
+  .start .go {
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+    padding: 0.4rem 0.7rem;
+    color: var(--dim);
+    text-decoration: none;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+
+  .start .go:hover,
+  .start .go:focus-visible {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .start .note {
+    display: block;
+    margin-top: -0.15rem;
+    font-size: 0.66rem;
+    line-height: 1.7;
+    color: var(--faint);
   }
 
   /* ---------- gravity ---------- */
@@ -606,11 +656,15 @@
 
   .board--static .tile__bar { cursor: default; }
   .board--static .cells { display: none; }
-  .board--static .tile--gba .dots { display: none; }   /* nothing to reveal */
+  /* nothing to reveal on either of the two that are already whole pages */
+  .board--static .tile--gba .dots,
+  .board--static .tile--llm .dots { display: none; }
   .board--static .ph,
   .board--static::before { display: none; }
-  /* the iframe is absolutely positioned, so the body needs its own height here */
+  /* stacked, the tiles size to their content — an iframe filling one has no
+     height of its own to give, so these two are told what to take */
   .board--static .tile--gba .tile__body { flex: none; height: 480px; }
+  .board--static .tile--llm.is-live .tile__body { flex: none; height: 560px; }
 
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
@@ -625,6 +679,8 @@
   .dots { display: none; }
   .ph { display: none; }
   .tile--gba .tile__body { height: 820px; }
+  /* no script to swap the iframe in, so the button is just the link it already is */
+  .start .go { text-decoration: underline; }
 </style></noscript>
 </head>
 <body>
@@ -720,6 +776,30 @@
       <iframe src="gba.html" title="GBA emulator" loading="lazy" allow="fullscreen; gamepad; autoplay" allowfullscreen></iframe>
     </div>
   </article>
+
+  <article class="tile tile--flush tile--llm" data-id="llm">
+    <header class="tile__bar" tabindex="0" aria-label="local llm tile — arrow keys nudge it half a cell, shift for a whole one">
+      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+      <span class="tile__title">local llm</span>
+      <span class="spacer"></span>
+      <a class="ln" href="llm.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+    </header>
+    <div class="tile__body">
+      <div class="start">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+          <path d="M12 12.6 20.8 17.4 12 22.2 3.2 17.4 12 12.6Z" opacity=".3"/>
+          <path d="M12 7.4 20.8 12.2 12 17 3.2 12.2 12 7.4Z" opacity=".55"/>
+          <path d="M12 2.2 20.8 7 12 11.8 3.2 7 12 2.2Z" opacity=".95"/>
+        </svg>
+        <span>
+          <span class="name">qwen3 0.6B</span>
+          <span class="what">a language model in a page — tokenizer and runtime inlined, weights fetched once from alongside it and cached, answering on your own GPU through WebGPU. nothing is sent anywhere.</span>
+        </span>
+        <a class="go" href="llm.html">load the model — 378 MB</a>
+        <span class="note">loads by itself when script is on. needs webgpu — chrome or edge 113+, safari 26+.</span>
+      </div>
+    </div>
+  </article>
 </div>
 
 <script>
@@ -731,7 +811,7 @@
   var SUB  = 2;        // ...and every cell splits into this many steps, so tiles can sit half-offset
   var GAP  = 14;       // gutter, px
   var GRID_AT = 1150;  // narrower than this the cells get cramped, so we stack
-  var KEY = 'board.v7';
+  var KEY = 'board.v8';
 
   // Everything below counts in steps rather than cells: a small tile is SUB
   // steps square, a big one twice that, and the board is this many across.
@@ -740,16 +820,17 @@
   // somewhere to drop into without giving a whole cell of height up to it.
   var GH = ROWS * SUB + SUB / 2;
 
-  var TILES = ['id', 'dol', 'gba'];
+  var TILES = ['id', 'dol', 'gba', 'llm'];
 
   // where everything starts, and what the reset button goes back to: a block in
-  // the middle two columns, leaving one open column either side. Three tiles
-  // take three corners of it in reading order — bigmah, then the project, then
-  // the emulator — and the fourth corner stays empty for whatever lands there.
+  // the middle two columns, leaving one open column either side. The four tiles
+  // take its four corners in reading order — bigmah, the project, the emulator,
+  // then the model.
   var HOME = {
     id:  { x: 1 * SUB, y: 0 * SUB },
     dol: { x: 2 * SUB, y: 0 * SUB },
-    gba: { x: 1 * SUB, y: 1 * SUB }
+    gba: { x: 1 * SUB, y: 1 * SUB },
+    llm: { x: 2 * SUB, y: 1 * SUB }
   };
 
   var board = document.getElementById('board');
@@ -1260,8 +1341,14 @@
   }
 
   board.addEventListener('click', function (e) {
+    if (phys) return;
+
+    // Without script this link opens the standalone page, which is the honest
+    // fallback; with it, the page comes to the tile instead.
+    if (e.target.closest('.go')) { e.preventDefault(); startLLM(); return; }
+
     var btn = e.target.closest('.dots');
-    if (!btn || phys) return;
+    if (!btn) return;
     retireHint();
     var id = btn.closest('.tile').dataset.id;
     if (!setBig(bigId === id ? null : id)) return;
@@ -1288,6 +1375,33 @@
     render();
     save();
   });
+
+  /* ---------- the model ---------- */
+
+  // Built on load, so llm.html starts fetching weights.gguf beside it without
+  // being asked for it. The 378 MB is paid once and once only: llm.html keeps
+  // the checkpoint in the Cache API, so every later visit opens it off disk.
+  // The .start panel in the markup is what shows when script never runs — its
+  // link hands the visitor the standalone page instead.
+  function startLLM() {
+    var tile = els.llm;
+    if (tile.classList.contains('is-live')) return;
+    tile.classList.add('is-live');
+
+    var frame = document.createElement('iframe');
+    frame.title = 'llmoxide — an LLM in the browser';
+    frame.src = 'llm.html';
+    tile.querySelector('.tile__body').replaceChildren(frame);
+  }
+
+  // It themes itself from the same saved key on the way in, but by the time the
+  // toggle is hit it is already open — so hand the change straight to it.
+  function pushTheme(theme) {
+    var frame = els.llm.querySelector('iframe');
+    // '*' rather than the origin: on file:// there isn't one to name, and the
+    // page on the other end checks the sender before it listens.
+    if (frame && frame.contentWindow) frame.contentWindow.postMessage({ theme: theme }, '*');
+  }
 
   /* ---------- gravity ---------- */
 
@@ -1779,6 +1893,7 @@
     var next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem('theme', next); } catch (e) {}
+    pushTheme(next);
   });
 
   document.querySelector('.js-reset').addEventListener('click', function () {
@@ -1806,6 +1921,7 @@
   setMode();
   showTug();
   requestAnimationFrame(function () { board.classList.add('is-ready'); });
+  startLLM();
 })();
 </script>
 
