@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Serve this folder over HTTP, which llm.html needs and file:// cannot give.
+"""Serve this folder over HTTP, which index.html needs and file:// cannot give.
 
     ./serve.py [port]        # default 8765
 
-Nothing here wants a real web server. llm.html fetches the checkpoint whole
+Nothing here wants a real web server. The page fetches the checkpoint whole
 rather than by ranges, and it runs no threads and touches no SharedArrayBuffer,
 so there is no Range support and no COOP/COEP to arrange. What it does want is
 an origin: opened as a file://, the page gets an opaque one and Chrome then
@@ -39,14 +39,14 @@ def main() -> int:
     # here rather than let the page report a 404 as a failed download.
     if not WEIGHTS.exists():
         print(
-            "no weights.gguf here, so llm.html will have nothing to load.\n"
+            "no weights.gguf here, so the llm tile will have nothing to load.\n"
             "  cp ~/dev/llmoxide/models/Qwen3-0.6B-Q4_K_M.gguf weights.gguf\n",
             flush=True,
         )
 
     # Threading matters more than it looks: the model is one long response, and
-    # a single-threaded server would sit on it while index.html waits for the
-    # rest of the page.
+    # a single-threaded server would sit on it while the emulator in the tile
+    # above is still waiting for its rom.
     class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
         daemon_threads = True
         allow_reuse_address = True
@@ -62,8 +62,8 @@ def main() -> int:
     # banner that appears only once the server is killed is worse than none.
     print(
         f"serving {HERE} at http://localhost:{port}/\n"
-        f"  board          http://localhost:{port}/\n"
-        f"  llm on its own http://localhost:{port}/llm.html\n"
+        f"  board http://localhost:{port}/\n"
+        "  the emulator and the llm are folded into it — both open from their tiles\n"
         "ctrl-c to stop",
         flush=True,
     )
