@@ -1557,6 +1557,9 @@ const MODEL_URL = new URLSearchParams(location.search).get("model")
 /* Above this, skip the Cache API: storing a second copy of a multi-gigabyte
    checkpoint is worse than re-reading it, and quota rejections are silent. */
 const CACHE_LIMIT = 2e9;
+/* Two places look in it now — one to read the checkpoint, one to find out
+   whether the button is about to spend the network or the disk. */
+const CACHE_NAME = "llmoxide-models";
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status"), loader = $("loader"), log = $("log");
@@ -1649,8 +1652,8 @@ function wasmBytes() {
   }
 
   // No model in the page, so the checkpoint is the file sitting next to it.
-  // Start on it without being asked: MODEL_URL is relative, so this is
-  // whatever `weights.gguf` is in the same directory as the page.
+  // MODEL_URL is relative, so this is whatever `weights.gguf` is in the same
+  // directory as the page.
   //
   // Except when that resolves to a file:// URL, where it cannot work. A page
   // opened straight off disk gets an opaque origin, and Chrome then refuses
@@ -1669,8 +1672,55 @@ function wasmBytes() {
       + "will load it on its own.";
     return;
   }
-  fetchAndOpen();
+
+  await offerModel();
 })();
+
+/** Put the download behind a click, and say which kind of click it is.
+ *
+ *  This page used to fetch on boot. That is a defensible default for a page
+ *  someone navigated to on purpose and a bad one framed in the board, where it
+ *  made every visit a 378 MB visit for a tile that might never be opened. So
+ *  the bytes wait to be asked for.
+ *
+ *  Worth getting the label right rather than always saying "download". A
+ *  checkpoint already in the Cache API is a disk read, and telling someone
+ *  they are about to spend a third of a gigabyte of a metered connection when
+ *  they are not is its own kind of wrong. The lookup is local and cheap, so
+ *  the answer is known before the offer is made — and nothing has touched the
+ *  network by the time the button is sitting there. */
+async function offerModel() {
+  const name = MODEL_URL.replace("./", "");
+
+  if (await isCached(MODEL_URL)) {
+    $("get").textContent = "load model";
+    $("lead").textContent = `${name} is already cached here.`;
+    $("sub").textContent = "read back off your disk rather than the network, "
+      + "then into GPU memory. it is never uploaded anywhere.";
+  } else {
+    $("get").textContent = `download ${name}`;
+    $("lead").textContent = "load a model to start.";
+    $("sub").textContent = "one download, kept for next time — or read a file "
+      + "straight off your disk instead. either way it goes into GPU memory "
+      + "and is never uploaded anywhere.";
+  }
+
+  // ?go — the board's llm tile only mounts this page once its own card has
+  // been clicked, so the answer is already in. Asking twice for one yes is
+  // just friction.
+  if (new URLSearchParams(location.search).has("go")) fetchAndOpen();
+}
+
+/** Whether `url` is in the Cache API already, without reading it back out.
+ *  Best-effort in both directions: there is no `caches` outside a secure
+ *  context, and a lookup that throws is answered as a miss — which costs a
+ *  wrong label at worst, never a wrong load. */
+async function isCached(url) {
+  try {
+    const store = await caches.open(CACHE_NAME);
+    return !!(await store.match(url));
+  } catch { return false; }
+}
 
 /* -- getting the bytes --------------------------------------------------- */
 
@@ -1709,7 +1759,7 @@ async function blobFromUrl(url, onProgress) {
   // `caches` is undefined outside a secure context — file:// among them — so
   // this is a best-effort fast path, never a requirement.
   let store = null;
-  try { store = await caches.open("llmoxide-models"); } catch { /* no cache */ }
+  try { store = await caches.open(CACHE_NAME); } catch { /* no cache */ }
 
   if (store) {
     const hit = await store.match(url).catch(() => null);
@@ -1743,8 +1793,9 @@ async function blobFromUrl(url, onProgress) {
 
 $("get").onclick = fetchAndOpen;
 
-/** Fetch MODEL_URL and hand it to `open`. Called on boot, and again by the
- *  button if that first attempt failed. */
+/** Fetch MODEL_URL and hand it to `open`. Reached from the button, or
+ *  straight away when ?go says the board already asked on this page's
+ *  behalf — and again from the button if that first attempt failed. */
 async function fetchAndOpen() {
   $("get").disabled = true; $("pick").disabled = true;
   bar.style.display = "block";

@@ -564,9 +564,9 @@
 
   /* llm */
 
-  /* The iframe goes in on load and the page behind it pulls 378 MB of weights
-     from beside it, cached after the first time. The card underneath is the
-     no-script fallback, so it is styled but rarely seen. */
+  /* The card is what sits here until someone asks for the model; the iframe
+     replaces it on the click, and the page behind it then pulls 378 MB of
+     weights from beside this one, cached after the first time. */
   .tile--llm .tile__body { background: var(--panel); }
   .tile--llm:not(.is-live) .tile__body { overflow: auto; }
 
@@ -796,7 +796,7 @@
           <span class="what">a language model in a page — tokenizer and runtime inlined, weights fetched once from alongside it and cached, answering on your own GPU through WebGPU. nothing is sent anywhere.</span>
         </span>
         <a class="go" href="llm.html">load the model — 378 MB</a>
-        <span class="note">loads by itself when script is on. needs webgpu — chrome or edge 113+, safari 26+.</span>
+        <span class="note">nothing is fetched until this is clicked. needs webgpu — chrome or edge 113+, safari 26+.</span>
       </div>
     </div>
   </article>
@@ -1378,11 +1378,15 @@
 
   /* ---------- the model ---------- */
 
-  // Built on load, so llm.html starts fetching weights.gguf beside it without
-  // being asked for it. The 378 MB is paid once and once only: llm.html keeps
-  // the checkpoint in the Cache API, so every later visit opens it off disk.
-  // The .start panel in the markup is what shows when script never runs — its
-  // link hands the visitor the standalone page instead.
+  // Waits to be asked. This used to run on load, which meant opening the board
+  // at all put 378 MB on the wire — most of a page view spent on a tile nobody
+  // had touched. The .start panel in the markup is the resting state now: it
+  // says what the thing is and what it costs, and its link is what carries the
+  // visitor to the standalone page when script never runs.
+  //
+  // ?go because the asking already happened here. Landing on llm.html directly
+  // is its own decision and gets its own button; arriving through this click
+  // should not ask twice for the same yes.
   function startLLM() {
     var tile = els.llm;
     if (tile.classList.contains('is-live')) return;
@@ -1390,7 +1394,7 @@
 
     var frame = document.createElement('iframe');
     frame.title = 'llmoxide — an LLM in the browser';
-    frame.src = 'llm.html';
+    frame.src = 'llm.html?go=1';
     tile.querySelector('.tile__body').replaceChildren(frame);
   }
 
@@ -1921,7 +1925,6 @@
   setMode();
   showTug();
   requestAnimationFrame(function () { board.classList.add('is-ready'); });
-  startLLM();
 })();
 </script>
 
