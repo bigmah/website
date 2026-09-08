@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Serve this folder over HTTP, which index.html needs and file:// cannot give.
+"""Serve this folder over HTTP, which llm.html needs and file:// cannot give.
 
     ./serve.py                  # http://localhost:8765, for working on the page
     ./serve.py 8765 --bind ''   # every interface, for a proxy on another host
     ./serve.py 443 --cert fullchain.pem --key privkey.pem   # https, unproxied
 
-Nothing here wants a real web server. The page fetches the checkpoint whole
+Nothing here wants a real web server. llm.html fetches the checkpoint whole
 rather than by ranges, and it runs no threads and touches no SharedArrayBuffer,
 so there is no Range support and no COOP/COEP to arrange. What it does want is
 an origin: opened as a file://, the page gets an opaque one and Chrome then
@@ -109,10 +109,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if any(part.startswith(".") for part in parts):
             return self.not_found()
 
-        # The page is the thing that changes; the two files beside it do not,
-        # and a CDN holding them for a day is most of the reason to have one.
-        # Revalidating the html costs nearly nothing — it comes back 304 on the
-        # Last-Modified this already sends.
+        # The pages are what change; the rom and the checkpoint beside them do
+        # not, and a CDN holding those for a day is most of the reason to have
+        # one. Revalidating the html costs nearly nothing — it comes back 304 on
+        # the Last-Modified this already sends.
         self._cache_control = (
             "public, max-age=86400"
             if target.suffix.lower() in (".gguf", ".gba")
@@ -294,7 +294,7 @@ def main() -> int:
     # here rather than let the page report a 404 as a failed download.
     if not WEIGHTS.exists():
         print(
-            "no weights.gguf here, so the llm tile will have nothing to load.\n"
+            "no weights.gguf here, so llm.html will have nothing to load.\n"
             "  cp ~/dev/llmoxide/models/Qwen3-0.6B-Q4_K_M.gguf weights.gguf\n",
             flush=True,
         )
@@ -323,8 +323,8 @@ def main() -> int:
     print(
         f"serving {HERE} at {scheme}://{reachable}:{args.port}/\n"
         f"  listening on {', '.join(show(a, args.port) for a in seen_addrs)}\n"
-        "  the emulator and the llm are folded into the board — both open from "
-        "their tiles",
+        f"  on their own {scheme}://{reachable}:{args.port}/gba.html"
+        f" and /llm.html",
         flush=True,
     )
     if public and context is None:

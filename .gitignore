@@ -1,4 +1,4 @@
-# The checkpoint the llm tile fetches from beside the page. 378 MB — over
+# The checkpoint llm.html fetches from beside it. 378 MB — over
 # GitHub's 100 MB hard limit, so it is copied to the host out-of-band rather
 # than committed. Rebuild it with:
 #   cp ~/dev/llmoxide/models/Qwen3-0.6B-Q4_K_M.gguf weights.gguf
