@@ -596,7 +596,27 @@ if (ENVIRONMENT_IS_PTHREAD) {
       var msgData = e.data;
       //dbg('msgData: ' + Object.keys(msgData));
       var cmd = msgData.cmd;
-      if (cmd == 1) { // Preload command that is called once per worker to parse and load the Emscripten code.
+      if (cmd == 'bod-pause') {
+        // Bike or Die runs in a pthread. Keep its event loop alive while its
+        // scheduler is stopped so that the page can resume it later.
+        if (MainLoop.func && MainLoop.scheduler) {
+          MainLoop.scheduler = null;
+          MainLoop.currentlyRunningMainloop++;
+          self.bodMainLoopPaused = true;
+        }
+      } else if (cmd == 'bod-resume') {
+        if (self.bodMainLoopPaused) {
+          self.bodMainLoopPaused = false;
+          // A short-lived helper loop can finish after it was paused. Only
+          // restart a loop that is still alive; the game loop remains so.
+          if (MainLoop.func) {
+            MainLoop.resume();
+            // resume() adds a keepalive reference when it recreates the
+            // scheduler. The pause path intentionally left the original one.
+            runtimeKeepalivePop();
+          }
+        }
+      } else if (cmd == 1) { // Preload command that is called once per worker to parse and load the Emscripten code.
 
         // Until we initialize the runtime, queue up any further incoming messages.
         let messageQueue = [];
@@ -8664,6 +8684,12 @@ PThread.init();;
       Module['requestAnimationFrame'] = MainLoop.requestAnimationFrame;
       Module['pauseMainLoop'] = MainLoop.pause;
       Module['resumeMainLoop'] = MainLoop.resume;
+      Module['pauseBikeOrDie'] = () => {
+        Object.values(PThread.pthreads).forEach((worker) => worker.postMessage({ cmd: 'bod-pause' }));
+      };
+      Module['resumeBikeOrDie'] = () => {
+        Object.values(PThread.pthreads).forEach((worker) => worker.postMessage({ cmd: 'bod-resume' }));
+      };
       MainLoop.init();;
 for (let i = 0; i < 32; ++i) tempFixedLengthArray.push(new Array(i));;
 var miniTempWebGLFloatBuffersStorage = new Float32Array(288);
@@ -9655,4 +9681,3 @@ createWasm().then(() => run());
 }
 
 // end include: postamble.js
-
