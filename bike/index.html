@@ -138,7 +138,7 @@
       if (paused) {
         Module.pauseBikeOrDie();
         var sdl = Module.SDL2, ctx = sdl && sdl.audioContext;
-        if (ctx && ctx.state === 'running' && ctx.suspend) ctx.suspend();
+        if (ctx && ctx.state !== 'closed' && ctx.suspend) ctx.suspend();
       } else {
         Module.resumeBikeOrDie();
         bodResumeAudio();
