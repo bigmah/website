@@ -137,13 +137,11 @@
       bodPaused = paused;
       if (paused) {
         Module.pauseBikeOrDie();
-        var sdl = Module.SDL2, ctx = sdl && sdl.audioContext;
-        if (ctx && ctx.state !== 'closed' && ctx.suspend) ctx.suspend();
       } else {
         Module.resumeBikeOrDie();
-        bodResumeAudio();
         canvas.focus();
       }
+      bodSyncAudio();
       pauseButton.textContent = paused ? 'Resume' : 'Pause';
       pauseButton.title = paused ? 'Resume game' : 'Pause game';
       pauseButton.setAttribute('aria-pressed', paused ? 'true' : 'false');
@@ -358,20 +356,24 @@
     // Safari parks an AudioContext in "interrupted" -- not the "suspended"
     // that SDL's own autoplay recovery looks for, so neither its resume-on-
     // gesture handler nor its silence fallback ever fires, and the game plays
-    // to a device that is not listening. Resume it from any gesture, and keep
-    // the listeners: the audio session goes away again whenever another
-    // application wants it, or the tab is hidden.
-    function bodResumeAudio() {
+    // to a device that is not listening. Keep it synchronized from gestures
+    // and state changes, without letting that recovery undo an explicit game
+    // pause. The audio session can go away again whenever another application
+    // wants it, or the tab is hidden.
+    function bodSyncAudio() {
       var sdl = window.Module && Module.SDL2, ctx = sdl && sdl.audioContext;
-      if (ctx && ctx.state !== 'running' && ctx.resume) {
+      if (!ctx || ctx.state === 'closed') return;
+      if (bodPaused && ctx.state !== 'suspended' && ctx.suspend) {
+        ctx.suspend().catch(function () { /* the next state change will retry */ });
+      } else if (!bodPaused && ctx.state !== 'running' && ctx.resume) {
         ctx.resume().catch(function () { /* not in a gesture; the next one will */ });
       }
     }
     ['pointerdown', 'mousedown', 'keydown', 'touchstart'].forEach(function (type) {
-      window.addEventListener(type, bodResumeAudio, { capture: true });
+      window.addEventListener(type, bodSyncAudio, { capture: true });
     });
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) bodResumeAudio();
+      if (!document.hidden) bodSyncAudio();
     });
     // The context does not exist until the game opens the device, a second or
     // two after the page loads; watch for it, then let it say when it stops.
@@ -379,8 +381,8 @@
       var sdl = window.Module && Module.SDL2;
       if (!sdl || !sdl.audioContext) return;
       clearInterval(bodAudioWatch);
-      sdl.audioContext.onstatechange = bodResumeAudio;
-      bodResumeAudio();
+      sdl.audioContext.onstatechange = bodSyncAudio;
+      bodSyncAudio();
     }, 500);
 
     function dropHandler(ev) {
