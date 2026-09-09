@@ -577,6 +577,31 @@
     border: 0;
   }
 
+  /* bike or die 2 */
+
+  /* Gated the same way the model is: the card sits here saying what it is and
+     what it costs, and the game replaces it on the click. */
+  .tile--bike .tile__body { position: relative; }
+  .tile--bike:not(.is-live) .tile__body { background: var(--panel); overflow: auto; }
+  .tile--bike.is-live .tile__body { background: #14161a; }
+
+  /* Same treatment as the emulator: laid out at a fixed size and scaled into
+     whatever square it is sitting in, rather than reflowed. */
+  .tile--bike iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    transform-origin: 0 0;
+    transition:
+      transform 260ms cubic-bezier(.2,.7,.3,1),
+      width 260ms cubic-bezier(.2,.7,.3,1),
+      height 260ms cubic-bezier(.2,.7,.3,1);
+  }
+
   .start {
     align-items: flex-start;
     padding: 1.05rem 1.1rem;
@@ -656,15 +681,19 @@
 
   .board--static .tile__bar { cursor: default; }
   .board--static .cells { display: none; }
-  /* nothing to reveal on either of the two that are already whole pages */
+  /* nothing to reveal on the three that are already whole pages */
   .board--static .tile--gba .dots,
-  .board--static .tile--llm .dots { display: none; }
+  .board--static .tile--llm .dots,
+  .board--static .tile--bike .dots { display: none; }
   .board--static .ph,
   .board--static::before { display: none; }
   /* stacked, the tiles size to their content — an iframe filling one has no
-     height of its own to give, so these two are told what to take */
+     height of its own to give, so these are told what to take. The two that
+     are scaled rather than reflowed get their real height from the script;
+     what is here is what they fall back to until it has run. */
   .board--static .tile--gba .tile__body { flex: none; height: 480px; }
   .board--static .tile--llm.is-live .tile__body { flex: none; height: 560px; }
+  .board--static .tile--bike.is-live .tile__body { flex: none; height: 700px; }
 
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
@@ -800,6 +829,32 @@
       </div>
     </div>
   </article>
+
+  <article class="tile tile--flush tile--bike" data-id="bike">
+    <header class="tile__bar" tabindex="0" aria-label="bike or die 2 tile — arrow keys nudge it half a cell, shift for a whole one">
+      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+      <span class="tile__title">bike or die 2</span>
+      <span class="spacer"></span>
+      <a class="ln" href="bike/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+    </header>
+    <div class="tile__body">
+      <div class="start">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="5.6" cy="16.4" r="4.1" opacity=".95"/>
+          <circle cx="18.4" cy="16.4" r="4.1" opacity=".5"/>
+          <path d="M5.6 16.4h5.8L9 9 5.6 16.4M9 9h6.4l-4 7.4M15.4 9l3 7.4" opacity=".95"/>
+          <path d="M8.1 8.2h1.9" opacity=".95"/>
+        </svg>
+        <span>
+          <span class="name">bike or die 2</span>
+          <span class="what">toyspring's palm os physics game, 2008 — statically recompiled. the original 68k and arm code was translated to webassembly ahead of time, and runs here on pumpkinos.</span>
+        </span>
+        <a class="go" href="bike/">load the game — 37 MB</a>
+        <span class="note">nothing is fetched until this is clicked. progress and level packs are kept in this browser.</span>
+      </div>
+    </div>
+  </article>
 </div>
 
 <script>
@@ -811,7 +866,7 @@
   var SUB  = 2;        // ...and every cell splits into this many steps, so tiles can sit half-offset
   var GAP  = 14;       // gutter, px
   var GRID_AT = 1150;  // narrower than this the cells get cramped, so we stack
-  var KEY = 'board.v8';
+  var KEY = 'board.v9';
 
   // Everything below counts in steps rather than cells: a small tile is SUB
   // steps square, a big one twice that, and the board is this many across.
@@ -820,17 +875,20 @@
   // somewhere to drop into without giving a whole cell of height up to it.
   var GH = ROWS * SUB + SUB / 2;
 
-  var TILES = ['id', 'dol', 'gba', 'llm'];
+  var TILES = ['id', 'dol', 'gba', 'llm', 'bike'];
 
-  // where everything starts, and what the reset button goes back to: a block in
-  // the middle two columns, leaving one open column either side. The four tiles
-  // take its four corners in reading order — bigmah, the project, the emulator,
-  // then the model.
+  // where everything starts, and what the reset button goes back to: three
+  // across and two centred beneath them, in reading order — bigmah, the
+  // project and the emulator, then the model and the game. Five into four
+  // columns does not divide, so the block sits half a cell over and leaves
+  // half a column either side; the grid counts in half-cells anyway, which is
+  // what makes that an ordinary position rather than a special case.
   var HOME = {
-    id:  { x: 1 * SUB, y: 0 * SUB },
-    dol: { x: 2 * SUB, y: 0 * SUB },
-    gba: { x: 1 * SUB, y: 1 * SUB },
-    llm: { x: 2 * SUB, y: 1 * SUB }
+    id:   { x: 1, y: 0 },
+    dol:  { x: 3, y: 0 },
+    gba:  { x: 5, y: 0 },
+    llm:  { x: 2, y: 1 * SUB },
+    bike: { x: 4, y: 1 * SUB }
   };
 
   var board = document.getElementById('board');
@@ -1149,8 +1207,43 @@
     frame.style.transform = 'translateX(' + inset + 'px) scale(' + scale + ')';
   }
 
+  // The game's page lays itself out at one of two sizes — the wide one above
+  // 700px and the phone one below it — and the wide one is the better bargain
+  // in a tile whichever way you cut it: its canvas is 640 of 892px of page
+  // against the other's 320 of 677, and a square tile runs out of height long
+  // before it runs out of width. So it is laid out wide whatever the box and
+  // scaled down into it, the same trick the emulator above is played.
+  var BIKE_W = 704;
+  var BIKE_H = 892;
+
+  function fitBike(w, h) {
+    var el = els.bike;
+    var frame = el && el.querySelector('iframe');
+    if (!frame) return;                  // still the card; nothing to scale
+    var body = el.querySelector('.tile__body');
+
+    if (isStatic) {
+      // Stacked there is no height to fit into — the tile is told to be as
+      // tall as the scaled page instead.
+      w = body.clientWidth;
+      h = Math.round(BIKE_H * Math.min(1, w / BIKE_W));
+      body.style.height = h + 'px';
+    } else {
+      body.style.height = '';
+    }
+
+    // Whole, and centred in whatever is left over: the page is a fixed size,
+    // so the slack is real, and the tile body behind it is the same colour.
+    var scale = Math.min(1, w / BIKE_W, h / BIKE_H);
+    frame.style.width = BIKE_W + 'px';
+    frame.style.height = BIKE_H + 'px';
+    frame.style.transform =
+      'translate(' + ((w - BIKE_W * scale) / 2) + 'px,' +
+                     ((h - BIKE_H * scale) / 2) + 'px) scale(' + scale + ')';
+  }
+
   function render(skip, cell) {
-    if (isStatic) { fitEmulator(); return; }
+    if (isStatic) { fitEmulator(); fitBike(); return; }
     if (cell === undefined) cell = cellPx();
     drawCells(cell);
 
@@ -1163,10 +1256,12 @@
     // that would have followed the last one.
     board.style.height = (GH * (cell + GAP) / SUB - GAP) + 'px';
 
-    if (!drag) {                       // the emulator only resizes outside a drag
-      var g = geo(pos.gba, sizeOf('gba'), cell);
+    if (!drag) {                       // the framed pages only resize outside a drag
       var bar = els.gba.querySelector('.tile__bar').offsetHeight;
+      var g = geo(pos.gba, sizeOf('gba'), cell);
       fitEmulator(g.w - 2, g.h - 2 - bar);   // minus the tile border and title bar
+      g = geo(pos.bike, sizeOf('bike'), cell);
+      fitBike(g.w - 2, g.h - 2 - bar);
     }
   }
 
@@ -1200,7 +1295,7 @@
         el.style.height = '';
         board.appendChild(el);
       });
-      requestAnimationFrame(function () { fitEmulator(); });
+      requestAnimationFrame(function () { fitEmulator(); fitBike(); });
     } else {
       render();
     }
@@ -1343,9 +1438,10 @@
   board.addEventListener('click', function (e) {
     if (phys) return;
 
-    // Without script this link opens the standalone page, which is the honest
-    // fallback; with it, the page comes to the tile instead.
-    if (e.target.closest('.go')) { e.preventDefault(); startLLM(); return; }
+    // Without script these links open the standalone page, which is the
+    // honest fallback; with it, the page comes to the tile instead.
+    var go = e.target.closest('.go');
+    if (go) { e.preventDefault(); startTile(go.closest('.tile').dataset.id); return; }
 
     var btn = e.target.closest('.dots');
     if (!btn) return;
@@ -1376,26 +1472,37 @@
     save();
   });
 
-  /* ---------- the model ---------- */
+  /* ---------- the two that wait to be asked ---------- */
 
-  // Waits to be asked. This used to run on load, which meant opening the board
-  // at all put 378 MB on the wire — most of a page view spent on a tile nobody
-  // had touched. The .start panel in the markup is the resting state now: it
-  // says what the thing is and what it costs, and its link is what carries the
+  // The model used to load on sight, which meant opening the board at all put
+  // 378 MB on the wire — most of a page view spent on a tile nobody had
+  // touched. The game is 37 MB and would be the same bargain on a worse day.
+  // The .start panel in the markup is the resting state for both now: it says
+  // what the thing is and what it costs, and its link is what carries the
   // visitor to the standalone page when script never runs.
   //
-  // ?go because the asking already happened here. Landing on llm.html directly
-  // is its own decision and gets its own button; arriving through this click
-  // should not ask twice for the same yes.
-  function startLLM() {
-    var tile = els.llm;
-    if (tile.classList.contains('is-live')) return;
+  // ?go on the model because the asking already happened here. Landing on
+  // llm.html directly is its own decision and gets its own button; arriving
+  // through this click should not ask twice for the same yes. The game has no
+  // such gate of its own — it starts when its page opens, whichever way you
+  // arrive at it.
+  var GATED = {
+    llm:  { src: 'llm.html?go=1', title: 'llmoxide — an LLM in the browser' },
+    bike: { src: 'bike/', title: 'Bike or Die 2 — recompiled to WebAssembly',
+            allow: 'fullscreen; gamepad; autoplay' }
+  };
+
+  function startTile(id) {
+    var tile = els[id], spec = GATED[id];
+    if (!spec || tile.classList.contains('is-live')) return;
     tile.classList.add('is-live');
 
     var frame = document.createElement('iframe');
-    frame.title = 'llmoxide — an LLM in the browser';
-    frame.src = 'llm.html?go=1';
+    frame.title = spec.title;
+    if (spec.allow) frame.setAttribute('allow', spec.allow);
+    frame.src = spec.src;
     tile.querySelector('.tile__body').replaceChildren(frame);
+    render();          // the game is scaled to its box, and now it has one
   }
 
   // It themes itself from the same saved key on the way in, but by the time the

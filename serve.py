@@ -5,11 +5,20 @@
     ./serve.py 8765 --bind ''   # every interface, for a proxy on another host
     ./serve.py 443 --cert fullchain.pem --key privkey.pem   # https, unproxied
 
-Nothing here wants a real web server. llm.html fetches the checkpoint whole
-rather than by ranges, and it runs no threads and touches no SharedArrayBuffer,
-so there is no Range support and no COOP/COEP to arrange. What it does want is
-an origin: opened as a file://, the page gets an opaque one and Chrome then
-refuses to let it read weights.gguf sitting right beside it.
+Nothing here wants a real web server. Neither page fetches by ranges, so there
+is no Range support to arrange. What they want is an origin: opened as a
+file://, a page gets an opaque one and Chrome then refuses to let it read the
+weights.gguf or the .wasm sitting right beside it.
+
+The one header pair that is not optional is COOP/COEP, and bike/ is why. That
+folder is tools/make_web.sh's output from the bike_or_die tree, copied in
+whole; refresh it by running that script and copying build/web over it. The
+recompiled game inside it runs on PumpkinOS's threads, and the SharedArrayBuffer they
+share is only handed to a cross-origin isolated page. Isolation is inherited
+rather than claimed, so it is not enough to send the headers with bike/ alone:
+index.html frames it, and a frame inside a page that is not isolated is not
+isolated either. They go on everything. Nothing served here loads a
+cross-origin subresource, so require-corp costs the other two pages nothing.
 
 Putting it on the public internet is the other reason to run it, and https is
 not optional there. The Cache API the page keeps the 378 MB checkpoint in is a
@@ -43,7 +52,12 @@ Behind nginx, the settings that matter for a 378 MB response:
 Caddy wants none of that; `reverse_proxy 127.0.0.1:8765` already streams. What
 both need is gzip left off for .gguf and .gba: the weights are quantised
 already, so compressing them burns cpu to make them bigger, and a compressed
-response drops the Content-Length that the page's progress bar reads.
+response drops the Content-Length that the page's progress bar reads. The
+.wasm is the other way round -- 30 MB of it compresses to well under a third,
+and it is worth turning gzip on for that type if the proxy has it off.
+
+A proxy also has to pass COOP/COEP through, or send them itself. Dropped, the
+game gets no SharedArrayBuffer and stops at a blank canvas.
 """
 
 import argparse
@@ -113,6 +127,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # not, and a CDN holding those for a day is most of the reason to have
         # one. Revalidating the html costs nearly nothing — it comes back 304 on
         # the Last-Modified this already sends.
+        #
+        # bike/'s .wasm and .data are big but they are build products, and a
+        # rebuild would leave a browser holding yesterday's 30 MB against a
+        # fresh page for a day. They revalidate like the html instead: a 304
+        # apiece on a repeat visit, and the whole thing again only when it has
+        # really changed.
         self._cache_control = (
             "public, max-age=86400"
             if target.suffix.lower() in (".gguf", ".gba")
@@ -133,6 +153,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # Every Content-Type here is right, so there is no reason to let a
         # browser guess a different one.
         self.send_header("X-Content-Type-Options", "nosniff")
+        # Cross-origin isolation, for the threads bike/ runs on. On every
+        # response rather than just that one: see the note at the top.
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
         if self._cache_control:
             self.send_header("Cache-Control", self._cache_control)
         super().end_headers()
@@ -323,8 +347,8 @@ def main() -> int:
     print(
         f"serving {HERE} at {scheme}://{reachable}:{args.port}/\n"
         f"  listening on {', '.join(show(a, args.port) for a in seen_addrs)}\n"
-        f"  on their own {scheme}://{reachable}:{args.port}/gba.html"
-        f" and /llm.html",
+        f"  on their own {scheme}://{reachable}:{args.port}/gba.html,"
+        f" /llm.html and /bike/",
         flush=True,
     )
     if public and context is None:

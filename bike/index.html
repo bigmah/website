@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bike or Die 2</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0; background: #14161a; color: #c9ced6;
+      font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+      padding: 22px 12px 32px;
+    }
+    h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: .02em; }
+    h1 span { color: #6f7885; font-weight: 400; }
+    /* The game draws 320x320. The canvas stays that size and the page scales
+       it with nearest-neighbour, so the pixel art is exact and the blitter
+       does not do the scaling. */
+    #canvas {
+      width: 640px; height: 640px;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+      background: #000; border-radius: 3px;
+      box-shadow: 0 0 0 1px #2a2f37, 0 18px 40px -18px #000;
+      touch-action: none;
+    }
+    @media (max-width: 700px) { #canvas { width: 320px; height: 320px; } }
+    /* The title bar and the settings panel are the width of the screen below
+       them, so the cog sits over the screen's right edge. */
+    .bar, .screen { width: 640px; max-width: 100%; }
+    @media (max-width: 700px) { .bar, .screen { width: 320px; } }
+    .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .screen { position: relative; line-height: 0; }
+    #cog {
+      display: flex; padding: 5px; border-radius: 6px; color: #7d8593; line-height: 0;
+    }
+    #cog:hover, #cog[aria-expanded="true"] { color: #c9ced6; }
+    /* The settings sit over the game rather than beside it, so that opening
+       them does not move the screen. */
+    #settings {
+      position: absolute; left: 0; right: 0; top: 0; z-index: 1;
+      max-height: 100%; overflow: auto;
+      background: #14161af2; border-radius: 3px; box-shadow: 0 0 0 1px #2a2f37;
+      line-height: 1.5; padding: 18px 20px;
+      display: flex; flex-direction: column; gap: 12px; align-items: flex-start;
+    }
+    /* The rule above outranks the browser's own [hidden] { display: none }. */
+    #settings[hidden] { display: none; }
+    #settings h2 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: .04em;
+                   text-transform: uppercase; color: #8b94a2; }
+    #binds { border-collapse: collapse; }
+    #binds td { padding: 3px 12px 3px 0; }
+    #binds td:first-child { color: #8b94a2; }
+    #binds button { min-width: 5.5em; font-variant-caps: all-small-caps; letter-spacing: .06em; }
+    #binds button.listening { color: #14161a; background: #c9ced6; border-color: #c9ced6; }
+    #settings p { margin: 0; color: #7d8593; max-width: 34em; }
+    #settings .row { display: flex; gap: 8px; }
+    #status { min-height: 1.5em; color: #8b94a2; font-variant-numeric: tabular-nums; }
+    #status.err { color: #e0777a; }
+    .keys { width: 640px; max-width: 100%; color: #7d8593;
+            display: flex; flex-direction: column; gap: 6px; }
+    .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
+    kbd {
+      font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: #20242b; border: 1px solid #333941; border-bottom-width: 2px;
+      border-radius: 4px; padding: 1px 5px; color: #cdd3db; white-space: nowrap;
+    }
+    button {
+      font: inherit; color: #c9ced6; background: #20242b;
+      border: 1px solid #333941; border-radius: 5px; padding: 4px 10px; cursor: pointer;
+    }
+    button:hover { background: #262b33; }
+  </style>
+</head>
+
+<body>
+  <div class="bar">
+    <h1>Bike or Die 2 <span>&mdash; ToySpring, 2008, recompiled to WebAssembly</span></h1>
+    <button id="cog" title="Controls" aria-label="Controls" aria-expanded="false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3.2"/>
+        <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3
+                 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1
+                 a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1
+                 a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3
+                 H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1
+                 a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1
+                 a1.6 1.6 0 0 0-1.5 1z"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="screen">
+    <canvas id="canvas" width="320" height="320" tabindex="0"
+            oncontextmenu="event.preventDefault()"></canvas>
+
+    <div id="settings" hidden>
+      <h2>Controls</h2>
+      <table id="binds"></table>
+      <p>Click a key and press the one you want; <kbd>Backspace</kbd> takes it away
+         and <kbd>Esc</kbd> leaves it as it was. The arrow keys ride whatever these
+         say, so the bike can always be steered with them.</p>
+      <div class="row">
+        <button id="binds-done">Done</button>
+        <button id="binds-reset">Restore defaults</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="status">loading&hellip;</div>
+
+  <div class="keys">
+    <div class="legend" id="legend"></div>
+    <div class="legend">
+      <span><kbd>F9</kbd> menu</span>
+      <span><kbd>F1</kbd>&ndash;<kbd>F4</kbd> Palm buttons</span>
+      <span><kbd>Esc</kbd> back</span>
+      <button onclick="bodReset()">reset saved data</button>
+    </div>
+    <p>Progress, settings and level packs are kept in this browser.
+       Drop a <code>.prc</code> on the screen to install it.</p>
+  </div>
+
+  <script>
+    var canvas = document.getElementById('canvas');
+    var statusEl = document.getElementById('status');
+
+    // ---------------------------------------------------------- the controls
+    //
+    // The game's five riding actions and the key each one answers to, on top
+    // of the arrow keys, which always ride. This is the browser's half of
+    // BOD_KEYS: the same spec string, handed to the runtime through
+    // pumpkin_set_ride_keys() so that a change takes effect where it is made,
+    // and kept in this browser so the next visit starts with it.
+    var BOD_ACTIONS = [
+      ['forward', 'Forward',       '&uarr;'],
+      ['brake',   'Brake',         '&darr;'],
+      ['left',    'Balance left',  '&larr;'],
+      ['right',   'Balance right', '&rarr;'],
+      ['flip',    'Flip',          'F9']
+    ];
+    var BOD_KEYS_DEFAULT = 'forward=w brake=s left=a right=d flip=space';
+    var BOD_KEYS_STORE = 'bod.keys';
+
+    // What BOD_KEYS calls the keys a browser reports by name, and what to
+    // print them as.
+    var BOD_NAMED = {
+      ' ': 'space', 'Spacebar': 'space', 'Enter': 'enter', 'Tab': 'tab',
+      'Escape': 'esc', 'Backspace': 'backspace', 'Delete': 'del', 'Insert': 'ins',
+      'ArrowUp': 'up', 'ArrowDown': 'down', 'ArrowLeft': 'left', 'ArrowRight': 'right',
+      'PageUp': 'pgup', 'PageDown': 'pgdown', 'Home': 'home', 'End': 'end'
+    };
+    var BOD_PRINTED = {
+      space: 'Space', up: '\u2191', down: '\u2193', left: '\u2190', right: '\u2192',
+      enter: 'Enter', esc: 'Esc', tab: 'Tab', pgup: 'PgUp', pgdown: 'PgDn',
+      home: 'Home', end: 'End', ins: 'Ins', del: 'Del', backspace: 'Bksp'
+    };
+
+    var bodKeys = {}, bodListening = null;
+
+    function bodKeyName(e) {
+      if (BOD_NAMED[e.key]) return BOD_NAMED[e.key];
+      if (/^F([1-9]|1[0-2])$/.test(e.key)) return e.key.toLowerCase();
+      if (e.key && e.key.length === 1 && e.key > ' ') return e.key.toLowerCase();
+      return '';
+    }
+
+    function bodPrinted(name) {
+      if (!name) return '\u2014';
+      return BOD_PRINTED[name] || name.toUpperCase();
+    }
+
+    function bodParseKeys(spec) {
+      var map = {};
+      (spec || '').split(/[\s;]+/).forEach(function (entry) {
+        var i = entry.indexOf('=');
+        // Only the first key of an action: the panel binds one, and the arrows
+        // are wired in the runtime rather than listed here.
+        if (i > 0) map[entry.slice(0, i).toLowerCase()] = entry.slice(i + 1).split(',')[0];
+      });
+      return map;
+    }
+
+    function bodKeysSpec() {
+      return BOD_ACTIONS.map(function (a) { return a[0] + '=' + (bodKeys[a[0]] || ''); }).join(' ');
+    }
+
+    // The runtime reads BOD_KEYS out of the environment when the OS comes up,
+    // which is later than this can be called, so what is set here wins from
+    // then on -- and a ?BOD_KEYS= in the query string is left to do its job.
+    function bodSendKeys() {
+      try {
+        if (window.Module && Module.ccall) {
+          Module.ccall('pumpkin_set_ride_keys', null, ['string'], [bodKeysSpec()]);
+        }
+      } catch (e) {
+        console.warn('could not set the controls:', e);
+      }
+    }
+
+    function bodDrawKeys() {
+      var binds = document.getElementById('binds'), legend = document.getElementById('legend');
+      binds.innerHTML = '';
+      legend.innerHTML = '';
+      BOD_ACTIONS.forEach(function (a) {
+        var row = binds.insertRow();
+        row.insertCell().textContent = a[1];
+        var b = document.createElement('button');
+        b.innerHTML = bodPrinted(bodKeys[a[0]]);
+        b.onclick = function () { bodListen(a[0], b); };
+        row.insertCell().appendChild(b);
+        row.insertCell().innerHTML = 'or <kbd>' + a[2] + '</kbd>';
+        var span = document.createElement('span');
+        span.innerHTML = '<kbd>' + a[2] + '</kbd>' +
+          (bodKeys[a[0]] ? ' <kbd>' + bodPrinted(bodKeys[a[0]]) + '</kbd>' : '') +
+          ' ' + a[1].toLowerCase();
+        legend.appendChild(span);
+      });
+    }
+
+    function bodSaveKeys() {
+      try { localStorage.setItem(BOD_KEYS_STORE, bodKeysSpec()); } catch (e) { /* private window */ }
+      bodSendKeys();
+      bodDrawKeys();
+    }
+
+    function bodListen(action, button) {
+      if (bodListening) bodListening.button.classList.remove('listening');
+      bodListening = { action: action, button: button };
+      button.classList.add('listening');
+      button.innerHTML = '\u2026';
+    }
+
+    function bodSettings(open) {
+      var panel = document.getElementById('settings');
+      if (bodListening) { bodListening.button.classList.remove('listening'); bodListening = null; }
+      panel.hidden = !open;
+      document.getElementById('cog').setAttribute('aria-expanded', open ? 'true' : 'false');
+      bodDrawKeys();
+      if (!open) canvas.focus();
+    }
+
+    (function () {
+      var stored = null, fromQuery;
+      try { stored = localStorage.getItem(BOD_KEYS_STORE); } catch (e) { /* private window */ }
+      try { fromQuery = new URLSearchParams(location.search).get('BOD_KEYS'); } catch (e) { }
+      // Both of those name only the actions they change, the way BOD_KEYS does,
+      // so they go over the defaults rather than replacing them.
+      var given = bodParseKeys(fromQuery || stored || '');
+      bodKeys = bodParseKeys(BOD_KEYS_DEFAULT);
+      Object.keys(given).forEach(function (a) { bodKeys[a] = given[a]; });
+      // The query string reaches the runtime on its own; anything else this
+      // page knows has to be handed over once the runtime is there to take it.
+      window.bodPendingKeys = !fromQuery && !!stored;
+      document.getElementById('cog').onclick = function () {
+        bodSettings(document.getElementById('settings').hidden);
+      };
+      document.getElementById('binds-done').onclick = function () { bodSettings(false); };
+      document.getElementById('binds-reset').onclick = function () {
+        bodKeys = bodParseKeys(BOD_KEYS_DEFAULT);
+        bodSaveKeys();
+      };
+      bodDrawKeys();
+    })();
+
+    var Module = {
+      canvas: canvas,
+      onRuntimeInitialized: function () { if (window.bodPendingKeys) bodSendKeys(); },
+      // The OS runs on a worker, which cannot see the page's URL. Handing the
+      // workers a script URL that carries the query string lets the options
+      // in it reach the code that reads them.
+      mainScriptUrlOrBlob: 'pumpkin.js' + location.search,
+      // The canvas must not be resized out from under SDL by the CSS size.
+      setStatus: function (text) {
+        if (statusEl.classList.contains('err')) return;
+        statusEl.textContent = text || '';
+      },
+      printErr: function (text) {
+        console.error(text);
+        if (/abort|Aborted|RuntimeError/.test(text)) {
+          statusEl.className = 'err';
+          statusEl.textContent = text;
+        }
+      }
+    };
+
+    // The game wants the arrow keys, space and the function keys; the browser
+    // would scroll the page or reload with them. Whatever the controls are
+    // bound to is claimed as well, for the same reason.
+    var claimed = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
+                   'F1', 'F2', 'F3', 'F4', 'F5', 'F9', 'Escape'];
+    window.addEventListener('keydown', function (e) {
+      var name = bodKeyName(e);
+
+      // Binding a key: the keystroke is the answer to the panel and must not
+      // also reach the game, which is listening on the document below this.
+      if (bodListening) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key !== 'Escape') {
+          bodKeys[bodListening.action] = (e.key === 'Backspace' || e.key === 'Delete') ? '' : name;
+        }
+        bodListening.button.classList.remove('listening');
+        bodListening = null;
+        bodSaveKeys();
+        return;
+      }
+
+      // The panel covers the screen, so the game does not get the keys pressed
+      // over it -- but the browser still does, so the panel can be walked with
+      // the keyboard like any other.
+      if (!document.getElementById('settings').hidden) {
+        e.stopPropagation();
+        if (e.key === 'Escape') bodSettings(false);
+      }
+
+      if (claimed.indexOf(e.code) >= 0 || claimed.indexOf(e.key) >= 0) e.preventDefault();
+      else if (name) {
+        for (var a in bodKeys) { if (bodKeys[a] === name) { e.preventDefault(); break; } }
+      }
+    }, { capture: true });
+
+    canvas.addEventListener('mousedown', function () { canvas.focus(); });
+
+    // Safari parks an AudioContext in "interrupted" -- not the "suspended"
+    // that SDL's own autoplay recovery looks for, so neither its resume-on-
+    // gesture handler nor its silence fallback ever fires, and the game plays
+    // to a device that is not listening. Resume it from any gesture, and keep
+    // the listeners: the audio session goes away again whenever another
+    // application wants it, or the tab is hidden.
+    function bodResumeAudio() {
+      var sdl = window.Module && Module.SDL2, ctx = sdl && sdl.audioContext;
+      if (ctx && ctx.state !== 'running' && ctx.resume) {
+        ctx.resume().catch(function () { /* not in a gesture; the next one will */ });
+      }
+    }
+    ['pointerdown', 'mousedown', 'keydown', 'touchstart'].forEach(function (type) {
+      window.addEventListener(type, bodResumeAudio, { capture: true });
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) bodResumeAudio();
+    });
+    // The context does not exist until the game opens the device, a second or
+    // two after the page loads; watch for it, then let it say when it stops.
+    var bodAudioWatch = setInterval(function () {
+      var sdl = window.Module && Module.SDL2;
+      if (!sdl || !sdl.audioContext) return;
+      clearInterval(bodAudioWatch);
+      sdl.audioContext.onstatechange = bodResumeAudio;
+      bodResumeAudio();
+    }, 500);
+
+    function dropHandler(ev) {
+      ev.preventDefault();
+      [...ev.dataTransfer.files].forEach(function (file) {
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          FS.writeFile('/vfs/app_install/' + file.name, new Uint8Array(e.target.result));
+          Module.ccall('pumpkin_send_deploy', null, null, null);
+          Module.setStatus('installed ' + file.name);
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+    canvas.addEventListener('dragover', function (e) { e.preventDefault(); });
+    canvas.addEventListener('drop', dropHandler);
+  </script>
+  <script>
+    // Only needed on a host that will not send COOP/COEP itself: the worker
+    // installs itself and reloads once, which a server that sets the headers
+    // makes unnecessary.
+    if (!window.crossOriginIsolated) document.write('<script src="coi-serviceworker.js"><\/script>');
+  </script>
+  <script src="pumpkin.js"></script>
+</body>
+</html>
