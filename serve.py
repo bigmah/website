@@ -11,14 +11,15 @@ file://, a page gets an opaque one and Chrome then refuses to let it read the
 weights.gguf or the .wasm sitting right beside it.
 
 The one header pair that is not optional is COOP/COEP, and bike/ is why. That
-folder is tools/make_web.sh's output from the bike_or_die tree, copied in
-whole; refresh it by running that script and copying build/web over it. The
-recompiled game inside it runs on PumpkinOS's threads, and the SharedArrayBuffer they
-share is only handed to a cross-origin isolated page. Isolation is inherited
-rather than claimed, so it is not enough to send the headers with bike/ alone:
-index.html frames it, and a frame inside a page that is not isolated is not
-isolated either. They go on everything. Nothing served here loads a
-cross-origin subresource, so require-corp costs the other two pages nothing.
+folder is tools/make_web.sh's output from the bike_or_die tree, copied in whole
+-- a build product rather than source, so it is refreshed by ./sync-bike.sh and
+never edited here. The recompiled game inside it runs on PumpkinOS's threads,
+and the SharedArrayBuffer they share is only handed to a cross-origin isolated
+page. Isolation is inherited rather than claimed, so it is not enough to send
+the headers with bike/ alone: index.html frames it, and a frame inside a page
+that is not isolated is not isolated either. They go on everything. Nothing
+served here loads a cross-origin subresource, so require-corp costs the other
+two pages nothing.
 
 Putting it on the public internet is the other reason to run it, and https is
 not optional there. The Cache API the page keeps the 378 MB checkpoint in is a
