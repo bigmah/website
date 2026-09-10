@@ -478,8 +478,9 @@
     .board:not(.board--static) .more p { font-size: 0.63rem; line-height: 1.75; }
     .board:not(.board--static) .more { margin-top: 0.9rem; padding-top: 0.9rem; }
     .board:not(.board--static) .now { font-size: 0.68rem; line-height: 1.75; margin-top: 0.95rem; }
-    .board:not(.board--static) .tile:not(.tile--big) .projects { gap: 0.2rem; }
-    .board:not(.board--static) .tile:not(.tile--big) .project { padding: 0.32rem 0.55rem; }
+    .board:not(.board--static) .tile:not(.tile--big) .projects { gap: 0.18rem; }
+    .board:not(.board--static) .tile:not(.tile--big) .project { padding: 0.22rem 0.55rem; }
+    .board:not(.board--static) .tile:not(.tile--big) .project .name { line-height: 1.3; }
   }
 
   @keyframes reveal {
@@ -543,7 +544,7 @@
   .projects {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.22rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -553,7 +554,7 @@
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    padding: 0.38rem 0.6rem;
+    padding: 0.3rem 0.6rem;
     text-decoration: none;
     background: var(--card-tint);
     border: 1px solid var(--line);
@@ -881,6 +882,21 @@
             <span>
               <span class="name">n64bundler</span>
               <span class="what">n64 static recompilation toolkit — dolbundler's counterpart, turning N64 ROMs into native macOS apps.</span>
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="project" href="https://pullspace.dev/#/bigmah/bike_or_die/blob/README.md" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="5.6" cy="16.4" r="4.1" opacity=".95"/>
+              <circle cx="18.4" cy="16.4" r="4.1" opacity=".5"/>
+              <path d="M5.6 16.4h5.8L9 9 5.6 16.4M9 9h6.4l-4 7.4M15.4 9l3 7.4" opacity=".95"/>
+              <path d="M8.1 8.2h1.9" opacity=".95"/>
+            </svg>
+            <span>
+              <span class="name">bike_or_die</span>
+              <span class="what">palm os static recompilation — bike or die 2's 68k and ARM code, translated ahead of time into a native macOS app and a webassembly build.</span>
             </span>
           </a>
         </li>
