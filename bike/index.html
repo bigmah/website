@@ -36,26 +36,55 @@
       display: flex; padding: 5px; border-radius: 6px; color: #7d8593; line-height: 0;
     }
     #cog:hover, #cog[aria-expanded="true"] { color: #c9ced6; }
-    /* The settings sit over the game rather than beside it, so that opening
-       them does not move the screen. */
-    #settings {
+    /* The level buttons: which pack, which level. They drive the game's own
+       menu and dialogs (see bodPack below), so they do what the F5 menu does. */
+    .tools { width: 640px; max-width: 100%; display: flex; flex-wrap: wrap;
+             align-items: center; gap: 6px; }
+    @media (max-width: 700px) { .tools { width: 320px; } }
+    .tools__group { display: flex; gap: 2px; margin-left: auto; }
+    .tools__group button { min-width: 2.6em; }
+    #packs-open { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+    #packs-open .cur { color: #8b94a2; overflow: hidden; text-overflow: ellipsis;
+                       white-space: nowrap; max-width: 18em; }
+    #packs-open .caret { color: #6f7885; font-size: 10px; }
+    /* The panels sit over the game rather than beside it, so that opening
+       one does not move the screen. */
+    .panel {
       position: absolute; left: 0; right: 0; top: 0; z-index: 1;
-      max-height: 100%; overflow: auto;
+      max-height: 100%; overflow: auto; box-sizing: border-box;
       background: #14161af2; border-radius: 3px; box-shadow: 0 0 0 1px #2a2f37;
       line-height: 1.5; padding: 18px 20px;
       display: flex; flex-direction: column; gap: 12px; align-items: flex-start;
     }
     /* The rule above outranks the browser's own [hidden] { display: none }. */
-    #settings[hidden] { display: none; }
-    #settings h2 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: .04em;
-                   text-transform: uppercase; color: #8b94a2; }
+    .panel[hidden] { display: none; }
+    .panel h2 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: .04em;
+                text-transform: uppercase; color: #8b94a2; }
+    /* Solid, unlike the controls: the game's own pack list is right behind it. */
+    #packs { height: 100%; background: #14161a; }
+    #packs-filter {
+      font: inherit; color: #c9ced6; background: #20242b; width: 100%; box-sizing: border-box;
+      border: 1px solid #333941; border-radius: 5px; padding: 5px 10px;
+    }
+    #packs-filter:focus { outline: none; border-color: #5a6371; }
+    #packs-list { flex: 1 1 auto; min-height: 0; overflow: auto; width: 100%;
+                  display: flex; flex-direction: column; gap: 1px; }
+    #packs-list button {
+      text-align: left; background: none; border: 0; border-radius: 4px; padding: 4px 8px;
+      white-space: pre; font-variant-numeric: tabular-nums;
+    }
+    #packs-list button:hover, #packs-list button:focus { background: #262b33; outline: none; }
+    #packs-list button.is-current { color: #fff; font-weight: 600; }
+    #packs-list button.is-current::after { content: ' \2713'; color: #8b94a2; font-weight: 400; }
+    #packs-list .none { color: #6f7885; padding: 4px 8px; }
+    #packs-note { color: #7d8593; margin: 0; }
     #binds { border-collapse: collapse; }
     #binds td { padding: 3px 12px 3px 0; }
     #binds td:first-child { color: #8b94a2; }
     #binds button { min-width: 5.5em; font-variant-caps: all-small-caps; letter-spacing: .06em; }
     #binds button.listening { color: #14161a; background: #c9ced6; border-color: #c9ced6; }
-    #settings p { margin: 0; color: #7d8593; max-width: 34em; }
-    #settings .row { display: flex; gap: 8px; }
+    .panel p { margin: 0; color: #7d8593; max-width: 34em; }
+    .panel .row { display: flex; gap: 8px; }
     #status { min-height: 1.5em; color: #8b94a2; font-variant-numeric: tabular-nums; }
     #status.err { color: #e0777a; }
     .keys { width: 640px; max-width: 100%; color: #7d8593;
@@ -96,11 +125,33 @@
     </div>
   </div>
 
+  <div class="tools">
+    <button id="packs-open" type="button" title="Choose a level pack" aria-expanded="false" disabled>
+      Level pack <span class="cur" id="packs-cur"></span> <span class="caret">&#9660;</span>
+    </button>
+    <button id="levels" type="button" title="Choose a level in this pack" disabled>Levels&hellip;</button>
+    <span class="tools__group">
+      <button id="level-prev" type="button" title="Previous level" disabled>&#9664;</button>
+      <button id="level-restart" type="button" title="Restart level" disabled>&#8635;</button>
+      <button id="level-next" type="button" title="Next level" disabled>&#9654;</button>
+    </span>
+  </div>
+
   <div class="screen">
     <canvas id="canvas" width="320" height="320" tabindex="0"
             oncontextmenu="event.preventDefault()"></canvas>
 
-    <div id="settings" hidden>
+    <div id="packs" class="panel" hidden>
+      <h2>Level packs</h2>
+      <input id="packs-filter" type="search" placeholder="Find a pack" autocomplete="off" spellcheck="false">
+      <div id="packs-list" role="listbox"></div>
+      <p id="packs-note">Pick one and it starts. These are the game's own packs, in its order.</p>
+      <div class="row">
+        <button id="packs-cancel">Cancel</button>
+      </div>
+    </div>
+
+    <div id="settings" class="panel" hidden>
       <h2>Controls</h2>
       <table id="binds"></table>
       <p>Click a key and press the one you want; <kbd>Backspace</kbd> takes it away
@@ -118,7 +169,7 @@
   <div class="keys">
     <div class="legend" id="legend"></div>
     <div class="legend">
-      <span><kbd>F9</kbd> menu</span>
+      <span><kbd>F5</kbd> menu</span>
       <span><kbd>F1</kbd>&ndash;<kbd>F4</kbd> Palm buttons</span>
       <span><kbd>Esc</kbd> back</span>
     </div>
@@ -256,6 +307,7 @@
     function bodSettings(open) {
       var panel = document.getElementById('settings');
       if (bodListening) { bodListening.button.classList.remove('listening'); bodListening = null; }
+      if (open && window.bodPack) bodPack.close(true);
       panel.hidden = !open;
       document.getElementById('cog').setAttribute('aria-expanded', open ? 'true' : 'false');
       bodDrawKeys();
@@ -293,6 +345,9 @@
           if (window.PThread && Object.keys(PThread.pthreads).length) {
             clearInterval(pauseReady);
             pauseButton.disabled = false;
+            ['packs-open', 'levels', 'level-prev', 'level-restart', 'level-next'].forEach(function (id) {
+              document.getElementById(id).disabled = false;
+            });
           }
         }, 100);
       },
@@ -336,9 +391,14 @@
         return;
       }
 
-      // The panel covers the screen, so the game does not get the keys pressed
+      // A panel covers the screen, so the game does not get the keys pressed
       // over it -- but the browser still does, so the panel can be walked with
-      // the keyboard like any other.
+      // the keyboard like any other, and typed into.
+      if (!document.getElementById('packs').hidden) {
+        e.stopPropagation();
+        if (e.key === 'Escape') bodPack.close(true);
+        return;
+      }
       if (!document.getElementById('settings').hidden) {
         e.stopPropagation();
         if (e.key === 'Escape') bodSettings(false);
@@ -352,6 +412,191 @@
 
     canvas.addEventListener('mousedown', function () { canvas.focus(); });
     pauseButton.addEventListener('click', function () { bodSetPaused(!bodPaused); });
+
+    // ------------------------------------------------ level packs and levels
+    //
+    // The buttons above the screen do what the game's own Game menu does, by
+    // asking the runtime to drive it (bodpack.c): a menu item for Restart,
+    // Previous, Next and the level list, and for the packs, the game's own
+    // Select Level -> More... dialog, whose names are read off its list and
+    // shown in the panel over the screen. Picking one hands the choice back to
+    // that dialog and presses Play, so the game is always the one that
+    // switches. Commands go in as text; the answer is polled back as text
+    // with a sequence number, since the game runs on another thread.
+    var bodPack = {
+      panel: document.getElementById('packs'),
+      list: document.getElementById('packs-list'),
+      filter: document.getElementById('packs-filter'),
+      button: document.getElementById('packs-open'),
+      names: [],
+      title: '',
+      poll: null,
+
+      ready: function () {
+        return !!(window.Module && Module.ccall && !pauseButton.disabled);
+      },
+
+      send: function (cmd) {
+        try {
+          Module.ccall('bod_pack_command', null, ['string'], [cmd]);
+          return true;
+        } catch (e) {
+          console.warn('could not send to the game:', e);
+          return false;
+        }
+      },
+
+      // The status text, read twice around its sequence number so that a
+      // change under the read is noticed and read again.
+      read: function () {
+        var s1, s2, text, tries;
+        for (tries = 0; tries < 5; tries++) {
+          s1 = Module.ccall('bod_pack_seq', 'number', [], []);
+          text = Module.ccall('bod_pack_state', 'string', [], []);
+          s2 = Module.ccall('bod_pack_seq', 'number', [], []);
+          if (s1 === s2) break;
+        }
+        var lines = (text || '').split('\n');
+        var state = lines[0] || 'idle';
+        var title = (lines[1] || '').replace(/^title /, '');
+        if (title) bodPack.setTitle(title);
+        return { state: state.split(' ')[0], error: state.replace(/^error ?/, ''),
+                 names: state === 'listed' ? lines.slice(2).filter(function (n) { return n !== ''; }) : null };
+      },
+
+      setTitle: function (title) {
+        bodPack.title = title;
+        document.getElementById('packs-cur').textContent = title ? '\u00b7 ' + title : '';
+      },
+
+      // Runs `cmd`, then polls until the state is one of `until`, or an error,
+      // or the game has stayed silent for `timeout` ms.
+      run: function (cmd, until, done, timeout) {
+        if (!bodPack.ready()) { bodPack.say('the game is still loading'); return; }
+        if (bodPaused) bodSetPaused(false);
+        if (bodPack.poll) { clearInterval(bodPack.poll); bodPack.poll = null; }
+        if (!bodPack.send(cmd)) return;
+        var started = Date.now();
+        bodPack.poll = setInterval(function () {
+          var r = bodPack.read();
+          if (r.state === 'error') {
+            clearInterval(bodPack.poll); bodPack.poll = null;
+            bodPack.say(r.error || 'the game did not answer');
+            done(r);
+          } else if (until.indexOf(r.state) >= 0) {
+            clearInterval(bodPack.poll); bodPack.poll = null;
+            done(r);
+          } else if (Date.now() - started > (timeout || 10000)) {
+            clearInterval(bodPack.poll); bodPack.poll = null;
+            bodPack.say('the game did not answer');
+            done({ state: 'error', error: 'timeout' });
+          }
+        }, 80);
+      },
+
+      say: function (text) {
+        if (statusEl.classList.contains('err')) return;
+        statusEl.textContent = text || '';
+      },
+
+      isOpen: function () { return !bodPack.panel.hidden; },
+
+      open: function () {
+        if (bodPack.isOpen()) return;
+        bodSettings(false);
+        bodPack.list.innerHTML = '<div class="none">Asking the game for its packs\u2026</div>';
+        bodPack.filter.value = '';
+        bodPack.panel.hidden = false;
+        bodPack.button.setAttribute('aria-expanded', 'true');
+        bodPack.run('open', ['listed'], function (r) {
+          if (r.state !== 'listed') { bodPack.close(false); return; }
+          bodPack.names = r.names || [];
+          bodPack.draw();
+          bodPack.filter.focus();
+        });
+      },
+
+      // Which of the names is the pack the game is on: the level list's title
+      // ends with it, except for the built-in one, which it calls something
+      // else.
+      current: function () {
+        var t = bodPack.title.toLowerCase(), best = -1, len = 0;
+        if (/^built-in/.test(t)) t = 'standard';
+        bodPack.names.forEach(function (n, i) {
+          var m = n.trim().toLowerCase();
+          if (m && t.slice(-m.length) === m && m.length > len) { best = i; len = m.length; }
+        });
+        return best;
+      },
+
+      draw: function () {
+        var q = bodPack.filter.value.trim().toLowerCase(), cur = bodPack.current(), shown = 0;
+        bodPack.list.innerHTML = '';
+        bodPack.names.forEach(function (name, i) {
+          if (q && name.toLowerCase().indexOf(q) < 0) return;
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.setAttribute('role', 'option');
+          b.textContent = name;
+          if (i === cur) b.className = 'is-current';
+          b.onclick = function () { bodPack.pick(i); };
+          bodPack.list.appendChild(b);
+          shown++;
+        });
+        if (!shown) {
+          bodPack.list.innerHTML = '<div class="none">' + (bodPack.names.length ? 'No pack by that name' : 'No packs') + '</div>';
+        }
+      },
+
+      pick: function (i) {
+        var name = bodPack.names[i] || '';
+        bodPack.list.innerHTML = '<div class="none">Starting ' + name.trim() + '\u2026</div>';
+        bodPack.run('pick ' + i, ['done', 'idle'], function (r) {
+          bodPack.close(false);
+          if (r.state === 'done') bodPack.say('');
+        });
+      },
+
+      // Closing the panel without a choice closes the game's dialogs too.
+      close: function (cancel) {
+        if (!bodPack.isOpen()) return;
+        bodPack.panel.hidden = true;
+        bodPack.button.setAttribute('aria-expanded', 'false');
+        if (cancel) bodPack.run('cancel', ['done', 'idle'], function () { });
+        canvas.focus();
+      },
+
+      // A menu item for the game itself.
+      menu: function (label) {
+        bodPack.run('menu ' + label, ['done', 'idle'], function (r) {
+          if (r.state === 'done') bodPack.say('');
+          canvas.focus();
+        });
+      }
+    };
+
+    bodPack.button.addEventListener('click', function () {
+      if (bodPack.isOpen()) bodPack.close(true); else bodPack.open();
+    });
+    // The pack can change through the game's own dialogs too; the button
+    // keeps up by looking now and then. Two calls into the runtime, nothing
+    // more.
+    setInterval(function () {
+      if (bodPack.ready() && !bodPack.poll) { try { bodPack.read(); } catch (e) { /* not yet */ } }
+    }, 1500);
+    document.getElementById('packs-cancel').addEventListener('click', function () { bodPack.close(true); });
+    bodPack.filter.addEventListener('input', function () { bodPack.draw(); });
+    bodPack.filter.addEventListener('keydown', function (e) {
+      // Enter takes the first pack shown.
+      if (e.key === 'Enter') {
+        var first = bodPack.list.querySelector('button');
+        if (first) first.click();
+      }
+    });
+    document.getElementById('levels').addEventListener('click', function () { bodPack.menu('Select Level'); });
+    document.getElementById('level-prev').addEventListener('click', function () { bodPack.menu('Previous Level'); });
+    document.getElementById('level-next').addEventListener('click', function () { bodPack.menu('Next Level'); });
+    document.getElementById('level-restart').addEventListener('click', function () { bodPack.menu('Restart Level'); });
 
     // Safari parks an AudioContext in "interrupted" -- not the "suspended"
     // that SDL's own autoplay recovery looks for, so neither its resume-on-
