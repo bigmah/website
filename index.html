@@ -384,6 +384,10 @@
 
   .tile--flush .tile__body { padding: 0; overflow: hidden; }
 
+  /* a click anywhere on a small tile grows it — the bar keeps its own cursor,
+     being the drag handle as well */
+  .tile:not(.tile--big) .tile__body { cursor: pointer; }
+
   /* ---------- tile content ---------- */
 
   .tile--id .tile__body {
@@ -474,6 +478,8 @@
     .board:not(.board--static) .more p { font-size: 0.63rem; line-height: 1.75; }
     .board:not(.board--static) .more { margin-top: 0.9rem; padding-top: 0.9rem; }
     .board:not(.board--static) .now { font-size: 0.68rem; line-height: 1.75; margin-top: 0.95rem; }
+    .board:not(.board--static) .tile:not(.tile--big) .projects { gap: 0.2rem; }
+    .board:not(.board--static) .tile:not(.tile--big) .project { padding: 0.32rem 0.55rem; }
   }
 
   @keyframes reveal {
@@ -500,10 +506,9 @@
     outline-offset: 4px;
   }
 
-  /* project — and the llm tile's start panel, which is the same card with a
-     button where the link would be */
+  /* the llm and bike tiles' start panel: what the thing is, what it costs, and
+     a button to load it */
 
-  .project,
   .start {
     display: flex;
     flex-direction: column;
@@ -511,18 +516,13 @@
     text-decoration: none;
   }
 
-  .project svg,
   .start svg {
     width: 24px;
     height: 24px;
     flex: none;
     color: var(--cube);
-    transition: color 160ms ease;
   }
 
-  .project:hover svg { color: var(--cube-hover); }
-
-  .project .name,
   .start .name {
     display: block;
     font-size: 0.78rem;
@@ -530,13 +530,85 @@
     margin-bottom: 0.35rem;
   }
 
-  .project .what,
   .start .what {
     display: block;
     font-size: 0.72rem;
     line-height: 1.75;
     color: var(--muted);
   }
+
+  /* projects: every one named while the tile is small, and each a row with its
+     description once it is big — the tile scrolls if they outgrow it */
+
+  .projects {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .project {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.38rem 0.6rem;
+    text-decoration: none;
+    background: var(--card-tint);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    transition: border-color 160ms ease;
+  }
+
+  .project svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--cube);
+    transition: color 160ms ease;
+  }
+
+  .project .name {
+    display: block;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: var(--fg);
+  }
+
+  .project .what { display: none; }
+
+  /* Small, a row is only a name, and the click goes through it to grow the tile
+     the way it would anywhere else on one. Big, each row is the link it looks like. */
+  .tile:not(.tile--big) .project { pointer-events: none; }
+
+  .tile--big .projects { gap: 0.5rem; }
+
+  .tile--big .project {
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 0.8rem 0.9rem;
+  }
+
+  .tile--big .project svg { width: 22px; height: 22px; }
+
+  .tile--big .project .name {
+    font-size: 0.78rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .tile--big .project .what {
+    display: block;
+    font-size: 0.72rem;
+    line-height: 1.75;
+    color: var(--muted);
+    animation: reveal 320ms 130ms both cubic-bezier(.2,.7,.3,1);
+  }
+
+  .tile--big .project:hover,
+  .tile--big .project:focus-visible { border-color: var(--line-strong); }
+
+  .tile--big .project:hover svg { color: var(--cube-hover); }
 
   /* emulator */
 
@@ -685,6 +757,10 @@
   .board--static .tile--gba .dots,
   .board--static .tile--llm .dots,
   .board--static .tile--bike .dots { display: none; }
+  /* ...and with no dots to close them again, a click does not open them either */
+  .board--static .tile--gba .tile__body,
+  .board--static .tile--llm .tile__body,
+  .board--static .tile--bike .tile__body { cursor: auto; }
   .board--static .ph,
   .board--static::before { display: none; }
   /* stacked, the tiles size to their content — an iframe filling one has no
@@ -710,6 +786,8 @@
   .tile--gba .tile__body { height: 820px; }
   /* no script to swap the iframe in, so the button is just the link it already is */
   .start .go { text-decoration: underline; }
+  /* nothing ever enlarges the tile, so its rows are links from the start */
+  .tile .projects .project { pointer-events: auto; }
 </style></noscript>
 </head>
 <body>
@@ -758,39 +836,93 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.41l-5.8-7.58-6.64 7.58H.46l8.6-9.83L0 1.15h7.59l5.24 6.93 6.07-6.93Zm-1.29 19.5h2.04L6.49 3.24H4.3l13.31 17.41Z"/></svg>
         </a>
       </nav>
-      <p class="now">working on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> — better code review in the browser for github PRs and whatnot</p>
+      <p class="now">working on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> — trying to make code review in browser better with Rust + WASM</p>
       <div class="more">
-        <p class="lead">interested in retro game preservation — emulation, decompilation, porting, and the rest of it. but mostly <em>static recompilation</em>.</p>
-        <p>emulation interprets a console's instructions while the game runs. decompilation rebuilds readable source from the original binary, function by function. static recompilation sits between the two — translate the machine code once, ahead of time, into a native binary.</p>
-        <p>what comes out runs on the host CPU directly, with no interpreter in the loop. the appeal is preservation: the game's original logic is kept intact while being cut loose from hardware that is quietly disappearing.</p>
-        <!-- placeholder copy — swap in your own -->
-        <p>github's review UI is fine on a twenty-line diff and comes apart on a thousand-line one. pullspace is the attempt at something better: read a pull request in the browser with the surrounding code within reach, instead of squinting at hunks in isolation.</p>
+        <p class="lead">These days reading + approving pull requests is a big bottleneck. It used to be the case that it was slower to write code than read it, so the PR queue never piled up. Obviously this is no longer the case due to coding agents. In some cases this does not matter, if nothing is really on the line with a particular repo, reviews can be brief, shoot first ask questions later. But some repos carry real weight. Lots of money is on the line, this is real deal high stakes production software.</p>
+        <p>In these cases there is no way around a thorough review of the code being released. Of course testing should be as comprehensive as possible, but at the end of the day there are still humans in the loop that are responsible for what a particular program does once released. These humans ought to understand what the code does.</p>
+        <p><em>Code review isn't going anywhere.</em></p>
+        <p>And the default ways we review code leave a lot to be desired. The stock diff viewer github is slow and hard to look at. The integrated vscode thing is bloated and cumbersome.</p>
+        <p>Of course we can just checkout a particular PR and view in our local editor, but this can be tedious. what if we have local changes? or want to review multiple branches. inb4 worktree</p>
+        <p>The path of least resistance today ends up looking like a million browser tabs open, one for each specific thing we want to investigate. The browser makes sense as the place to review things in this way, but we pay the price with ergonomics and a cluttered browser tab list.</p>
+        <p>pullspace aims to be a solution to this. A better browser based code review UX.</p>
+        <p>All you need is a github token (or not for a public repo) and then you can open a PR/branch/repo on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> where you get a buttery like IDE UX to view code.</p>
       </div>
     </div>
   </article>
 
   <article class="tile" data-id="dol">
-    <header class="tile__bar" tabindex="0" aria-label="project tile — arrow keys nudge it half a cell, shift for a whole one">
+    <header class="tile__bar" tabindex="0" aria-label="projects tile — arrow keys nudge it half a cell, shift for a whole one">
       <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
-      <span class="tile__title">project</span>
+      <span class="tile__title">projects</span>
     </header>
     <div class="tile__body">
-      <a class="project" href="https://pullspace.dev/#/bigmah/dolbundler/blob/README.md" target="_blank" rel="noopener noreferrer">
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-          <path d="M12 2 21.5 7.25v9.5L12 22 2.5 16.75v-9.5L12 2Z" opacity=".2"/>
-          <path d="M12 2.6 20.9 7.5 12 12.4 3.1 7.5 12 2.6Z" opacity=".95"/>
-          <path d="M3.1 8.55 11.45 13.15v8.05L3.1 16.6V8.55Z" opacity=".5"/>
-          <path d="M20.9 8.55 12.55 13.15v8.05L20.9 16.6V8.55Z" opacity=".72"/>
-        </svg>
-        <span>
-          <span class="name">dolbundler</span>
-          <span class="what">gamecube static recompilation toolkit — turn GC ROMs into native macOS / iOS apps.</span>
-        </span>
-      </a>
-      <!-- placeholder copy — swap in your own -->
-      <div class="more">
-        <p>gamecube games shipped as PowerPC code inside a .dol executable on the disc. dolbundler's job is getting that code running natively on apple hardware — packaged as an app you open, rather than a ROM you hand to an emulator.</p>
-      </div>
+      <ul class="projects">
+        <li>
+          <a class="project" href="https://pullspace.dev/#/bigmah/dolbundler/blob/README.md" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+              <path d="M12 2 21.5 7.25v9.5L12 22 2.5 16.75v-9.5L12 2Z" opacity=".2"/>
+              <path d="M12 2.6 20.9 7.5 12 12.4 3.1 7.5 12 2.6Z" opacity=".95"/>
+              <path d="M3.1 8.55 11.45 13.15v8.05L3.1 16.6V8.55Z" opacity=".5"/>
+              <path d="M20.9 8.55 12.55 13.15v8.05L20.9 16.6V8.55Z" opacity=".72"/>
+            </svg>
+            <span>
+              <span class="name">dolbundler</span>
+              <span class="what">gamecube static recompilation toolkit — turn GC ROMs into native macOS / iOS apps.</span>
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="project" href="https://pullspace.dev/#/bigmah/n64bundler/blob/README.md" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+              <path d="M4 3.5h16V17l-2.6 3.5H6.6L4 17V3.5Z" opacity=".3"/>
+              <path d="M7 6.2h10v7.3H7V6.2Z" opacity=".95"/>
+              <path d="M7.4 16.2h9.2v1.5H7.4v-1.5Z" opacity=".6"/>
+            </svg>
+            <span>
+              <span class="name">n64bundler</span>
+              <span class="what">n64 static recompilation toolkit — dolbundler's counterpart, turning N64 ROMs into native macOS apps.</span>
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="project" href="https://pullspace.dev/#/bigmah/llmoxide/blob/README.md" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+              <path d="M12 12.6 20.8 17.4 12 22.2 3.2 17.4 12 12.6Z" opacity=".3"/>
+              <path d="M12 7.4 20.8 12.2 12 17 3.2 12.2 12 7.4Z" opacity=".55"/>
+              <path d="M12 2.2 20.8 7 12 11.8 3.2 7 12 2.2Z" opacity=".95"/>
+            </svg>
+            <span>
+              <span class="name">llmoxide</span>
+              <span class="what">privacy-first local LLM inference in rust — written from scratch with no ML dependencies, and runs in the browser on WebGPU too.</span>
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="project" href="https://pullspace.dev/#/bigmah/fluids/blob/README.md" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+              <path d="M2 8.5c2.5 0 3.5-2.5 6-2.5s3.5 2.5 6 2.5 3.5-2.5 6-2.5c1 0 2 .5 2 .5V21H2V8.5Z" opacity=".25"/>
+              <path d="M2 10c2.5 0 3.5 2.5 6 2.5s3.5-2.5 6-2.5 3.5 2.5 6 2.5c1 0 2-.5 2-.5V21H2V10Z" opacity=".45"/>
+              <path d="M2 16.5c2.5 0 3.5-2.5 6-2.5s3.5 2.5 6 2.5 3.5-2.5 6-2.5c1 0 2 .5 2 .5V21H2v-4.5Z" opacity=".9"/>
+            </svg>
+            <span>
+              <span class="name">fluids</span>
+              <span class="what">3D particle water simulation in rust and bevy — offshore swell rolling in over a reef and breaking.</span>
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="project" href="https://pullspace.dev/#/bigmah/kb-agent/blob/README.md" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+              <path d="M12 6.2C9.8 4.6 6.6 4 3 4.3v14.2c3.6-.3 6.8.3 9 1.9V6.2Z" opacity=".55"/>
+              <path d="M12 6.2c2.2-1.6 5.4-2.2 9-1.9v14.2c-3.6-.3-6.8.3-9 1.9V6.2Z" opacity=".95"/>
+            </svg>
+            <span>
+              <span class="name">kb-agent</span>
+              <span class="what">ask a folder of books a question — every one gets read in full before it answers.</span>
+            </span>
+          </a>
+        </li>
+      </ul>
     </div>
   </article>
 
@@ -1316,10 +1448,12 @@
   /* ---------- drag ---------- */
 
   var drag = null;
+  var dragged = false;          // the last press became a drag, so its click isn't one
   var moveRaf = 0;              // the one pending drag frame, if any
   var ptr = { x: 0, y: 0 };     // the latest pointer position it will read
 
   board.addEventListener('pointerdown', function (e) {
+    dragged = false;
     if (e.button !== 0) return;
     if (phys) { grab(e); return; }       // under gravity you grab the tile itself
     if (isStatic || homing) return;
@@ -1406,6 +1540,7 @@
     var el = drag.el, live = drag.live;
     drag = null;
     if (!live) return;
+    dragged = true;
     el.classList.remove('is-drag');
     document.body.classList.remove('is-dragging');
     ph.hidden = true;
@@ -1454,11 +1589,24 @@
     var go = e.target.closest('.go');
     if (go) { e.preventDefault(); startTile(go.closest('.tile').dataset.id); return; }
 
-    var btn = e.target.closest('.dots');
-    if (!btn) return;
-    retireHint();
-    var id = btn.closest('.tile').dataset.id;
-    if (!setBig(bigId === id ? null : id)) return;
+    var tile = e.target.closest('.tile');
+    if (!tile) return;
+    var id = tile.dataset.id;
+
+    if (e.target.closest('.dots')) {
+      // the dots are the one thing that shrinks a tile back down
+      retireHint();
+      if (!setBig(bigId === id ? null : id)) return;
+    } else {
+      // Anywhere else on a small tile grows it; a big one keeps its clicks for
+      // what is in it. Links still go where they go, the click that ends a drag
+      // or a text selection isn't asking for anything, and a tile whose dots
+      // are hidden would have no way to close again.
+      if (id === bigId || dragged || e.target.closest('a, button')) return;
+      if (!window.getSelection().isCollapsed) return;
+      if (!tile.querySelector('.dots').offsetWidth) return;
+      if (!setBig(id)) return;
+    }
     syncDots();
     render();
     showTug();
