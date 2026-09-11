@@ -590,7 +590,7 @@ const defaultBindings = () => {
 };
 
 let bindings = loadJSON(BINDINGS_KEY, defaultBindings());
-let settings = loadJSON(SETTINGS_KEY, { volume: 70, scale: 3, slot: 1, rom: "", defaultRomSeeded: false });
+let settings = loadJSON(SETTINGS_KEY, { volume: 70, scale: 3, slot: 1, rom: "", seededRom: "" });
 
 // Drop bindings for actions that no longer exist, add ones that are new.
 for (const a of ALL_ACTIONS) {
@@ -1204,7 +1204,7 @@ function showIdleOverlay(roms = libraryRoms()) {
     // An empty library means the bundled ROM was removed, since it seeds itself
     // on a first visit. Offer it back: it is the one ROM nobody can re-add from
     // their own machine.
-    const removedDefault = settings.defaultRomSeeded;
+    const removedDefault = settings.seededRom === DEFAULT_ROM.name;
     showOverlay(
       removedDefault
         ? "No ROMs in this browser. Add a .gba file, or put " + DEFAULT_ROM.name +
@@ -1230,20 +1230,25 @@ function showIdleOverlay(roms = libraryRoms()) {
 
 // ----------------------------------------------------------- default rom
 
-/** Ships next to this page, so the emulator is never empty on a first visit. */
-const DEFAULT_ROM = { name: "solar_guard.gba", url: "solar_guard.gba" };
+/**
+ * Ships next to this page, so the emulator is never empty on a first visit.
+ * Connect 4, from github.com/bigmah/connect4 — `make` there rebuilds it.
+ */
+const DEFAULT_ROM = { name: "connect4.gba", url: "connect4.gba" };
 
 /**
  * Copies the bundled ROM into the browser's library.
  *
  * Once storage is persistent the seed is recorded, so removing the ROM makes
  * it stay gone; without persistence nothing survives a reload anyway, so it
- * is re-seeded every boot. Returns whether the ROM ended up in the library.
+ * is re-seeded every boot. What is recorded is the name that was seeded, so a
+ * browser holding an earlier bundled ROM is still handed this one. Returns
+ * whether the ROM ended up in the library.
  */
 async function seedDefaultRom() {
   if (!Module) return false;
   if (libraryRoms().includes(DEFAULT_ROM.name)) return true;
-  if (Module.persistent && settings.defaultRomSeeded) return false;
+  if (Module.persistent && settings.seededRom === DEFAULT_ROM.name) return false;
 
   showOverlay("Loading " + DEFAULT_ROM.name + "…");
   try {
@@ -1253,7 +1258,7 @@ async function seedDefaultRom() {
     Module.FS.writeFile(Module.filePaths().gamePath + "/" + DEFAULT_ROM.name, bytes);
     await Module.FSSync().catch(() => {});
 
-    settings.defaultRomSeeded = true;
+    settings.seededRom = DEFAULT_ROM.name;
     persistSettings();
     return true;
   } catch (e) {
@@ -1266,7 +1271,7 @@ async function seedDefaultRom() {
 /** Puts the bundled ROM back after it was removed, and starts it. */
 async function restoreDefaultRom() {
   unlockAudio();
-  settings.defaultRomSeeded = false;
+  settings.seededRom = "";
   persistSettings();
 
   if (!(await seedDefaultRom())) {
@@ -1455,10 +1460,16 @@ async function boot() {
 
   // The library lives in this browser, so it may already have entries.
   const haveDefault = await seedDefaultRom();
-  refreshRomLibrary(settings.rom || (haveDefault ? DEFAULT_ROM.name : ""));
+
+  // ?go — the board's tile only mounts this page once its card, which offers
+  // the bundled game by name, has been clicked. So the answer is already in:
+  // start that game, not whatever was played here last, and skip asking.
+  const go = haveDefault && new URLSearchParams(location.search).has("go");
+  refreshRomLibrary(go ? DEFAULT_ROM.name : settings.rom || (haveDefault ? DEFAULT_ROM.name : ""));
   wireDragAndDrop();
-  showIdleOverlay();
   setStatus("ready");
+  if (go) await startSelectedRom();
+  else showIdleOverlay();
 }
 
 boot().catch((e) => {

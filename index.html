@@ -472,15 +472,19 @@
   @media (max-width: 1400px) {
     .board:not(.board--static) .more p { font-size: 0.7rem; line-height: 1.8; }
     .board:not(.board--static) .now { font-size: 0.72rem; line-height: 1.8; }
+    /* seven projects only fit a small tile at full size from about 1360px up */
+    .board:not(.board--static) .tile:not(.tile--big) .projects { gap: 0.18rem; }
+    .board:not(.board--static) .tile:not(.tile--big) .project { padding: 0.22rem 0.55rem; }
+    .board:not(.board--static) .tile:not(.tile--big) .project .name { line-height: 1.3; }
   }
 
   @media (max-width: 1260px) {
     .board:not(.board--static) .more p { font-size: 0.63rem; line-height: 1.75; }
     .board:not(.board--static) .more { margin-top: 0.9rem; padding-top: 0.9rem; }
     .board:not(.board--static) .now { font-size: 0.68rem; line-height: 1.75; margin-top: 0.95rem; }
-    .board:not(.board--static) .tile:not(.tile--big) .projects { gap: 0.18rem; }
-    .board:not(.board--static) .tile:not(.tile--big) .project { padding: 0.22rem 0.55rem; }
-    .board:not(.board--static) .tile:not(.tile--big) .project .name { line-height: 1.3; }
+    /* ...and on the narrowest boards, only packed this close */
+    .board:not(.board--static) .tile:not(.tile--big) .projects { gap: 0.1rem; }
+    .board:not(.board--static) .tile:not(.tile--big) .project { padding: 0.15rem 0.55rem; }
   }
 
   @keyframes reveal {
@@ -507,8 +511,8 @@
     outline-offset: 4px;
   }
 
-  /* the llm and bike tiles' start panel: what the thing is, what it costs, and
-     a button to load it */
+  /* the gba, llm and bike tiles' start panel: what the thing is, what it costs,
+     and a button to load it */
 
   .start {
     display: flex;
@@ -613,10 +617,11 @@
 
   /* emulator */
 
-  .tile--gba .tile__body {
-    background: #0f1115;
-    position: relative;
-  }
+  /* Gated like the model and the game below: the card says what is in the
+     tile, and the emulator replaces it on the click. */
+  .tile--gba .tile__body { position: relative; }
+  .tile--gba:not(.is-live) .tile__body { background: var(--panel); overflow: auto; }
+  .tile--gba.is-live .tile__body { background: #0f1115; }
 
   /* The emulator is laid out at a fixed width and scaled to whatever square it
      is sitting in, so its controls stay whole instead of getting clipped. */
@@ -768,7 +773,7 @@
      height of its own to give, so these are told what to take. The two that
      are scaled rather than reflowed get their real height from the script;
      what is here is what they fall back to until it has run. */
-  .board--static .tile--gba .tile__body { flex: none; height: 480px; }
+  .board--static .tile--gba.is-live .tile__body { flex: none; height: 480px; }
   .board--static .tile--llm.is-live .tile__body { flex: none; height: 560px; }
   .board--static .tile--bike.is-live .tile__body { flex: none; height: 700px; }
 
@@ -784,7 +789,6 @@
   .tile__bar { cursor: default; }
   .dots { display: none; }
   .ph { display: none; }
-  .tile--gba .tile__body { height: 820px; }
   /* no script to swap the iframe in, so the button is just the link it already is */
   .start .go { text-decoration: underline; }
   /* nothing ever enlarges the tile, so its rows are links from the start */
@@ -901,6 +905,33 @@
           </a>
         </li>
         <li>
+          <a class="project" href="https://pullspace.dev/#/bigmah/connect4/blob/README.md" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+              <rect x="2.5" y="2.5" width="19" height="19" rx="2.5" opacity=".16"/>
+              <g opacity=".22">
+                <circle cx="5.25" cy="5.25" r="1.75"/><circle cx="9.75" cy="5.25" r="1.75"/><circle cx="14.25" cy="5.25" r="1.75"/>
+                <circle cx="5.25" cy="9.75" r="1.75"/><circle cx="9.75" cy="9.75" r="1.75"/>
+                <circle cx="5.25" cy="14.25" r="1.75"/>
+              </g>
+              <g opacity=".5">
+                <circle cx="18.75" cy="9.75" r="1.75"/>
+                <circle cx="14.25" cy="14.25" r="1.75"/><circle cx="18.75" cy="14.25" r="1.75"/>
+                <circle cx="9.75" cy="18.75" r="1.75"/><circle cx="18.75" cy="18.75" r="1.75"/>
+              </g>
+              <g opacity=".95">
+                <circle cx="18.75" cy="5.25" r="1.75"/>
+                <circle cx="14.25" cy="9.75" r="1.75"/>
+                <circle cx="9.75" cy="14.25" r="1.75"/>
+                <circle cx="5.25" cy="18.75" r="1.75"/><circle cx="14.25" cy="18.75" r="1.75"/>
+              </g>
+            </svg>
+            <span>
+              <span class="name">connect4</span>
+              <span class="what">connect 4 for the game boy advance — homebrew in C with sound, no SDK and no libc, against a CPU that looks five moves ahead.</span>
+            </span>
+          </a>
+        </li>
+        <li>
           <a class="project" href="https://pullspace.dev/#/bigmah/llmoxide/blob/README.md" target="_blank" rel="noopener noreferrer">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
               <path d="M12 12.6 20.8 17.4 12 22.2 3.2 17.4 12 12.6Z" opacity=".3"/>
@@ -942,24 +973,50 @@
     </div>
   </article>
 
-  <!-- Off for now. Kept whole rather than deleted: a template renders nothing
-       and its iframe never loads, so the emulator stops reaching for its rom
-       merely by sitting here. Everything that drives these two is still in the
-       script below — putting them back on the board is unwrapping this and
-       returning their names to TILES and HOME. -->
-  <template id="off">
-    <article class="tile tile--flush tile--gba" data-id="gba">
-      <header class="tile__bar" tabindex="0" aria-label="gba emulator tile — arrow keys nudge it half a cell, shift for a whole one">
-        <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
-        <span class="tile__title">gba emulator</span>
-        <span class="spacer"></span>
-        <a class="ln" href="gba.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
-      </header>
-      <div class="tile__body">
-        <iframe src="gba.html" title="GBA emulator" loading="lazy" allow="fullscreen; gamepad; autoplay" allowfullscreen></iframe>
+  <article class="tile tile--flush tile--gba" data-id="gba">
+    <header class="tile__bar" tabindex="0" aria-label="connect 4 tile — arrow keys nudge it half a cell, shift for a whole one">
+      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+      <span class="tile__title">connect 4</span>
+      <span class="spacer"></span>
+      <a class="ln" href="gba.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+    </header>
+    <div class="tile__body">
+      <div class="start">
+        <!-- a board that has just been won: the bright diagonal, from bottom left -->
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+          <rect x="2.5" y="2.5" width="19" height="19" rx="2.5" opacity=".16"/>
+          <g opacity=".22">
+            <circle cx="5.25" cy="5.25" r="1.75"/><circle cx="9.75" cy="5.25" r="1.75"/><circle cx="14.25" cy="5.25" r="1.75"/>
+            <circle cx="5.25" cy="9.75" r="1.75"/><circle cx="9.75" cy="9.75" r="1.75"/>
+            <circle cx="5.25" cy="14.25" r="1.75"/>
+          </g>
+          <g opacity=".5">
+            <circle cx="18.75" cy="9.75" r="1.75"/>
+            <circle cx="14.25" cy="14.25" r="1.75"/><circle cx="18.75" cy="14.25" r="1.75"/>
+            <circle cx="9.75" cy="18.75" r="1.75"/><circle cx="18.75" cy="18.75" r="1.75"/>
+          </g>
+          <g opacity=".95">
+            <circle cx="18.75" cy="5.25" r="1.75"/>
+            <circle cx="14.25" cy="9.75" r="1.75"/>
+            <circle cx="9.75" cy="14.25" r="1.75"/>
+            <circle cx="5.25" cy="18.75" r="1.75"/><circle cx="14.25" cy="18.75" r="1.75"/>
+          </g>
+        </svg>
+        <span>
+          <span class="name">connect 4</span>
+          <span class="what"><a class="ln" href="https://pullspace.dev/#/bigmah/connect4/blob/README.md" target="_blank" rel="noopener noreferrer">my own gba game</a> — get four in a row before the cpu does, and it looks five moves ahead. written in c with no sdk and no libc, and played here on mgba compiled to webassembly.</span>
+        </span>
+        <a class="go" href="gba.html">load the game — 1 MB</a>
+        <span class="note">nothing is fetched until this is clicked. ← → to move, ↓ or x to drop, enter to start.</span>
       </div>
-    </article>
+    </div>
+  </article>
 
+  <!-- Off for now. Kept whole rather than deleted: a template renders nothing,
+       and everything that drives the model is still in the script below —
+       putting it back on the board is unwrapping this and returning its name
+       to TILES and HOME. -->
+  <template id="off">
     <article class="tile tile--flush tile--llm" data-id="llm">
       <header class="tile__bar" tabindex="0" aria-label="local llm tile — arrow keys nudge it half a cell, shift for a whole one">
         <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
@@ -1030,20 +1087,19 @@
   // somewhere to drop into without giving a whole cell of height up to it.
   var GH = ROWS * SUB + SUB / 2;
 
-  // The emulator and the model are parked in the template above; this list is
-  // the other half of that, and the board is built from it alone. Neither is
-  // missed by the code — what is not named here is simply not on the board.
-  var TILES = ['id', 'dol', 'bike'];
+  // The model is parked in the template above; this list is the other half of
+  // that, and the board is built from it alone. It is not missed by the code —
+  // what is not named here is simply not on the board.
+  var TILES = ['id', 'dol', 'gba', 'bike'];
 
   // where everything starts, and what the reset button goes back to: two
-  // across with the third centred beneath them, in reading order — bigmah,
-  // the project, then the game. Odd counts do not divide into four columns,
-  // so the block sits half a cell over; the grid counts in half-cells anyway,
-  // which is what makes that an ordinary position rather than a special case.
+  // across and two beneath, centred with a column spare either side, in
+  // reading order — bigmah and the projects, then the two games.
   var HOME = {
     id:   { x: 2, y: 0 },
     dol:  { x: 4, y: 0 },
-    bike: { x: 3, y: 1 * SUB }
+    gba:  { x: 2, y: 1 * SUB },
+    bike: { x: 4, y: 1 * SUB }
   };
 
   var board = document.getElementById('board');
@@ -1669,21 +1725,25 @@
     save();
   });
 
-  /* ---------- the two that wait to be asked ---------- */
+  /* ---------- the three that wait to be asked ---------- */
 
   // The model used to load on sight, which meant opening the board at all put
   // 378 MB on the wire — most of a page view spent on a tile nobody had
-  // touched. The game is 37 MB and would be the same bargain on a worse day.
-  // The .start panel in the markup is the resting state for both now: it says
-  // what the thing is and what it costs, and its link is what carries the
-  // visitor to the standalone page when script never runs.
+  // touched. Bike or die is 37 MB and would be the same bargain on a worse
+  // day, and even the emulator is a megabyte of core that most visits never
+  // run. The .start panel in the markup is the resting state for all three
+  // now: it says what the thing is and what it costs, and its link is what
+  // carries the visitor to the standalone page when script never runs.
   //
-  // ?go on the model because the asking already happened here. Landing on
-  // llm.html directly is its own decision and gets its own button; arriving
-  // through this click should not ask twice for the same yes. The game has no
-  // such gate of its own — it starts when its page opens, whichever way you
-  // arrive at it.
+  // ?go on the model and the emulator because the asking already happened
+  // here. Landing on llm.html or gba.html directly is its own decision and
+  // gets its own button; arriving through this click should not ask twice for
+  // the same yes, so the emulator comes up with connect 4 already running.
+  // Bike or die has no such gate of its own — it starts when its page opens,
+  // whichever way you arrive at it.
   var GATED = {
+    gba:  { src: 'gba.html?go=1', title: 'Connect 4, running in mGBA',
+            allow: 'fullscreen; gamepad; autoplay' },
     llm:  { src: 'llm.html?go=1', title: 'llmoxide — an LLM in the browser' },
     bike: { src: 'bike/', title: 'Bike or Die 2 — recompiled to WebAssembly',
             allow: 'fullscreen; gamepad; autoplay' }
