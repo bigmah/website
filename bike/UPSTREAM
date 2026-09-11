@@ -5,6 +5,6 @@ unedited (less pumpkin.html, a duplicate of index.html). Change the game there
 and run ./sync-bike.sh to bring it here.
 
 source     /Users/tonyradtke/dev/bike_or_die
-commit     9d940fa  Refresh: sixty frames a second instead of twenty, which is what felt slow
+commit     5a24df0  Refresh: sixty frames a second in earnest, one per display refresh
 pumpkinos  matches patches/pumpkinos.patch
-built      2026-09-11T05:10:05Z
+built      2026-09-11T18:03:01Z
