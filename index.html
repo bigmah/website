@@ -1362,20 +1362,42 @@
     frame.style.transform = 'translateX(' + inset + 'px) scale(' + scale + ')';
   }
 
-  // The game's page lays itself out at one of two sizes — the wide one above
-  // 700px and the phone one below it — and the wide one is the better bargain
-  // in a tile whichever way you cut it: its canvas is 640 of 892px of page
-  // against the other's 320 of 677, and a square tile runs out of height long
-  // before it runs out of width. So it is laid out wide whatever the box and
-  // scaled down into it, the same trick the emulator above is played.
+  // The game's page lays itself out three ways: wide, narrow, and — for a
+  // coarse pointer — as a phone, the screen filling the page and the keys it
+  // is ridden with under it. The wide one is the better bargain in a tile
+  // whichever way you cut it: its canvas is 640 of 892px of page against the
+  // narrow one's 320 of 677, and a square tile runs out of height long before
+  // it runs out of width. So it is laid out wide whatever the box and scaled
+  // down into it, the same trick the emulator above is played.
   var BIKE_W = 704;
   var BIKE_H = 926;
+  // Under a thumb that trick is the wrong one. The phone layout's keys are
+  // meant to be pressed, and a page scaled to half size has half-size keys —
+  // 26px of arrow, against the 44 a thumb wants. So the frame is given the
+  // tile's real width and left at 1:1, and the page divides that box between
+  // its screen and its keys the way it does when it has a whole window. This
+  // much taller than wide leaves it room for both.
+  var BIKE_THUMB = 1.75;
+
+  function thumb() {
+    return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  }
 
   function fitBike(w, h) {
     var el = els.bike;
     var frame = el && el.querySelector('iframe');
     if (!frame) return;                  // still the card; nothing to scale
     var body = el.querySelector('.tile__body');
+
+    if (isStatic && thumb()) {
+      w = body.clientWidth;
+      h = Math.round(w * BIKE_THUMB);
+      body.style.height = h + 'px';
+      frame.style.width = w + 'px';
+      frame.style.height = h + 'px';
+      frame.style.transform = '';
+      return;
+    }
 
     if (isStatic) {
       // Stacked there is no height to fit into — the tile is told to be as

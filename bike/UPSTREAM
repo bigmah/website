@@ -5,6 +5,6 @@ unedited (less pumpkin.html, a duplicate of index.html). Change the game there
 and run ./sync-bike.sh to bring it here.
 
 source     /Users/tonyradtke/dev/bike_or_die
-commit     b3d6d5f  Level packs: picking one plays it, instead of falling back to Introduction
+commit     12cc47a  On a phone: the game takes the screen, and grows the keys to ride it
 pumpkinos  matches patches/pumpkinos.patch
-built      2026-09-10T23:15:17Z
+built      2026-09-11T04:18:04Z
