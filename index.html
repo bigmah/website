@@ -978,7 +978,7 @@
       <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
       <span class="tile__title">connect 4</span>
       <span class="spacer"></span>
-      <a class="ln" href="gba.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+      <a class="ln" href="gba/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
     </header>
     <div class="tile__body">
       <div class="start">
@@ -1006,7 +1006,7 @@
           <span class="name">connect 4</span>
           <span class="what"><a class="ln" href="https://pullspace.dev/#/bigmah/connect4/blob/README.md" target="_blank" rel="noopener noreferrer">my own gba game</a> — get four in a row before the cpu does, and it looks five moves ahead. written in c with no sdk and no libc, and played here on mgba compiled to webassembly.</span>
         </span>
-        <a class="go" href="gba.html">load the game — 1 MB</a>
+        <a class="go" href="gba/">load the game — 1 MB</a>
         <span class="note">nothing is fetched until this is clicked. ← → to move, ↓ or x to drop, enter to start.</span>
       </div>
     </div>
@@ -1736,13 +1736,13 @@
   // carries the visitor to the standalone page when script never runs.
   //
   // ?go on the model and the emulator because the asking already happened
-  // here. Landing on llm.html or gba.html directly is its own decision and
+  // here. Landing on llm.html or gba/ directly is its own decision and
   // gets its own button; arriving through this click should not ask twice for
   // the same yes, so the emulator comes up with connect 4 already running.
   // Bike or die has no such gate of its own — it starts when its page opens,
   // whichever way you arrive at it.
   var GATED = {
-    gba:  { src: 'gba.html?go=1', title: 'Connect 4, running in mGBA',
+    gba:  { src: 'gba/?go=1', title: 'Connect 4, running in mGBA',
             allow: 'fullscreen; gamepad; autoplay' },
     llm:  { src: 'llm.html?go=1', title: 'llmoxide — an LLM in the browser' },
     bike: { src: 'bike/', title: 'Bike or Die 2 — recompiled to WebAssembly',

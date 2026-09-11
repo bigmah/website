@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GBA</title>
-<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzBmMTExNSIvPgogIDxyZWN0IHg9IjciICB5PSIxOSIgd2lkdGg9IjE4IiBoZWlnaHQ9IjYiIHJ4PSIxLjUiIGZpbGw9IiM2ZWE4ZmUiLz4KICA8cmVjdCB4PSI5IiAgeT0iMTIiIHdpZHRoPSIxNCIgaGVpZ2h0PSI2IiByeD0iMS41IiBmaWxsPSIjNGFkZTgwIi8+CiAgPHJlY3QgeD0iMTIiIHk9IjUiICB3aWR0aD0iMTAiIGhlaWdodD0iNiIgcng9IjEuNSIgZmlsbD0iI2ZmZDE2NiIvPgo8L3N2Zz4K">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzBmMTExNSIvPgogIDxyZWN0IHg9IjQiICB5PSI3IiAgd2lkdGg9IjciIGhlaWdodD0iMyIgICByeD0iMS40IiBmaWxsPSIjMmEzMDQwIi8+CiAgPHJlY3QgeD0iMjEiIHk9IjciICB3aWR0aD0iNyIgaGVpZ2h0PSIzIiAgIHJ4PSIxLjQiIGZpbGw9IiMyYTMwNDAiLz4KICA8cmVjdCB4PSIzIiAgeT0iOSIgIHdpZHRoPSIyNiIgaGVpZ2h0PSIxNSIgcng9IjQiICAgZmlsbD0iIzIyMjgzNiIvPgogIDxyZWN0IHg9IjExIiB5PSIxMiIgd2lkdGg9IjEwIiBoZWlnaHQ9IjkiICByeD0iMS41IiBmaWxsPSIjNmVhOGZlIi8+CiAgPHJlY3QgeD0iNS40IiB5PSIxNS42IiB3aWR0aD0iNC42IiBoZWlnaHQ9IjEuOCIgcng9IjAuNiIgZmlsbD0iI2U2ZTllZiIvPgogIDxyZWN0IHg9IjYuOCIgeT0iMTQuMiIgd2lkdGg9IjEuOCIgaGVpZ2h0PSI0LjYiIHJ4PSIwLjYiIGZpbGw9IiNlNmU5ZWYiLz4KICA8Y2lyY2xlIGN4PSIyNS40IiBjeT0iMTUuNCIgcj0iMS41IiBmaWxsPSIjNGFkZTgwIi8+CiAgPGNpcmNsZSBjeD0iMjIuNiIgY3k9IjE4LjQiIHI9IjEuNSIgZmlsbD0iI2ZmZDE2NiIvPgo8L3N2Zz4K">
 <style>
 :root {
   --bg: #0f1115;
@@ -520,8 +520,8 @@ const HOTKEY_ACTIONS = [
 const ALL_ACTIONS = [...GBA_ACTIONS, ...HOTKEY_ACTIONS];
 const GBA_IDS = new Set(GBA_ACTIONS.map((a) => a.id));
 
-const BINDINGS_KEY = "wackystackers.bindings.v2";
-const SETTINGS_KEY = "wackystackers.settings.v2";
+const BINDINGS_KEY = "gbawasm.bindings.v2";
+const SETTINGS_KEY = "gbawasm.settings.v2";
 const FF_MULTIPLIER = 4;
 const AXIS_DEADZONE = 0.5;
 
@@ -1231,10 +1231,15 @@ function showIdleOverlay(roms = libraryRoms()) {
 // ----------------------------------------------------------- default rom
 
 /**
- * Ships next to this page, so the emulator is never empty on a first visit.
- * Connect 4, from github.com/bigmah/connect4 — `make` there rebuilds it.
+ * A ROM served beside this page, seeded into the library on a first visit so
+ * the emulator is never empty.
+ *
+ * The path is relative and identical in both builds: the server serves
+ * `web/roms/`, and tools/bundle.py's single file is meant to be dropped next
+ * to a `roms/` directory holding the same ROM. Opened straight off disk with
+ * nothing beside it, the fetch fails and the library simply starts empty.
  */
-const DEFAULT_ROM = { name: "connect4.gba", url: "connect4.gba" };
+const DEFAULT_ROM = { name: "connect4.gba", url: "roms/connect4.gba" };
 
 /**
  * Copies the bundled ROM into the browser's library.
@@ -1262,7 +1267,7 @@ async function seedDefaultRom() {
     persistSettings();
     return true;
   } catch (e) {
-    // Offline, or opened straight off disk — fall back to an empty library.
+    // Offline, or opened with nothing beside it — fall back to an empty library.
     console.warn("could not load the bundled ROM:", e);
     return false;
   }
@@ -1334,7 +1339,7 @@ function wireDragAndDrop() {
 
 function downloadScreenshot() {
   if (!Module || !running) return;
-  const name = "gba-emu-" + new Date().toISOString().replace(/[:.]/g, "-") + ".png";
+  const name = "gba-wasm-" + new Date().toISOString().replace(/[:.]/g, "-") + ".png";
   try {
     Module.screenshot(name);
     const bytes = Module.FS.readFile(Module.filePaths().screenshotsPath + "/" + name);
@@ -1458,18 +1463,20 @@ async function boot() {
 
   window.addEventListener("beforeunload", () => { try { Module.FSSync(); } catch { /* ignore */ } });
 
-  // The library lives in this browser, so it may already have entries.
+  // The library lives in this browser, so it may already have entries; the
+  // bundled ROM joins them the first time anyone visits.
   const haveDefault = await seedDefaultRom();
 
-  // ?go — the board's tile only mounts this page once its card, which offers
-  // the bundled game by name, has been clicked. So the answer is already in:
-  // start that game, not whatever was played here last, and skip asking.
+  // ?go — for an embedder that has already asked. A page linked from a card
+  // naming the bundled game should come up with that game running rather than
+  // ask for the same yes twice. Landing here directly is its own decision, and
+  // gets the usual click-to-start.
   const go = haveDefault && new URLSearchParams(location.search).has("go");
   refreshRomLibrary(go ? DEFAULT_ROM.name : settings.rom || (haveDefault ? DEFAULT_ROM.name : ""));
   wireDragAndDrop();
-  setStatus("ready");
   if (go) await startSelectedRom();
   else showIdleOverlay();
+  setStatus("ready");
 }
 
 boot().catch((e) => {

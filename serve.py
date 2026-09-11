@@ -21,6 +21,12 @@ that is not isolated is not isolated either. They go on everything. Nothing
 served here loads a cross-origin subresource, so require-corp costs the other
 two pages nothing.
 
+gba/ is the same arrangement one repo over: tools/bundle.py's output from
+gba_wasm, refreshed by ./sync-gba.sh and never edited here. That one is
+single-threaded and asks for no headers of its own -- it only wants an origin,
+to fetch the game sitting in gba/roms/ beside it -- but it is no more source
+than bike/ is.
+
 Putting it on the public internet is the other reason to run it, and https is
 not optional there. The Cache API the page keeps the 378 MB checkpoint in is a
 secure-context feature: over plain http to anything but localhost it is simply
@@ -348,7 +354,7 @@ def main() -> int:
     print(
         f"serving {HERE} at {scheme}://{reachable}:{args.port}/\n"
         f"  listening on {', '.join(show(a, args.port) for a in seen_addrs)}\n"
-        f"  on their own {scheme}://{reachable}:{args.port}/gba.html,"
+        f"  on their own {scheme}://{reachable}:{args.port}/gba/,"
         f" /llm.html and /bike/",
         flush=True,
     )
