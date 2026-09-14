@@ -409,10 +409,13 @@
   .links {
     margin: 1.05rem 0 0;
     display: flex;
-    gap: 0.9rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem 0.9rem;
   }
 
-  .links a {
+  .links a,
+  .links button {
     display: inline-flex;
     color: var(--icon);
     padding: 0.35rem;
@@ -421,10 +424,54 @@
     transition: color 160ms ease;
   }
 
-  .links a + a { margin-left: 0; }
+  .links button {
+    background: none;
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .links > * + * { margin-left: 0; }
 
   .links a:hover,
-  .links a:focus-visible { color: var(--fg); }
+  .links a:focus-visible,
+  .links button:hover,
+  .links button:focus-visible,
+  .links button[aria-expanded="true"] { color: var(--fg); }
+
+  /* the address the mail button shows: beside the icons when the tile is wide
+     enough, on a line of its own under them when it isn't */
+  .email {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .email[hidden] { display: none; }
+
+  /* one click selects the whole address, not just the word under it */
+  .email__addr {
+    font-size: 0.75rem;
+    color: var(--dim);
+    user-select: all;
+    -webkit-user-select: all;
+  }
+
+  .links .email button { margin-left: 0; padding: 0.3rem; }
+  .links .email svg { width: 14px; height: 14px; }
+  .email .i-done,
+  .email .is-done .i-copy { display: none; }
+  .email .is-done .i-done { display: block; }
+
+  /* said aloud, not shown — the tick is what shows */
+  .email__said {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 
   .links svg {
     width: 18px;
@@ -800,6 +847,9 @@
   .start .go { text-decoration: underline; }
   /* nothing ever enlarges the tile, so its rows are links from the start */
   .tile .projects .project { pointer-events: auto; }
+  /* nothing to reveal or copy the address with, so it is just there */
+  .links .js-mail, .email button { display: none; }
+  .links .email[hidden] { display: inline-flex; }
 </style></noscript>
 </head>
 <body>
@@ -847,6 +897,17 @@
         <a href="https://x.com/_bigmah_" target="_blank" rel="noopener noreferrer" aria-label="X" title="X">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.41l-5.8-7.58-6.64 7.58H.46l8.6-9.83L0 1.15h7.59l5.24 6.93 6.07-6.93Zm-1.29 19.5h2.04L6.49 3.24H4.3l13.31 17.41Z"/></svg>
         </a>
+        <button class="js-mail" type="button" aria-expanded="false" aria-controls="email" aria-label="Email" title="Email">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M2.4 2.4h19.2A2.4 2.4 0 0 1 24 4.8v14.4a2.4 2.4 0 0 1-2.4 2.4H2.4A2.4 2.4 0 0 1 0 19.2V4.8a2.4 2.4 0 0 1 2.4-2.4Zm19.2 4.8L12 13.2 2.4 7.2V4.8l9.6 6 9.6-6Z"/></svg>
+        </button>
+        <span class="email" id="email" hidden>
+          <span class="email__addr">bigmahdev@gmail.com</span>
+          <button class="js-copy" type="button" aria-label="Copy email address" title="Copy">
+            <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1Zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2Zm0 16H8V7h11v14Z"/></svg>
+            <svg class="i-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>
+          </button>
+          <span class="email__said" role="status"></span>
+        </span>
       </nav>
       <p class="now">working on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> — trying to make code review in browser better with Rust + WASM</p>
       <div class="more">
@@ -1716,9 +1777,10 @@
     } else {
       // Anywhere else on a small tile grows it; a big one keeps its clicks for
       // what is in it. Links still go where they go, the click that ends a drag
-      // or a text selection isn't asking for anything, and a tile whose dots
-      // are hidden would have no way to close again.
-      if (id === bigId || dragged || e.target.closest('a, button')) return;
+      // or a text selection isn't asking for anything (the email address is
+      // one, a click selecting all of it), and a tile whose dots are hidden
+      // would have no way to close again.
+      if (id === bigId || dragged || e.target.closest('a, button, .email')) return;
       if (!window.getSelection().isCollapsed) return;
       if (!tile.querySelector('.dots').offsetWidth) return;
       if (!setBig(id)) return;
@@ -2297,6 +2359,60 @@
     land();
     resume();
     showTug();
+  });
+
+  // The mail button shows the address as plain text rather than being a
+  // mailto:, which does nothing visible for anyone without a mail app set up.
+  // The button beside the address copies it; if that can't happen, the
+  // address is selected instead so it can be copied by hand.
+  var mailBtn = document.querySelector('.js-mail');
+  var email = document.getElementById('email');
+  var emailAddr = email.querySelector('.email__addr');
+  var copyBtn = email.querySelector('.js-copy');
+  var copySaid = email.querySelector('.email__said');
+  var copyTimer = 0;
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      if (ok) resolve(); else reject();
+    });
+  }
+
+  mailBtn.addEventListener('click', function () {
+    var open = email.hidden;
+    email.hidden = !open;
+    mailBtn.setAttribute('aria-expanded', String(open));
+  });
+
+  copyBtn.addEventListener('click', function () {
+    clearTimeout(copyTimer);
+    copyText(emailAddr.textContent).then(function () {
+      copyBtn.classList.add('is-done');
+      copySaid.textContent = 'copied';
+      copyTimer = setTimeout(function () {
+        copyBtn.classList.remove('is-done');
+        copySaid.textContent = '';
+      }, 1600);
+    }, function () {
+      var range = document.createRange();
+      range.selectNodeContents(emailAddr);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
   });
 
   /* ---------- go ---------- */
