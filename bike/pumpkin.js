@@ -38,7 +38,7 @@ var ENVIRONMENT_IS_PTHREAD = ENVIRONMENT_IS_WORKER && globalThis.name == 'em-pth
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /var/folders/06/sphc00m13l12tqmf70tpd4wc0000gn/T/tmpk8pjhof8.js
+// include: /var/folders/06/sphc00m13l12tqmf70tpd4wc0000gn/T/tmpjhb8slma.js
 
   if (!Module['expectedDataFileDownloads']) Module['expectedDataFileDownloads'] = 0;
   Module['expectedDataFileDownloads']++;
@@ -390,7 +390,7 @@ Module['FS_createPath']("/pristine/app_storage", "vi_7669", true, true);
 
   })();
 
-// end include: /var/folders/06/sphc00m13l12tqmf70tpd4wc0000gn/T/tmpk8pjhof8.js
+// end include: /var/folders/06/sphc00m13l12tqmf70tpd4wc0000gn/T/tmpjhb8slma.js
 // include: bod-pre.js
 // Browser-side setup for the Bike or Die 2 WebAssembly build: the environment
 // that tools/make_app.sh exports around the native one, and the page's half of
@@ -447,55 +447,6 @@ function bodReset() {
   window.location.reload();
 }
 
-// ---------------------------------------------------------------- pausing --
-//
-// There is nothing on the main thread to pause: -sPROXY_TO_PTHREAD puts main()
-// on a worker, so the game's loop is that worker's and Module.pauseMainLoop
-// would stop a loop that is not the game's. Ask the workers instead and let
-// whichever of them owns a main loop stop its own; the rest have none and do
-// nothing.
-//
-// MainLoop.pause() is not quite what is wanted either. It also drops the
-// keepalive reference the loop holds, which is what lets a loop that is really
-// finished exit the runtime -- and a paused game is not a finished one. So the
-// count is left where it is, and the matching push that MainLoop.resume() does
-// when it rebuilds the scheduler is popped back off instead.
-//
-// The message deliberately carries no `cmd`: the generated worker handler
-// complains about a cmd it does not recognise, and says nothing at all about a
-// message without one.
-
-if (typeof ENVIRONMENT_IS_PTHREAD !== 'undefined' && ENVIRONMENT_IS_PTHREAD) {
-  self.addEventListener('message', function (e) {
-    var what = e.data && e.data.bod;
-    if (what === 'pause') {
-      if (MainLoop.func && MainLoop.scheduler) {
-        MainLoop.scheduler = null;
-        // Signals the loop already in flight that it has become old and must return.
-        MainLoop.currentlyRunningMainloop++;
-        self.bodMainLoopPaused = true;
-      }
-    } else if (what === 'resume') {
-      // A short-lived helper loop can finish while it is paused; only restart
-      // one that is still alive. The game's own outlives the pause.
-      if (self.bodMainLoopPaused && MainLoop.func) {
-        MainLoop.resume();
-        runtimeKeepalivePop();
-      }
-      self.bodMainLoopPaused = false;
-    }
-  });
-}
-
-function bodTellThreads(what) {
-  Object.values(PThread.pthreads).forEach(function (worker) {
-    worker.postMessage({ bod: what });
-  });
-}
-
-Module['pauseBikeOrDie'] = function () { bodTellThreads('pause'); };
-Module['resumeBikeOrDie'] = function () { bodTellThreads('resume'); };
-
 // ------------------------------------------------------------ presenting --
 //
 // The page draws the frame; the game never waits for it to.
@@ -518,6 +469,237 @@ Module['resumeBikeOrDie'] = function () { bodTellThreads('resume'); };
 // `seq` counts published frames, and is read either side of the copy: a frame
 // published while this one was being copied is copied again rather than torn
 // into the one before it.
+//
+// What it draws with is the other half: see the screen, below.
+
+// ------------------------------------------------------------ the screen --
+//
+// The game draws 320x320, and the screen it is looked at on has several times
+// that many pixels in each direction. How they are made up is the Screen
+// setting on the page:
+//
+//   pixels  every one of the game's pixels a square, as a Palm showed it. At
+//           a whole-number scale that is exactly nearest-neighbour. At any
+//           other -- a phone, whose screen is as big as the phone allows --
+//           the squares cannot all be the same size, so the one device pixel
+//           that straddles a seam is blended instead of some rows doubling.
+//   smooth  bilinear.
+//   xbr     Hyllian's xBR (level 2). Each pixel's corners are redrawn from the
+//           edges that run through its 5x5 neighbourhood, so lettering,
+//           wheels and the outlines of hills come out as smooth lines at the
+//           display's own resolution, while flat colour and texture are left
+//           as they were.
+//
+// Each is a fragment shader, drawn into the canvas with its backing store set
+// to its CSS size times devicePixelRatio: one of its pixels per device pixel,
+// which is the resolution the frame is upscaled to. The frame itself goes up
+// as a 320x320 texture. Upscaling on the CPU instead would make the copy out
+// of the heap and the putImageData after it sixteen times the size, sixty
+// times a second, on the thread the page's controls run on.
+//
+// Without WebGL the canvas keeps the 2D context and its 320x320 backing, and
+// the browser scales it the way the stylesheet says: pixels or smooth. xBR
+// needs the shader and is not offered.
+
+var BOD_SCREEN_MODES = ['pixels', 'smooth', 'xbr'];
+
+var BOD_SCREEN_VS = [
+  'attribute vec2 a_pos;',
+  'varying vec2 v_uv;',
+  'void main() {',
+  '  v_uv = a_pos * vec2(0.5, -0.5) + 0.5;',   // row 0 of the frame at the top
+  '  gl_Position = vec4(a_pos, 0.0, 1.0);',
+  '}'
+].join('\n');
+
+// u_size is the frame in pixels, u_scale how many device pixels each of them
+// covers on the screen.
+var BOD_SCREEN_HEAD = [
+  'precision highp float;',
+  'uniform sampler2D u_tex;',
+  'uniform vec2 u_size;',
+  'uniform vec2 u_scale;',
+  'varying vec2 v_uv;',
+  ''
+].join('\n');
+
+var BOD_SCREEN_FS = {
+  // Sampled bilinearly, but only ever at a texel's centre except within half
+  // a device pixel of a seam, where the sample slides across it.
+  pixels: BOD_SCREEN_HEAD + [
+    'void main() {',
+    '  vec2 p = v_uv * u_size;',
+    '  vec2 seam = floor(p + 0.5);',
+    '  vec2 d = clamp((p - seam) * u_scale, -0.5, 0.5);',
+    '  gl_FragColor = texture2D(u_tex, (seam + d) / u_size);',
+    '}'
+  ].join('\n'),
+
+  smooth: BOD_SCREEN_HEAD + [
+    'void main() { gl_FragColor = texture2D(u_tex, v_uv); }'
+  ].join('\n'),
+
+  // xBR-lv2, after Hyllian's (MIT licence), with corner type C. Sampled with
+  // nearest-neighbour. The 5x5 neighbourhood of the pixel E being drawn:
+  //
+  //        A1 B1 C1
+  //     A0  A  B  C C4
+  //     D0  D  E  F F4
+  //     G0  G  H  I I4
+  //        G5 H5 I5
+  //
+  // Everything is worked out for the four corners of E at once, as the four
+  // components of a vec4: the bottom right, top right, top left and bottom
+  // left, each with its neighbours renamed as if it were the bottom right.
+  // The comparisons are of luma scaled to 0-48; delta is how far across an
+  // edge the blend runs, one device pixel's worth.
+  xbr: BOD_SCREEN_HEAD + [
+    'const vec3 Y  = vec3(14.352, 28.176, 5.472);',
+    'const vec4 Ao = vec4( 1.0, -1.0, -1.0,  1.0);',
+    'const vec4 Bo = vec4( 1.0,  1.0, -1.0, -1.0);',
+    'const vec4 Co = vec4( 1.5,  0.5, -0.5,  0.5);',
+    'const vec4 Ax = vec4( 1.0, -1.0, -1.0,  1.0);',
+    'const vec4 Bx = vec4( 0.5,  2.0, -0.5, -2.0);',
+    'const vec4 Cx = vec4( 1.0,  1.0, -0.5,  0.0);',
+    'const vec4 Ay = vec4( 1.0, -1.0, -1.0,  1.0);',
+    'const vec4 By = vec4( 2.0,  0.5, -2.0, -0.5);',
+    'const vec4 Cy = vec4( 2.0,  0.0, -1.0,  0.5);',
+    'vec4 df(vec4 a, vec4 b) { return abs(a - b); }',
+    'float cdf(vec3 a, vec3 b) { vec3 d = abs(a - b); return d.r + d.g + d.b; }',
+    'vec4 eq(vec4 a, vec4 b) { return step(df(a, b), vec4(15.0)); }',
+    'vec4 neq(vec4 a, vec4 b) { return vec4(1.0) - eq(a, b); }',
+    'vec4 wd(vec4 a, vec4 b, vec4 c, vec4 d, vec4 e, vec4 f, vec4 g, vec4 h) {',
+    '  return df(a, b) + df(a, c) + df(d, e) + df(d, f) + 4.0 * df(g, h);',
+    '}',
+    'vec3 at(vec2 c, float x, float y) { return texture2D(u_tex, c + vec2(x, y) / u_size).rgb; }',
+    'void main() {',
+    '  vec2 p = v_uv * u_size;',
+    '  vec2 fp = fract(p);',
+    '  vec2 c = (floor(p) + 0.5) / u_size;',
+    '  vec3 A1 = at(c, -1.0, -2.0), B1 = at(c, 0.0, -2.0), C1 = at(c, 1.0, -2.0);',
+    '  vec3 A0 = at(c, -2.0, -1.0), A = at(c, -1.0, -1.0), B = at(c, 0.0, -1.0), C = at(c, 1.0, -1.0), C4 = at(c, 2.0, -1.0);',
+    '  vec3 D0 = at(c, -2.0,  0.0), D = at(c, -1.0,  0.0), E = at(c, 0.0,  0.0), F = at(c, 1.0,  0.0), F4 = at(c, 2.0,  0.0);',
+    '  vec3 G0 = at(c, -2.0,  1.0), G = at(c, -1.0,  1.0), H = at(c, 0.0,  1.0), I = at(c, 1.0,  1.0), I4 = at(c, 2.0,  1.0);',
+    '  vec3 G5 = at(c, -1.0,  2.0), H5 = at(c, 0.0,  2.0), I5 = at(c, 1.0,  2.0);',
+    '  vec4 b  = vec4(dot(B, Y), dot(D, Y), dot(H, Y), dot(F, Y));',
+    '  vec4 k  = vec4(dot(C, Y), dot(A, Y), dot(G, Y), dot(I, Y));',   // c in Hyllian's
+    '  vec4 e  = vec4(dot(E, Y));',
+    '  vec4 d  = b.yzwx, f = b.wxyz, h = b.zwxy, g = k.zwxy, i = k.wxyz;',
+    '  vec4 i4 = vec4(dot(I4, Y), dot(C1, Y), dot(A0, Y), dot(G5, Y));',
+    '  vec4 i5 = vec4(dot(I5, Y), dot(C4, Y), dot(A1, Y), dot(G0, Y));',
+    '  vec4 h5 = vec4(dot(H5, Y), dot(F4, Y), dot(B1, Y), dot(D0, Y));',
+    '  vec4 f4 = h5.yzwx;',
+    // The lines across each corner that the blend is on the far side of:
+    // 45 degrees, and the shallow and steep ones either side of it.
+    '  vec4 fx   = Ao * fp.y + Bo * fp.x;',
+    '  vec4 fx_l = Ax * fp.y + Bx * fp.x;',
+    '  vec4 fx_u = Ay * fp.y + By * fp.x;',
+    '  vec4 irlv0 = neq(e, f) * neq(e, h);',
+    '  vec4 irlv1 = irlv0 * (neq(f, b) * neq(f, k) + neq(h, d) * neq(h, g) +',
+    '               eq(e, i) * (neq(f, f4) * neq(f, i4) + neq(h, h5) * neq(h, i5)) + eq(e, g) + eq(e, k));',
+    '  vec4 irlv2l = neq(e, g) * neq(d, g);',
+    '  vec4 irlv2u = neq(e, k) * neq(b, k);',
+    '  float dl = 1.0 / max(u_scale.x, 1.0);',
+    '  vec4 delta   = vec4(dl);',
+    '  vec4 delta_l = vec4(0.5, 1.0, 0.5, 1.0) * dl;',
+    '  vec4 delta_u = delta_l.yxwz;',
+    '  vec4 fx45 = clamp((fx   + delta   - Co) / (2.0 * delta),   0.0, 1.0);',
+    '  vec4 fx30 = clamp((fx_l + delta_l - Cx) / (2.0 * delta_l), 0.0, 1.0);',
+    '  vec4 fx60 = clamp((fx_u + delta_u - Cy) / (2.0 * delta_u), 0.0, 1.0);',
+    // Whether an edge runs across the corner at all, and whether it is
+    // shallow or steep enough to take the longer line.
+    '  vec4 wd1 = wd(e, k, g, i, h5, f4, h, f);',
+    '  vec4 wd2 = wd(h, d, i5, f, i4, b, e, i);',
+    '  vec4 edr   = step(wd1 + 0.1, wd2) * step(0.5, irlv1);',
+    '  vec4 edr_l = step(2.0 * df(f, g), df(h, k)) * irlv2l * edr;',
+    '  vec4 edr_u = step(2.0 * df(h, k), df(f, g)) * irlv2u * edr;',
+    '  vec4 m  = max(max(fx30 * edr_l, fx60 * edr_u), fx45 * edr);',
+    '  vec4 px = step(df(e, f), df(e, h));',
+    // Opposite corners are blended in pairs, and the pair that moved E the
+    // further wins.
+    '  vec3 r1 = mix(E,  mix(H, F, px.x), m.x);',
+    '  r1      = mix(r1, mix(B, D, px.z), m.z);',
+    '  vec3 r2 = mix(E,  mix(F, B, px.y), m.y);',
+    '  r2      = mix(r2, mix(D, H, px.w), m.w);',
+    '  gl_FragColor = vec4(mix(r1, r2, step(cdf(E, r1), cdf(E, r2))), 1.0);',
+    '}'
+  ].join('\n')
+};
+
+// The shaders and the quad they are drawn on, in a context that already
+// exists -- a lost context that comes back is the same object with nothing in
+// it, and is set up again from here. Programs are compiled when first used.
+function bodScreenGL(gl) {
+  var programs = {}, vs, quad, tex, tw = 0, th = 0;
+
+  function shader(type, source) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, source);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS) && !gl.isContextLost()) {
+      throw new Error('screen shader: ' + gl.getShaderInfoLog(s));
+    }
+    return s;
+  }
+
+  function program(mode) {
+    var p = programs[mode];
+
+    if (p) return p;
+    p = gl.createProgram();
+    gl.attachShader(p, vs);
+    gl.attachShader(p, shader(gl.FRAGMENT_SHADER, BOD_SCREEN_FS[mode]));
+    gl.bindAttribLocation(p, 0, 'a_pos');
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS) && !gl.isContextLost()) {
+      throw new Error('screen program: ' + gl.getProgramInfoLog(p));
+    }
+    p.size = gl.getUniformLocation(p, 'u_size');
+    p.scale = gl.getUniformLocation(p, 'u_scale');
+    return (programs[mode] = p);
+  }
+
+  vs = shader(gl.VERTEX_SHADER, BOD_SCREEN_VS);
+  quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  // A 320x320 texture is not a power of two, which WebGL 1 allows only
+  // clamped and without mipmaps.
+  tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  return {
+    // bytes is RGBA, and not a view of the shared heap: WebGL refuses those.
+    upload: function (w, h, bytes) {
+      if (w !== tw || h !== th) {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+        tw = w;
+        th = h;
+      } else {
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+      }
+    },
+    draw: function (mode) {
+      var p = program(mode), filter = mode === 'xbr' ? gl.NEAREST : gl.LINEAR;
+      var w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+
+      if (!tw) return false;
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+      gl.viewport(0, 0, w, h);
+      gl.useProgram(p);
+      gl.uniform2f(p.size, tw, th);
+      gl.uniform2f(p.scale, w / tw, h / th);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      return true;
+    }
+  };
+}
 
 if (typeof ENVIRONMENT_IS_PTHREAD === 'undefined' || !ENVIRONMENT_IS_PTHREAD) (function () {
   // The order of the fields is the interface; see web_canvas_t.
@@ -525,13 +707,85 @@ if (typeof ENVIRONMENT_IS_PTHREAD === 'undefined' || !ENVIRONMENT_IS_PTHREAD) (f
       F_TICK = 6, F_PRESENTED = 7, F_STALE = 8;
   var MAGIC = 0x424F4443;
 
-  var base = 0, ctx = null, img = null, out = null, pixels = 0, words = 0, last = -1;
+  var el = Module['canvas'], base = 0, pixels = 0, words = 0, last = -1;
+  var gl = null, screen = null, ctx = null, img = null, bytes = null, frame32 = null;
+  var fw = 0, fh = 0, devW = 0, devH = 0, dirty = false;
+  var mode = BOD_SCREEN_MODES.indexOf(Module['bodScreenMode']) >= 0 ? Module['bodScreenMode'] : 'xbr';
+
+  // SDL presents into the same canvas when it is asked to (BOD_PRESENT=sdl),
+  // with a 2D context of its own; a WebGL one taken first would leave it
+  // none. The frame is not this loop's to draw then anyway.
+  function sdlPresents() {
+    return /(^|\n)BOD_PRESENT=sdl(\n|$)/.test(bodEnvString());
+  }
+
+  // Taken at once rather than when the first frame arrives, so the page
+  // knows from the start whether xBR is on offer.
+  if (el && !sdlPresents()) {
+    try {
+      gl = el.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false,
+                                    premultipliedAlpha: false, preserveDrawingBuffer: false });
+      if (gl) screen = bodScreenGL(gl);
+    } catch (e) {
+      console.warn('no WebGL screen, drawing it in 2D:', e);
+      gl = screen = null;
+    }
+    if (gl) {
+      el.addEventListener('webglcontextlost', function (e) {
+        e.preventDefault();       // or it never comes back
+        screen = null;
+      });
+      el.addEventListener('webglcontextrestored', function () {
+        try { screen = bodScreenGL(gl); } catch (e) { console.warn(e); }
+        last = -1;                // the texture went with it
+      });
+    }
+  }
+
+  // The size of the canvas in device pixels. Browsers that can say exactly
+  // what it is (device-pixel-content-box) are asked; the rest are worked out
+  // from the CSS size, as it is drawn, every refresh. The exact answer is only
+  // taken when it is the worked-out one give or take the rounding: Chrome's
+  // emulated device scale factors -- how the page is tested at 2x -- report
+  // the CSS size there.
+  if (gl && typeof ResizeObserver !== 'undefined') {
+    try {
+      new ResizeObserver(function (entries) {
+        var s = entries[entries.length - 1].devicePixelContentBoxSize;
+        if (s && s[0]) {
+          devW = s[0].inlineSize;
+          devH = s[0].blockSize;
+        }
+      }).observe(el, { box: 'device-pixel-content-box' });
+    } catch (e) { /* not in this browser */ }
+  }
+
+  function fit() {
+    var dpr = window.devicePixelRatio || 1;
+    var w = Math.round(el.clientWidth * dpr), h = Math.round(el.clientHeight * dpr);
+
+    if (Math.abs(devW - w) <= 1 && Math.abs(devH - h) <= 1) {
+      w = devW;
+      h = devH;
+    }
+
+    if (w > 0 && h > 0 && (el.width !== w || el.height !== h)) {
+      el.width = w;               // which clears it
+      el.height = h;
+      dirty = true;
+    }
+  }
+
+  // The 2D context has only the browser's own scaling to offer.
+  function style() {
+    if (!gl && el) el.style.imageRendering = mode === 'pixels' ? '' : 'auto';
+  }
 
   // Zero until the wasm side has a frame buffer to show, which is when the
   // window is created -- a second or so into the boot. Asked again every time
   // the buffer goes, so a window that comes back is picked up again.
   function ready() {
-    var p, w, h, el;
+    var p, w, h;
 
     if (base) return true;
     if (typeof _bod_canvas_info !== 'function') return false;
@@ -539,13 +793,18 @@ if (typeof ENVIRONMENT_IS_PTHREAD === 'undefined' || !ENVIRONMENT_IS_PTHREAD) (f
 
     w = HEAPU32[(p >>> 2) + F_WIDTH];
     h = HEAPU32[(p >>> 2) + F_HEIGHT];
-    el = Module['canvas'];
     if (!el || !w || !h) return false;
 
-    if (!ctx && !(ctx = el.getContext('2d', { alpha: false }))) return false;
-    if (!img || img.width !== w || img.height !== h) {
-      img = ctx.createImageData(w, h);
-      out = new Uint32Array(img.data.buffer);
+    if (!gl && !ctx) {
+      if (!(ctx = el.getContext('2d', { alpha: false }))) return false;
+      style();
+    }
+    if (w !== fw || h !== fh) {
+      img = ctx ? ctx.createImageData(w, h) : null;
+      bytes = img ? new Uint8Array(img.data.buffer) : new Uint8Array(w * h * 4);
+      frame32 = new Uint32Array(bytes.buffer);
+      fw = w;
+      fh = h;
     }
     base = p >>> 2;
     pixels = HEAPU32[base + F_PIXELS] >>> 2;
@@ -565,17 +824,28 @@ if (typeof ENVIRONMENT_IS_PTHREAD === 'undefined' || !ENVIRONMENT_IS_PTHREAD) (f
     // window closing on the way out looks like from here.
     if (HEAPU32[base + F_MAGIC] !== MAGIC) { base = 0; return; }
 
+    if (gl) fit();
+
     seq = Atomics.load(HEAPU32, base + F_SEQ);
-    if (seq !== last) {
-      out.set(HEAPU32.subarray(pixels, pixels + words));
+    if (seq !== last && (screen || ctx)) {
+      frame32.set(HEAPU32.subarray(pixels, pixels + words));
       if ((again = Atomics.load(HEAPU32, base + F_SEQ)) !== seq) {
-        out.set(HEAPU32.subarray(pixels, pixels + words));
+        frame32.set(HEAPU32.subarray(pixels, pixels + words));
         seq = again;
       }
       last = seq;
-      ctx.putImageData(img, 0, 0);
+      if (screen) {
+        screen.upload(fw, fh, bytes);
+        screen.draw(mode);
+      } else {
+        ctx.putImageData(img, 0, 0);
+      }
+      dirty = false;
       HEAPU32[base + F_PRESENTED]++;
     } else {
+      // Resized, or a different screen asked for, with no new frame to show:
+      // the one there is, again.
+      if (dirty && screen && screen.draw(mode)) dirty = false;
       HEAPU32[base + F_STALE]++;
     }
 
@@ -598,6 +868,22 @@ if (typeof ENVIRONMENT_IS_PTHREAD === 'undefined' || !ENVIRONMENT_IS_PTHREAD) (f
       refreshes: Atomics.load(HEAPU32, base + F_VSYNC)
     };
   };
+
+  // The page's Screen setting. set() answers whether the mode was taken.
+  Module['bodScreen'] = {
+    modes: BOD_SCREEN_MODES.slice(),
+    get: function () { return mode; },
+    available: function (m) { return BOD_SCREEN_MODES.indexOf(m) >= 0 && (m !== 'xbr' || !!gl); },
+    set: function (m) {
+      if (!this.available(m)) return false;
+      mode = m;
+      dirty = true;
+      style();
+      return true;
+    }
+  };
+  if (!gl && mode === 'xbr') mode = 'smooth';
+  style();
 
   requestAnimationFrame(frame);
 })();
@@ -8706,7 +8992,6 @@ var FS_mkdir = (path, mode = 0o777) => FS.handleError(withStackSave(() => {
 
 
 
-
   
   
   
@@ -8942,23 +9227,23 @@ var proxiedFunctionTable = [
 ];
 
 var ASM_CONSTS = {
-  1079692: () => { return stringToNewUTF8(bodEnvString()); },  
- 1079736: ($0) => { var str = UTF8ToString($0) + '\n\n' + 'Abort/Retry/Ignore/AlwaysIgnore? [ariA] :'; var reply = window.prompt(str, "i"); if (reply === null) { reply = "i"; } return reply.length === 1 ? reply.charCodeAt(0) : -1; },  
- 1079951: () => { if (typeof(AudioContext) !== 'undefined') { return true; } else if (typeof(webkitAudioContext) !== 'undefined') { return true; } return false; },  
- 1080098: () => { if ((typeof(navigator.mediaDevices) !== 'undefined') && (typeof(navigator.mediaDevices.getUserMedia) !== 'undefined')) { return true; } else if (typeof(navigator.webkitGetUserMedia) !== 'undefined') { return true; } return false; },  
- 1080332: ($0) => { if(typeof(Module['SDL2']) === 'undefined') { Module['SDL2'] = {}; } var SDL2 = Module['SDL2']; if (!$0) { SDL2.audio = {}; } else { SDL2.capture = {}; } if (!SDL2.audioContext) { if (typeof(AudioContext) !== 'undefined') { SDL2.audioContext = new AudioContext(); } else if (typeof(webkitAudioContext) !== 'undefined') { SDL2.audioContext = new webkitAudioContext(); } if (SDL2.audioContext) { if ((typeof navigator.userActivation) === 'undefined') { autoResumeAudioContext(SDL2.audioContext); } } } return SDL2.audioContext === undefined ? -1 : 0; },  
- 1080884: () => { var SDL2 = Module['SDL2']; return SDL2.audioContext.sampleRate; },  
- 1080952: ($0, $1, $2, $3) => { var SDL2 = Module['SDL2']; var have_microphone = function(stream) { if (SDL2.capture.silenceTimer !== undefined) { clearInterval(SDL2.capture.silenceTimer); SDL2.capture.silenceTimer = undefined; SDL2.capture.silenceBuffer = undefined } SDL2.capture.mediaStreamNode = SDL2.audioContext.createMediaStreamSource(stream); SDL2.capture.scriptProcessorNode = SDL2.audioContext.createScriptProcessor($1, $0, 1); SDL2.capture.scriptProcessorNode.onaudioprocess = function(audioProcessingEvent) { if ((SDL2 === undefined) || (SDL2.capture === undefined)) { return; } audioProcessingEvent.outputBuffer.getChannelData(0).fill(0.0); SDL2.capture.currentCaptureBuffer = audioProcessingEvent.inputBuffer; dynCall('vp', $2, [$3]); }; SDL2.capture.mediaStreamNode.connect(SDL2.capture.scriptProcessorNode); SDL2.capture.scriptProcessorNode.connect(SDL2.audioContext.destination); SDL2.capture.stream = stream; }; var no_microphone = function(error) { }; SDL2.capture.silenceBuffer = SDL2.audioContext.createBuffer($0, $1, SDL2.audioContext.sampleRate); SDL2.capture.silenceBuffer.getChannelData(0).fill(0.0); var silence_callback = function() { SDL2.capture.currentCaptureBuffer = SDL2.capture.silenceBuffer; dynCall('vp', $2, [$3]); }; SDL2.capture.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1000); if ((navigator.mediaDevices !== undefined) && (navigator.mediaDevices.getUserMedia !== undefined)) { navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(have_microphone).catch(no_microphone); } else if (navigator.webkitGetUserMedia !== undefined) { navigator.webkitGetUserMedia({ audio: true, video: false }, have_microphone, no_microphone); } },  
- 1082645: ($0, $1, $2, $3) => { var SDL2 = Module['SDL2']; SDL2.audio.scriptProcessorNode = SDL2.audioContext['createScriptProcessor']($1, 0, $0); SDL2.audio.scriptProcessorNode['onaudioprocess'] = function (e) { if ((SDL2 === undefined) || (SDL2.audio === undefined)) { return; } if (SDL2.audio.silenceTimer !== undefined) { clearInterval(SDL2.audio.silenceTimer); SDL2.audio.silenceTimer = undefined; SDL2.audio.silenceBuffer = undefined; } SDL2.audio.currentOutputBuffer = e['outputBuffer']; dynCall('vp', $2, [$3]); }; SDL2.audio.scriptProcessorNode['connect'](SDL2.audioContext['destination']); if (SDL2.audioContext.state === 'suspended') { SDL2.audio.silenceBuffer = SDL2.audioContext.createBuffer($0, $1, SDL2.audioContext.sampleRate); SDL2.audio.silenceBuffer.getChannelData(0).fill(0.0); var silence_callback = function() { if ((typeof navigator.userActivation) !== 'undefined') { if (navigator.userActivation.hasBeenActive) { SDL2.audioContext.resume(); } } SDL2.audio.currentOutputBuffer = SDL2.audio.silenceBuffer; dynCall('vp', $2, [$3]); SDL2.audio.currentOutputBuffer = undefined; }; SDL2.audio.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1000); } },  
- 1083820: ($0, $1) => { var SDL2 = Module['SDL2']; var numChannels = SDL2.capture.currentCaptureBuffer.numberOfChannels; for (var c = 0; c < numChannels; ++c) { var channelData = SDL2.capture.currentCaptureBuffer.getChannelData(c); if (channelData.length != $1) { throw 'Web Audio capture buffer length mismatch! Destination size: ' + channelData.length + ' samples vs expected ' + $1 + ' samples!'; } if (numChannels == 1) { for (var j = 0; j < $1; ++j) { setValue($0 + (j * 4), channelData[j], 'float'); } } else { for (var j = 0; j < $1; ++j) { setValue($0 + (((j * numChannels) + c) * 4), channelData[j], 'float'); } } } },  
- 1084425: ($0, $1) => { var SDL2 = Module['SDL2']; var buf = $0 >>> 2; var numChannels = SDL2.audio.currentOutputBuffer['numberOfChannels']; for (var c = 0; c < numChannels; ++c) { var channelData = SDL2.audio.currentOutputBuffer['getChannelData'](c); if (channelData.length != $1) { throw 'Web Audio output buffer length mismatch! Destination size: ' + channelData.length + ' samples vs expected ' + $1 + ' samples!'; } for (var j = 0; j < $1; ++j) { channelData[j] = HEAPF32[buf + (j*numChannels + c)]; } } },  
- 1084914: ($0) => { var SDL2 = Module['SDL2']; if ($0) { if (SDL2.capture.silenceTimer !== undefined) { clearInterval(SDL2.capture.silenceTimer); } if (SDL2.capture.stream !== undefined) { var tracks = SDL2.capture.stream.getAudioTracks(); for (var i = 0; i < tracks.length; i++) { SDL2.capture.stream.removeTrack(tracks[i]); } } if (SDL2.capture.scriptProcessorNode !== undefined) { SDL2.capture.scriptProcessorNode.onaudioprocess = function(audioProcessingEvent) {}; SDL2.capture.scriptProcessorNode.disconnect(); } if (SDL2.capture.mediaStreamNode !== undefined) { SDL2.capture.mediaStreamNode.disconnect(); } SDL2.capture = undefined; } else { if (SDL2.audio.scriptProcessorNode != undefined) { SDL2.audio.scriptProcessorNode.disconnect(); } if (SDL2.audio.silenceTimer !== undefined) { clearInterval(SDL2.audio.silenceTimer); } SDL2.audio = undefined; } if ((SDL2.audioContext !== undefined) && (SDL2.audio === undefined) && (SDL2.capture === undefined)) { SDL2.audioContext.close(); SDL2.audioContext = undefined; } },  
- 1085920: ($0, $1, $2) => { var w = $0; var h = $1; var pixels = $2; if (!Module['SDL2']) Module['SDL2'] = {}; var SDL2 = Module['SDL2']; if (SDL2.ctxCanvas !== Module['canvas']) { SDL2.ctx = Browser.createContext(Module['canvas'], false, true); SDL2.ctxCanvas = Module['canvas']; } if (SDL2.w !== w || SDL2.h !== h || SDL2.imageCtx !== SDL2.ctx) { SDL2.image = SDL2.ctx.createImageData(w, h); SDL2.w = w; SDL2.h = h; SDL2.imageCtx = SDL2.ctx; } var data = SDL2.image.data; var src = pixels / 4; var dst = 0; var num; if (typeof CanvasPixelArray !== 'undefined' && data instanceof CanvasPixelArray) { num = data.length; while (dst < num) { var val = HEAP32[src]; data[dst ] = val & 0xff; data[dst+1] = (val >> 8) & 0xff; data[dst+2] = (val >> 16) & 0xff; data[dst+3] = 0xff; src++; dst += 4; } } else { if (SDL2.data32Data !== data) { SDL2.data32 = new Int32Array(data.buffer); SDL2.data8 = new Uint8Array(data.buffer); SDL2.data32Data = data; } var data32 = SDL2.data32; num = data32.length; data32.set(HEAP32.subarray(src, src + num)); var data8 = SDL2.data8; var i = 3; var j = i + 4*num; if (num % 8 == 0) { while (i < j) { data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; } } else { while (i < j) { data8[i] = 0xff; i = i + 4 | 0; } } } SDL2.ctx.putImageData(SDL2.image, 0, 0); },  
- 1087386: ($0, $1, $2, $3, $4) => { var w = $0; var h = $1; var hot_x = $2; var hot_y = $3; var pixels = $4; var canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h; var ctx = canvas.getContext("2d"); var image = ctx.createImageData(w, h); var data = image.data; var src = pixels / 4; var dst = 0; var num; if (typeof CanvasPixelArray !== 'undefined' && data instanceof CanvasPixelArray) { num = data.length; while (dst < num) { var val = HEAP32[src]; data[dst ] = val & 0xff; data[dst+1] = (val >> 8) & 0xff; data[dst+2] = (val >> 16) & 0xff; data[dst+3] = (val >> 24) & 0xff; src++; dst += 4; } } else { var data32 = new Int32Array(data.buffer); num = data32.length; data32.set(HEAP32.subarray(src, src + num)); } ctx.putImageData(image, 0, 0); var url = hot_x === 0 && hot_y === 0 ? "url(" + canvas.toDataURL() + "), auto" : "url(" + canvas.toDataURL() + ") " + hot_x + " " + hot_y + ", auto"; var urlBuf = _malloc(url.length + 1); stringToUTF8(url, urlBuf, url.length + 1); return urlBuf; },  
- 1088374: ($0) => { if (Module['canvas']) { Module['canvas'].style['cursor'] = UTF8ToString($0); } },  
- 1088457: () => { if (Module['canvas']) { Module['canvas'].style['cursor'] = 'none'; } },  
- 1088526: () => { return window.innerWidth; },  
- 1088556: () => { return window.innerHeight; }
+  1079804: () => { return stringToNewUTF8(bodEnvString()); },  
+ 1079848: ($0) => { var str = UTF8ToString($0) + '\n\n' + 'Abort/Retry/Ignore/AlwaysIgnore? [ariA] :'; var reply = window.prompt(str, "i"); if (reply === null) { reply = "i"; } return reply.length === 1 ? reply.charCodeAt(0) : -1; },  
+ 1080063: () => { if (typeof(AudioContext) !== 'undefined') { return true; } else if (typeof(webkitAudioContext) !== 'undefined') { return true; } return false; },  
+ 1080210: () => { if ((typeof(navigator.mediaDevices) !== 'undefined') && (typeof(navigator.mediaDevices.getUserMedia) !== 'undefined')) { return true; } else if (typeof(navigator.webkitGetUserMedia) !== 'undefined') { return true; } return false; },  
+ 1080444: ($0) => { if(typeof(Module['SDL2']) === 'undefined') { Module['SDL2'] = {}; } var SDL2 = Module['SDL2']; if (!$0) { SDL2.audio = {}; } else { SDL2.capture = {}; } if (!SDL2.audioContext) { if (typeof(AudioContext) !== 'undefined') { SDL2.audioContext = new AudioContext(); } else if (typeof(webkitAudioContext) !== 'undefined') { SDL2.audioContext = new webkitAudioContext(); } if (SDL2.audioContext) { if ((typeof navigator.userActivation) === 'undefined') { autoResumeAudioContext(SDL2.audioContext); } } } return SDL2.audioContext === undefined ? -1 : 0; },  
+ 1080996: () => { var SDL2 = Module['SDL2']; return SDL2.audioContext.sampleRate; },  
+ 1081064: ($0, $1, $2, $3) => { var SDL2 = Module['SDL2']; var have_microphone = function(stream) { if (SDL2.capture.silenceTimer !== undefined) { clearInterval(SDL2.capture.silenceTimer); SDL2.capture.silenceTimer = undefined; SDL2.capture.silenceBuffer = undefined } SDL2.capture.mediaStreamNode = SDL2.audioContext.createMediaStreamSource(stream); SDL2.capture.scriptProcessorNode = SDL2.audioContext.createScriptProcessor($1, $0, 1); SDL2.capture.scriptProcessorNode.onaudioprocess = function(audioProcessingEvent) { if ((SDL2 === undefined) || (SDL2.capture === undefined)) { return; } audioProcessingEvent.outputBuffer.getChannelData(0).fill(0.0); SDL2.capture.currentCaptureBuffer = audioProcessingEvent.inputBuffer; dynCall('vp', $2, [$3]); }; SDL2.capture.mediaStreamNode.connect(SDL2.capture.scriptProcessorNode); SDL2.capture.scriptProcessorNode.connect(SDL2.audioContext.destination); SDL2.capture.stream = stream; }; var no_microphone = function(error) { }; SDL2.capture.silenceBuffer = SDL2.audioContext.createBuffer($0, $1, SDL2.audioContext.sampleRate); SDL2.capture.silenceBuffer.getChannelData(0).fill(0.0); var silence_callback = function() { SDL2.capture.currentCaptureBuffer = SDL2.capture.silenceBuffer; dynCall('vp', $2, [$3]); }; SDL2.capture.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1000); if ((navigator.mediaDevices !== undefined) && (navigator.mediaDevices.getUserMedia !== undefined)) { navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(have_microphone).catch(no_microphone); } else if (navigator.webkitGetUserMedia !== undefined) { navigator.webkitGetUserMedia({ audio: true, video: false }, have_microphone, no_microphone); } },  
+ 1082757: ($0, $1, $2, $3) => { var SDL2 = Module['SDL2']; SDL2.audio.scriptProcessorNode = SDL2.audioContext['createScriptProcessor']($1, 0, $0); SDL2.audio.scriptProcessorNode['onaudioprocess'] = function (e) { if ((SDL2 === undefined) || (SDL2.audio === undefined)) { return; } if (SDL2.audio.silenceTimer !== undefined) { clearInterval(SDL2.audio.silenceTimer); SDL2.audio.silenceTimer = undefined; SDL2.audio.silenceBuffer = undefined; } SDL2.audio.currentOutputBuffer = e['outputBuffer']; dynCall('vp', $2, [$3]); }; SDL2.audio.scriptProcessorNode['connect'](SDL2.audioContext['destination']); if (SDL2.audioContext.state === 'suspended') { SDL2.audio.silenceBuffer = SDL2.audioContext.createBuffer($0, $1, SDL2.audioContext.sampleRate); SDL2.audio.silenceBuffer.getChannelData(0).fill(0.0); var silence_callback = function() { if ((typeof navigator.userActivation) !== 'undefined') { if (navigator.userActivation.hasBeenActive) { SDL2.audioContext.resume(); } } SDL2.audio.currentOutputBuffer = SDL2.audio.silenceBuffer; dynCall('vp', $2, [$3]); SDL2.audio.currentOutputBuffer = undefined; }; SDL2.audio.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1000); } },  
+ 1083932: ($0, $1) => { var SDL2 = Module['SDL2']; var numChannels = SDL2.capture.currentCaptureBuffer.numberOfChannels; for (var c = 0; c < numChannels; ++c) { var channelData = SDL2.capture.currentCaptureBuffer.getChannelData(c); if (channelData.length != $1) { throw 'Web Audio capture buffer length mismatch! Destination size: ' + channelData.length + ' samples vs expected ' + $1 + ' samples!'; } if (numChannels == 1) { for (var j = 0; j < $1; ++j) { setValue($0 + (j * 4), channelData[j], 'float'); } } else { for (var j = 0; j < $1; ++j) { setValue($0 + (((j * numChannels) + c) * 4), channelData[j], 'float'); } } } },  
+ 1084537: ($0, $1) => { var SDL2 = Module['SDL2']; var buf = $0 >>> 2; var numChannels = SDL2.audio.currentOutputBuffer['numberOfChannels']; for (var c = 0; c < numChannels; ++c) { var channelData = SDL2.audio.currentOutputBuffer['getChannelData'](c); if (channelData.length != $1) { throw 'Web Audio output buffer length mismatch! Destination size: ' + channelData.length + ' samples vs expected ' + $1 + ' samples!'; } for (var j = 0; j < $1; ++j) { channelData[j] = HEAPF32[buf + (j*numChannels + c)]; } } },  
+ 1085026: ($0) => { var SDL2 = Module['SDL2']; if ($0) { if (SDL2.capture.silenceTimer !== undefined) { clearInterval(SDL2.capture.silenceTimer); } if (SDL2.capture.stream !== undefined) { var tracks = SDL2.capture.stream.getAudioTracks(); for (var i = 0; i < tracks.length; i++) { SDL2.capture.stream.removeTrack(tracks[i]); } } if (SDL2.capture.scriptProcessorNode !== undefined) { SDL2.capture.scriptProcessorNode.onaudioprocess = function(audioProcessingEvent) {}; SDL2.capture.scriptProcessorNode.disconnect(); } if (SDL2.capture.mediaStreamNode !== undefined) { SDL2.capture.mediaStreamNode.disconnect(); } SDL2.capture = undefined; } else { if (SDL2.audio.scriptProcessorNode != undefined) { SDL2.audio.scriptProcessorNode.disconnect(); } if (SDL2.audio.silenceTimer !== undefined) { clearInterval(SDL2.audio.silenceTimer); } SDL2.audio = undefined; } if ((SDL2.audioContext !== undefined) && (SDL2.audio === undefined) && (SDL2.capture === undefined)) { SDL2.audioContext.close(); SDL2.audioContext = undefined; } },  
+ 1086032: ($0, $1, $2) => { var w = $0; var h = $1; var pixels = $2; if (!Module['SDL2']) Module['SDL2'] = {}; var SDL2 = Module['SDL2']; if (SDL2.ctxCanvas !== Module['canvas']) { SDL2.ctx = Browser.createContext(Module['canvas'], false, true); SDL2.ctxCanvas = Module['canvas']; } if (SDL2.w !== w || SDL2.h !== h || SDL2.imageCtx !== SDL2.ctx) { SDL2.image = SDL2.ctx.createImageData(w, h); SDL2.w = w; SDL2.h = h; SDL2.imageCtx = SDL2.ctx; } var data = SDL2.image.data; var src = pixels / 4; var dst = 0; var num; if (typeof CanvasPixelArray !== 'undefined' && data instanceof CanvasPixelArray) { num = data.length; while (dst < num) { var val = HEAP32[src]; data[dst ] = val & 0xff; data[dst+1] = (val >> 8) & 0xff; data[dst+2] = (val >> 16) & 0xff; data[dst+3] = 0xff; src++; dst += 4; } } else { if (SDL2.data32Data !== data) { SDL2.data32 = new Int32Array(data.buffer); SDL2.data8 = new Uint8Array(data.buffer); SDL2.data32Data = data; } var data32 = SDL2.data32; num = data32.length; data32.set(HEAP32.subarray(src, src + num)); var data8 = SDL2.data8; var i = 3; var j = i + 4*num; if (num % 8 == 0) { while (i < j) { data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; data8[i] = 0xff; i = i + 4 | 0; } } else { while (i < j) { data8[i] = 0xff; i = i + 4 | 0; } } } SDL2.ctx.putImageData(SDL2.image, 0, 0); },  
+ 1087498: ($0, $1, $2, $3, $4) => { var w = $0; var h = $1; var hot_x = $2; var hot_y = $3; var pixels = $4; var canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h; var ctx = canvas.getContext("2d"); var image = ctx.createImageData(w, h); var data = image.data; var src = pixels / 4; var dst = 0; var num; if (typeof CanvasPixelArray !== 'undefined' && data instanceof CanvasPixelArray) { num = data.length; while (dst < num) { var val = HEAP32[src]; data[dst ] = val & 0xff; data[dst+1] = (val >> 8) & 0xff; data[dst+2] = (val >> 16) & 0xff; data[dst+3] = (val >> 24) & 0xff; src++; dst += 4; } } else { var data32 = new Int32Array(data.buffer); num = data32.length; data32.set(HEAP32.subarray(src, src + num)); } ctx.putImageData(image, 0, 0); var url = hot_x === 0 && hot_y === 0 ? "url(" + canvas.toDataURL() + "), auto" : "url(" + canvas.toDataURL() + ") " + hot_x + " " + hot_y + ", auto"; var urlBuf = _malloc(url.length + 1); stringToUTF8(url, urlBuf, url.length + 1); return urlBuf; },  
+ 1088486: ($0) => { if (Module['canvas']) { Module['canvas'].style['cursor'] = UTF8ToString($0); } },  
+ 1088569: () => { if (Module['canvas']) { Module['canvas'].style['cursor'] = 'none'; } },  
+ 1088638: () => { return window.innerWidth; },  
+ 1088668: () => { return window.innerHeight; }
 };
 
 // Imports from the Wasm binary.
@@ -8976,6 +9261,7 @@ var _bod_reset_saves,
   _bod_pack_state,
   _bod_pack_seq,
   _bod_ui_command,
+  _bod_ui_taken,
   _bod_ui_state,
   _bod_ui_seq,
   _bod_ui_menubar,
@@ -9063,6 +9349,7 @@ function assignWasmExports(wasmExports) {
   _bod_pack_state = Module['_bod_pack_state'] = wasmExports['bod_pack_state'];
   _bod_pack_seq = Module['_bod_pack_seq'] = wasmExports['bod_pack_seq'];
   _bod_ui_command = Module['_bod_ui_command'] = wasmExports['bod_ui_command'];
+  _bod_ui_taken = Module['_bod_ui_taken'] = wasmExports['bod_ui_taken'];
   _bod_ui_state = Module['_bod_ui_state'] = wasmExports['bod_ui_state'];
   _bod_ui_seq = Module['_bod_ui_seq'] = wasmExports['bod_ui_seq'];
   _bod_ui_menubar = Module['_bod_ui_menubar'] = wasmExports['bod_ui_menubar'];

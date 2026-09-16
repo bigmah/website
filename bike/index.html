@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Bike or Die 2</title>
   <style>
-    :root { color-scheme: dark; --key: 46px; --keygap: 6px; }
+    :root { color-scheme: dark; --key: 46px; --keygap: 6px; --focus: #7fa6f5; }
     body {
       margin: 0; background: #14161a; color: #c9ced6;
       font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -14,9 +14,10 @@
     }
     h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: .02em; }
     h1 span { color: #6f7885; font-weight: 400; }
-    /* The game draws 320x320. The canvas stays that size and the page scales
-       it with nearest-neighbour, so the pixel art is exact and the blitter
-       does not do the scaling. */
+    /* The game draws 320x320. The canvas is drawn at the resolution of the
+       display under it, upscaled the way the Screen setting says (bod-pre.js);
+       pixelated is for a browser without WebGL, where the canvas stays 320x320
+       and this is the scaling. */
     #canvas {
       width: 640px; height: 640px;
       image-rendering: pixelated; image-rendering: crisp-edges;
@@ -25,19 +26,16 @@
       touch-action: none;
     }
     @media (max-width: 700px) { #canvas { width: 320px; height: 320px; } }
-    /* The title bar and the settings panel are the width of the screen below
-       them, so the cog sits over the screen's right edge. */
+    /* The title bar and the panels are the width of the screen below them. */
     .bar, .screen { width: 640px; max-width: 100%; }
     @media (max-width: 700px) { .bar, .screen { width: 320px; } }
     .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .bar__actions { display: flex; align-items: center; gap: 6px; }
     .screen { position: relative; line-height: 0; }
-    #cog {
-      display: flex; padding: 5px; border-radius: 6px; color: #7d8593; line-height: 0;
-    }
-    #cog:hover, #cog[aria-expanded="true"] { color: #c9ced6; }
+    #pause { display: flex; align-items: center; gap: 7px; }
+    #pause kbd { font-size: 10px; padding: 0 4px; }
     /* The level buttons: which pack, which level. They drive the game's own
-       menu and dialogs (see bodPack below), so they do what the F5 menu does. */
+       menu and dialogs (see bodPack below), so they do what its Game menu does. */
     .tools { width: 640px; max-width: 100%; display: flex; flex-wrap: wrap;
              align-items: center; gap: 6px; }
     @media (max-width: 700px) { .tools { width: 320px; } }
@@ -61,6 +59,12 @@
     .panel[hidden] { display: none; }
     .panel h2 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: .04em;
                 text-transform: uppercase; color: #8b94a2; }
+    /* Where the keyboard is, in every panel. A ring drawn inside the control
+       rather than an outline around it: several of them sit in boxes that
+       scroll, which would cut an outline off. */
+    .panel button:focus-visible, .panel select:focus-visible, .panel input:focus-visible {
+      outline: none; box-shadow: inset 0 0 0 2px var(--focus);
+    }
     /* Solid, unlike the controls: the game's own pack list is right behind it. */
     #packs { height: 100%; background: #14161a; }
     #packs-filter {
@@ -79,46 +83,68 @@
     #packs-list button.is-current::after { content: ' \2713'; color: #8b94a2; font-weight: 400; }
     #packs-list .none { color: #6f7885; padding: 4px 8px; }
     #packs-note { color: #7d8593; margin: 0; }
-    /* The game's own menus and dialogs, drawn by the page (bodui.c). The
-       rows follow the form's own layout: what shared a line on a Palm screen
-       shares one here. */
-    #menu-list { width: 100%; display: flex; flex-direction: column; gap: 1px; }
-    #menu-list h3 { font-size: 11px; font-weight: 600; margin: 10px 0 2px; letter-spacing: .06em;
-                    text-transform: uppercase; color: #6f7885; }
-    #menu-list h3:first-child { margin-top: 0; }
-    #menu-list button { text-align: left; background: none; border: 0; border-radius: 4px; padding: 4px 8px; }
-    #menu-list button:hover, #menu-list button:focus { background: #262b33; outline: none; }
-    #menu-list hr { border: 0; border-top: 1px solid #262b33; width: 100%; margin: 4px 0; }
+    /* The game's own dialogs, drawn by the page (bodui.c). The rows follow
+       the form's own layout: what shared a line on a Palm screen shares one
+       here. */
     #dialog { max-height: 100%; }
     #dialog-body { width: 100%; display: flex; flex-direction: column; gap: 8px;
                    overflow: auto; min-height: 0; }
     .dlg__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .dlg__text { color: #c9ced6; }
     .dlg__note { color: #8b94a2; }
-    .dlg__group { display: flex; gap: 0; }
-    .dlg__group button { border-radius: 0; margin-left: -1px; }
-    .dlg__group button:first-child { border-radius: 5px 0 0 5px; margin-left: 0; }
-    .dlg__group button:last-child { border-radius: 0 5px 5px 0; }
-    .dlg__group button.is-on { color: #14161a; background: #c9ced6; border-color: #c9ced6; }
+    .dlg__group, .seg { display: flex; gap: 0; }
+    .dlg__group button, .seg button { border-radius: 0; margin-left: -1px; }
+    .dlg__group button:first-child, .seg button:first-child { border-radius: 5px 0 0 5px; margin-left: 0; }
+    .dlg__group button:last-child, .seg button:last-child { border-radius: 0 5px 5px 0; }
+    .dlg__group button.is-on, .seg button.is-on, #dialog button.is-on {
+      color: #14161a; background: #c9ced6; border-color: #c9ced6;
+    }
     .dlg__list { width: 100%; max-height: 40vh; overflow: auto; display: flex; flex-direction: column;
-                 gap: 1px; border: 1px solid #333941; border-radius: 5px; padding: 3px; }
+                 gap: 1px; border: 1px solid #333941; border-radius: 5px; padding: 3px; box-sizing: border-box; }
     .dlg__list button { text-align: left; background: none; border: 0; border-radius: 4px; padding: 3px 7px;
                         white-space: pre; font-variant-numeric: tabular-nums; }
     .dlg__list button:hover, .dlg__list button:focus { background: #262b33; outline: none; }
-    .dlg__list button.is-on { color: #fff; background: #303741; }
+    #dialog .dlg__list button.is-on { color: #fff; background: #303741; }
     #dialog select, #dialog input[type="text"] {
       font: inherit; color: #c9ced6; background: #20242b;
       border: 1px solid #333941; border-radius: 5px; padding: 4px 8px;
     }
     #dialog select:focus, #dialog input[type="text"]:focus { outline: none; border-color: #5a6371; }
     #dialog button.is-default { color: #14161a; background: #c9ced6; border-color: #c9ced6; }
-    #binds { border-collapse: collapse; }
-    #binds td { padding: 3px 12px 3px 0; }
-    #binds td:first-child { color: #8b94a2; }
-    #binds button { min-width: 5.5em; font-variant-caps: all-small-caps; letter-spacing: .06em; }
-    #binds button.listening { color: #14161a; background: #c9ced6; border-color: #c9ced6; }
+
+    /* ------------------------------------------------------ the pause menu
+       Everything that is not riding, in one place over the game: levels and
+       packs, the keys, the settings, and the rest of the game's own menu. */
+    .pm { background: #14161aeb; gap: 10px; }
+    .pm__head { display: flex; align-items: baseline; gap: 10px; width: 100%; min-width: 0; }
+    .pm__where { color: #6f7885; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pm__page { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+    .pm__page[hidden] { display: none; }
+    .pm__list { width: 100%; display: flex; flex-direction: column; gap: 1px; }
+    .pm__list:empty { display: none; }
+    .pm__list h3 { font-size: 11px; font-weight: 600; margin: 10px 0 2px; padding: 0 10px; letter-spacing: .06em;
+                   text-transform: uppercase; color: #6f7885; }
+    .pm__list h3:first-child { margin-top: 0; }
+    .pm__list hr { border: 0; border-top: 1px solid #262b33; width: 100%; margin: 4px 0; }
+    .pm__item {
+      display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
+      text-align: left; background: none; border: 0; border-radius: 4px; padding: 5px 10px;
+    }
+    .pm__item:hover:not(:disabled), .pm__item:focus { background: #262b33; }
+    .pm__side { margin-left: auto; color: #6f7885; display: flex; align-items: center; gap: 6px; }
+    .pm__item--more .pm__side::after { content: '\203A'; font-size: 16px; line-height: 1; }
+    .pm__bind .pm__label { min-width: 7.5em; }
+    .pm__bind kbd { min-width: 3.5em; text-align: center; }
+    .pm__bind.listening > kbd { color: #14161a; background: #c9ced6; border-color: #c9ced6; }
+    .pm__row { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 2px 10px; }
+    .pm__label { color: #8b94a2; }
+    .pm__row > .pm__label { min-width: 8em; }
+    .panel .pm__note { color: #7d8593; margin: 0; padding: 0 10px; }
+    .panel .pm__foot { color: #6f7885; font-size: 12px; margin: 2px 0 0; max-width: none; }
+    /* A menu item that may open one of the game's dialogs, waiting to see. */
+    .pm.is-waiting .pm__page { opacity: .6; }
+
     .panel p { margin: 0; color: #7d8593; max-width: 34em; }
-    .panel .row { display: flex; gap: 8px; }
     #status { min-height: 1.5em; color: #8b94a2; font-variant-numeric: tabular-nums; }
     #status.err { color: #e0777a; }
     .keys { width: 640px; max-width: 100%; color: #7d8593;
@@ -135,14 +161,19 @@
     }
     button:hover:not(:disabled) { background: #262b33; }
     button:disabled { color: #6f7885; cursor: wait; }
+    /* What is chosen stays looking chosen under the pointer, which the rule
+       above would otherwise darken to the colour of its own label. */
+    .seg button.is-on:hover:not(:disabled), .dlg__group button.is-on:hover:not(:disabled),
+    #dialog .dlg__row > button.is-on:hover:not(:disabled),
+    #dialog button.is-default:hover:not(:disabled) { background: #dde1e8; }
 
-    /* ------------------------------------------------------------ on a phone
-       There is no keyboard to ride with and no room to waste, so the page
-       becomes the game: one line of controls at the top, the screen as large
-       as what is left allows, and the five keys the game is played with along
-       the bottom -- or, held sideways, down either side of it. Nothing
-       scrolls. .stage is display:contents until then, so that the page a
-       desktop gets is laid out exactly as it was before any of this.
+    /* ---------------------------------------------------- touch controls
+       Off unless they are asked for, in Settings or with ?touch=1. Then the
+       page becomes the game: one line of controls at the top, the screen as
+       large as what is left allows, and the five keys the game is played
+       with along the bottom -- or, held sideways, down either side of it.
+       Nothing scrolls. .stage is display:contents until then, so that the
+       page is otherwise laid out exactly as it would be without any of this.
        bodFit() below settles --key and the square between them. */
     .stage { display: contents; }
     .pad { display: none; }
@@ -163,6 +194,7 @@
        line below, and the key legend is advice for a keyboard that is not
        there. */
     html.touch .bar, html.touch .keys { display: none; }
+    html.touch #pause kbd, html.touch .pm__foot, html.touch .pm__side kbd { display: none; }
     html.touch .tools { width: 100%; gap: 3px; flex-wrap: nowrap; }
     html.touch .tools button { padding: 6px 8px; }
     html.touch .tools__group button { min-width: 2em; }
@@ -252,20 +284,8 @@
   <div class="bar">
     <h1>Bike or Die 2 <span>&mdash; ToySpring, 2008, recompiled to WebAssembly</span></h1>
     <div class="bar__actions">
-      <button id="pause" type="button" title="Pause game" aria-pressed="false" disabled>Pause</button>
-      <button id="cog" title="Controls" aria-label="Controls" aria-expanded="false">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="3.2"/>
-          <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3
-                   1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1
-                   a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1
-                   a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3
-                   H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1
-                   a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1
-                   a1.6 1.6 0 0 0-1.5 1z"/>
-        </svg>
-      </button>
+      <button id="pause" type="button" title="Pause: levels, packs, controls and settings"
+              aria-haspopup="dialog" aria-expanded="false" disabled><span class="lbl">Pause</span> <kbd>Esc</kbd></button>
     </div>
   </div>
 
@@ -274,7 +294,6 @@
       <span class="lbl">Level pack</span> <span class="cur" id="packs-cur"></span> <span class="caret">&#9660;</span>
     </button>
     <button id="levels" type="button" title="Choose a level in this pack" disabled>Levels&hellip;</button>
-    <button id="menu-open" type="button" title="The game's own menus" aria-expanded="false" disabled>Menu&hellip;</button>
     <span class="tools__group">
       <button id="level-prev" type="button" title="Previous level" disabled>&#9664;</button>
       <button id="level-restart" type="button" title="Restart level" disabled>&#8635;</button>
@@ -297,30 +316,89 @@
         </div>
       </div>
 
-      <div id="menu" class="panel" hidden>
-        <h2>Menu</h2>
-        <div id="menu-list"></div>
-        <div class="row">
-          <button id="menu-close">Close</button>
-        </div>
-      </div>
-
       <div id="dialog" class="panel" hidden>
         <h2 id="dialog-head"></h2>
         <div id="dialog-body"></div>
         <div class="row" id="dialog-foot"></div>
       </div>
 
-      <div id="settings" class="panel" hidden>
-        <h2>Controls</h2>
-        <table id="binds"></table>
-        <p>Click a key and press the one you want; <kbd>Backspace</kbd> takes it away
-           and <kbd>Esc</kbd> leaves it as it was. The arrow keys ride whatever these
-           say, so the bike can always be steered with them.</p>
-        <div class="row">
-          <button id="binds-done">Done</button>
-          <button id="binds-reset">Restore defaults</button>
+      <div id="pm" class="panel pm" hidden role="dialog" aria-labelledby="pm-title">
+        <div class="pm__head">
+          <h2 id="pm-title">Paused</h2>
+          <span class="pm__where" id="pm-where"></span>
         </div>
+
+        <div class="pm__page" data-page="main">
+          <div class="pm__list">
+            <button type="button" class="pm__item" data-do="resume">Resume <span class="pm__side"><kbd>Esc</kbd></span></button>
+            <button type="button" class="pm__item" data-do="restart">Restart level</button>
+            <button type="button" class="pm__item" data-do="next">Next level</button>
+            <button type="button" class="pm__item" data-do="prev">Previous level</button>
+            <hr>
+            <button type="button" class="pm__item" data-do="levels">Choose a level&hellip;</button>
+            <button type="button" class="pm__item" data-do="packs">Level packs&hellip;</button>
+            <hr>
+            <button type="button" class="pm__item pm__item--more" data-page="controls">Controls <span class="pm__side"></span></button>
+            <button type="button" class="pm__item pm__item--more" data-page="settings">Settings <span class="pm__side"></span></button>
+            <button type="button" class="pm__item pm__item--more" data-page="records">Profiles &amp; records <span class="pm__side"></span></button>
+            <button type="button" class="pm__item pm__item--more" data-page="help">Help <span class="pm__side"></span></button>
+          </div>
+        </div>
+
+        <div class="pm__page" data-page="controls" hidden>
+          <div class="pm__list" id="pm-binds"></div>
+          <p class="pm__note">Choose one and press the key you want; <kbd>Backspace</kbd> takes it
+             away and <kbd>Esc</kbd> leaves it as it was. The arrow keys always ride too.</p>
+          <div class="pm__list">
+            <button type="button" class="pm__item" data-do="default-keys">Default keys</button>
+            <button type="button" class="pm__item" data-do="game-controls">The game&rsquo;s own control options&hellip;</button>
+            <hr>
+            <button type="button" class="pm__item" data-do="back">Back</button>
+          </div>
+        </div>
+
+        <div class="pm__page" data-page="settings" hidden>
+          <div class="pm__row">
+            <span class="pm__label">Screen</span>
+            <div class="seg" id="screen-modes" role="radiogroup" aria-label="Screen">
+              <button type="button" role="radio" data-screen="pixels">Pixels</button>
+              <button type="button" role="radio" data-screen="smooth">Smooth</button>
+              <button type="button" role="radio" data-screen="xbr">xBR</button>
+            </div>
+          </div>
+          <p class="pm__note" id="screen-note"></p>
+          <div class="pm__row">
+            <span class="pm__label">Touch controls</span>
+            <div class="seg" id="touch-modes" role="radiogroup" aria-label="Touch controls">
+              <button type="button" role="radio" data-touch="off">Off</button>
+              <button type="button" role="radio" data-touch="on">On</button>
+            </div>
+          </div>
+          <p class="pm__note">Keys on the page to ride with, for a phone or a tablet with no keyboard.</p>
+          <div class="pm__list" id="pm-options"></div>
+          <div class="pm__list">
+            <hr>
+            <button type="button" class="pm__item" data-do="back">Back</button>
+          </div>
+        </div>
+
+        <div class="pm__page" data-page="records" hidden>
+          <div class="pm__list" id="pm-records"></div>
+          <div class="pm__list">
+            <hr>
+            <button type="button" class="pm__item" data-do="back">Back</button>
+          </div>
+        </div>
+
+        <div class="pm__page" data-page="help" hidden>
+          <div class="pm__list" id="pm-help"></div>
+          <div class="pm__list">
+            <hr>
+            <button type="button" class="pm__item" data-do="back">Back</button>
+          </div>
+        </div>
+
+        <p class="pm__foot">&uarr; &darr; choose &middot; &larr; &rarr; change &middot; Enter select &middot; Esc back</p>
       </div>
     </div>
 
@@ -345,8 +423,8 @@
   <div class="keys">
     <div class="legend" id="legend"></div>
     <div class="legend">
+      <span><kbd>Esc</kbd> pause: levels, controls, settings</span>
       <span><kbd>F1</kbd>&ndash;<kbd>F4</kbd> Palm buttons</span>
-      <span><kbd>Esc</kbd> back</span>
     </div>
     <p>Progress, settings and level packs are kept in this browser.
        Drop a <code>.prc</code> on the screen to install it.</p>
@@ -356,22 +434,8 @@
     var canvas = document.getElementById('canvas');
     var statusEl = document.getElementById('status');
     var pauseButton = document.getElementById('pause');
+    // Whether the game is held still for the pause menu; the audio follows it.
     var bodPaused = false;
-
-    function bodSetPaused(paused) {
-      if (!window.Module || !Module.pauseBikeOrDie || !Module.resumeBikeOrDie) return;
-      bodPaused = paused;
-      if (paused) {
-        Module.pauseBikeOrDie();
-      } else {
-        Module.resumeBikeOrDie();
-        canvas.focus();
-      }
-      bodSyncAudio();
-      pauseButton.textContent = paused ? 'Resume' : 'Pause';
-      pauseButton.title = paused ? 'Resume game' : 'Pause game';
-      pauseButton.setAttribute('aria-pressed', paused ? 'true' : 'false');
-    }
 
     // ---------------------------------------------------------- the controls
     //
@@ -381,10 +445,10 @@
     // pumpkin_set_ride_keys() so that a change takes effect where it is made,
     // and kept in this browser so the next visit starts with it.
     var BOD_ACTIONS = [
-      ['forward', 'Forward',       '&uarr;'],
-      ['brake',   'Brake',         '&darr;'],
-      ['left',    'Balance left',  '&larr;'],
-      ['right',   'Balance right', '&rarr;'],
+      ['forward', 'Forward',       '↑'],
+      ['brake',   'Brake',         '↓'],
+      ['left',    'Balance left',  '←'],
+      ['right',   'Balance right', '→'],
       ['flip',    'Flip',          'F9']
     ];
     var BOD_KEYS_DEFAULT = 'forward=w brake=s left=a right=d flip=space';
@@ -399,7 +463,7 @@
       'PageUp': 'pgup', 'PageDown': 'pgdown', 'Home': 'home', 'End': 'end'
     };
     var BOD_PRINTED = {
-      space: 'Space', up: '\u2191', down: '\u2193', left: '\u2190', right: '\u2192',
+      space: 'Space', up: '↑', down: '↓', left: '←', right: '→',
       enter: 'Enter', esc: 'Esc', tab: 'Tab', pgup: 'PgUp', pgdown: 'PgDn',
       home: 'Home', end: 'End', ins: 'Ins', del: 'Del', backspace: 'Bksp'
     };
@@ -414,7 +478,7 @@
     }
 
     function bodPrinted(name) {
-      if (!name) return '\u2014';
+      if (!name) return '—';
       return BOD_PRINTED[name] || name.toUpperCase();
     }
 
@@ -422,7 +486,7 @@
       var map = {};
       (spec || '').split(/[\s;]+/).forEach(function (entry) {
         var i = entry.indexOf('=');
-        // Only the first key of an action: the panel binds one, and the arrows
+        // Only the first key of an action: the menu binds one, and the arrows
         // are wired in the runtime rather than listed here.
         if (i > 0) map[entry.slice(0, i).toLowerCase()] = entry.slice(i + 1).split(',')[0];
       });
@@ -446,22 +510,45 @@
       }
     }
 
+    function bodKbd(text) {
+      var k = document.createElement('kbd');
+      k.textContent = text;
+      return k;
+    }
+
+    // The Controls page of the pause menu, and the legend under the screen.
     function bodDrawKeys() {
-      var binds = document.getElementById('binds'), legend = document.getElementById('legend');
+      var binds = document.getElementById('pm-binds'), legend = document.getElementById('legend');
+      var had = document.activeElement && binds.contains(document.activeElement) ?
+                document.activeElement.dataset.bind : null;
+
       binds.innerHTML = '';
       legend.innerHTML = '';
       BOD_ACTIONS.forEach(function (a) {
-        var row = binds.insertRow();
-        row.insertCell().textContent = a[1];
-        var b = document.createElement('button');
-        b.innerHTML = bodPrinted(bodKeys[a[0]]);
+        var b = document.createElement('button'), label = document.createElement('span'),
+            side = document.createElement('span'), span = document.createElement('span');
+
+        b.type = 'button';
+        b.className = 'pm__item pm__bind';
+        b.dataset.bind = a[0];
+        label.className = 'pm__label';
+        label.textContent = a[1];
+        side.className = 'pm__side';
+        side.appendChild(document.createTextNode('or '));
+        side.appendChild(bodKbd(a[2]));
+        b.appendChild(label);
+        b.appendChild(bodKbd(bodPrinted(bodKeys[a[0]])));
+        b.appendChild(side);
         b.onclick = function () { bodListen(a[0], b); };
-        row.insertCell().appendChild(b);
-        row.insertCell().innerHTML = 'or <kbd>' + a[2] + '</kbd>';
-        var span = document.createElement('span');
-        span.innerHTML = '<kbd>' + a[2] + '</kbd>' +
-          (bodKeys[a[0]] ? ' <kbd>' + bodPrinted(bodKeys[a[0]]) + '</kbd>' : '') +
-          ' ' + a[1].toLowerCase();
+        binds.appendChild(b);
+        if (had === a[0]) b.focus();
+
+        span.appendChild(bodKbd(a[2]));
+        if (bodKeys[a[0]]) {
+          span.appendChild(document.createTextNode(' '));
+          span.appendChild(bodKbd(bodPrinted(bodKeys[a[0]])));
+        }
+        span.appendChild(document.createTextNode(' ' + a[1].toLowerCase()));
         legend.appendChild(span);
       });
     }
@@ -473,20 +560,16 @@
     }
 
     function bodListen(action, button) {
-      if (bodListening) bodListening.button.classList.remove('listening');
+      bodStopListening();
       bodListening = { action: action, button: button };
       button.classList.add('listening');
-      button.innerHTML = '\u2026';
+      button.querySelector('kbd').textContent = 'press a key';
     }
 
-    function bodSettings(open) {
-      var panel = document.getElementById('settings');
-      if (bodListening) { bodListening.button.classList.remove('listening'); bodListening = null; }
-      if (open && window.bodPack) bodPack.close(true);
-      panel.hidden = !open;
-      document.getElementById('cog').setAttribute('aria-expanded', open ? 'true' : 'false');
+    function bodStopListening() {
+      if (!bodListening) return;
+      bodListening = null;
       bodDrawKeys();
-      if (!open) canvas.focus();
     }
 
     (function () {
@@ -501,26 +584,71 @@
       // The query string reaches the runtime on its own; anything else this
       // page knows has to be handed over once the runtime is there to take it.
       window.bodPendingKeys = !fromQuery && !!stored;
-      document.getElementById('cog').onclick = function () {
-        bodSettings(document.getElementById('settings').hidden);
-      };
-      document.getElementById('binds-done').onclick = function () { bodSettings(false); };
-      document.getElementById('binds-reset').onclick = function () {
-        bodKeys = bodParseKeys(BOD_KEYS_DEFAULT);
-        bodSaveKeys();
-      };
       bodDrawKeys();
     })();
 
+    // ------------------------------------------------------------ the screen
+    //
+    // How the game's 320x320 is made up to the display's resolution; the
+    // presenter in bod-pre.js does the drawing. Kept in this browser, and
+    // ?BOD_SCREEN= says it for one visit without keeping it. The runtime is
+    // told through Module before it loads, and asked directly after.
+    var BOD_SCREEN_STORE = 'bod.screen';
+    var BOD_SCREEN_NOTES = {
+      pixels: 'The game’s own 320×320 pixels, each drawn as a square, the way a Palm showed them.',
+      smooth: 'Blended between pixels: no stair-steps, and softer everywhere.',
+      xbr: 'Upscaled with xBR to this display’s resolution: edges, wheels and lettering are redrawn as smooth lines, and textures keep their detail.'
+    };
+    var bodScreenMode = 'xbr';
+
+    function bodScreenAvailable(m) {
+      if (window.Module && Module.bodScreen) return Module.bodScreen.available(m);
+      return !!BOD_SCREEN_NOTES[m];
+    }
+
+    function bodDrawScreen() {
+      var current = (window.Module && Module.bodScreen) ? Module.bodScreen.get() : bodScreenMode;
+      Array.prototype.forEach.call(document.querySelectorAll('#screen-modes button'), function (b) {
+        var on = b.dataset.screen === current;
+        b.classList.toggle('is-on', on);
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+        b.disabled = !bodScreenAvailable(b.dataset.screen);
+        b.title = b.disabled ? 'Needs WebGL, which this browser does not have' : '';
+      });
+      document.getElementById('screen-note').textContent = BOD_SCREEN_NOTES[current] || '';
+    }
+
+    function bodSetScreen(m, keep) {
+      if (!bodScreenAvailable(m)) return;
+      bodScreenMode = m;
+      if (window.Module && Module.bodScreen) Module.bodScreen.set(m);
+      else if (window.Module) Module.bodScreenMode = m;
+      if (keep) {
+        try { localStorage.setItem(BOD_SCREEN_STORE, m); } catch (e) { /* private window */ }
+      }
+      bodDrawScreen();
+    }
+
+    (function () {
+      var stored = null, fromQuery = null;
+      try { stored = localStorage.getItem(BOD_SCREEN_STORE); } catch (e) { /* private window */ }
+      try { fromQuery = new URLSearchParams(location.search).get('BOD_SCREEN'); } catch (e) { }
+      if (BOD_SCREEN_NOTES[fromQuery || stored]) bodScreenMode = fromQuery || stored;
+      Array.prototype.forEach.call(document.querySelectorAll('#screen-modes button'), function (b) {
+        b.onclick = function () { bodSetScreen(b.dataset.screen, true); };
+      });
+      bodDrawScreen();
+    })();
+
     var Module = {
+      bodScreenMode: bodScreenMode,
       canvas: canvas,
       onRuntimeInitialized: function () {
         if (window.bodPendingKeys) bodSendKeys();
-        var pauseReady = setInterval(function () {
+        var ready = setInterval(function () {
           if (window.PThread && Object.keys(PThread.pthreads).length) {
-            clearInterval(pauseReady);
-            pauseButton.disabled = false;
-            ['packs-open', 'levels', 'menu-open', 'level-prev', 'level-restart', 'level-next'].forEach(function (id) {
+            clearInterval(ready);
+            ['pause', 'packs-open', 'levels', 'level-prev', 'level-restart', 'level-next'].forEach(function (id) {
               document.getElementById(id).disabled = false;
             });
           }
@@ -544,51 +672,64 @@
       }
     };
 
+    // ------------------------------------------------------------ the keyboard
+    //
     // The game wants the arrow keys, space and the function keys; the browser
     // would scroll the page or reload with them. Whatever the controls are
     // bound to is claimed as well, for the same reason.
+    //
+    // A panel over the screen -- the pause menu, the level packs, one of the
+    // game's own dialogs -- takes the keys for itself: none of them reaches the
+    // game while one is open, and the arrows, Enter and Escape walk the panel
+    // instead (bodNav). Only presses are kept from the game, not releases, so
+    // a key that was held when a panel came up is let go of there too.
     var claimed = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space',
                    'F1', 'F2', 'F3', 'F4', 'F5', 'F9', 'Escape'];
-    window.addEventListener('keydown', function (e) {
-      var name = bodKeyName(e);
 
-      // Binding a key: the keystroke is the answer to the panel and must not
-      // also reach the game, which is listening on the document below this.
-      // The pad's keys are not an answer to it: a thumb cannot be the key
-      // someone wants bound, and the pad is dimmed while the panel is open.
+    function bodTopPanel() {
+      var panels = [bodPack.panel, bodUI.panel, bodPM.panel];
+      for (var i = 0; i < panels.length; i++) {
+        if (!panels[i].hidden) return panels[i];
+      }
+      return null;
+    }
+
+    window.addEventListener('keydown', function (e) {
+      var name = bodKeyName(e), panel;
+
+      // Binding a key: the keystroke is the answer to the menu and must not
+      // also reach the game, which is listening on the window below this. The
+      // pad's keys are not an answer to it: a thumb cannot be the key someone
+      // wants bound, and the pad is dimmed while a panel is open.
       if (bodListening && !e.bodTouch) {
         e.preventDefault();
         e.stopPropagation();
-        if (e.key !== 'Escape') {
-          bodKeys[bodListening.action] = (e.key === 'Backspace' || e.key === 'Delete') ? '' : name;
+        if (e.repeat || /^(Shift|Control|Alt|Meta|CapsLock)$/.test(e.key)) return;
+        if (/^Arrow/.test(e.key) || e.key === 'Escape') {
+          // The arrows ride whatever is bound, so they are not a binding; they
+          // and Escape leave this one as it was.
+          bodStopListening();
+          return;
         }
-        bodListening.button.classList.remove('listening');
+        if (e.key === 'Backspace' || e.key === 'Delete') bodKeys[bodListening.action] = '';
+        else if (name) bodKeys[bodListening.action] = name;
+        else return;
         bodListening = null;
         bodSaveKeys();
         return;
       }
 
-      // A panel covers the screen, so the game does not get the keys pressed
-      // over it -- but the browser still does, so the panel can be walked with
-      // the keyboard like any other, and typed into.
-      if (!document.getElementById('packs').hidden) {
+      if ((panel = bodTopPanel()) !== null) {
         e.stopPropagation();
-        if (e.key === 'Escape') bodPack.close(true);
+        if (e.bodTouch) { e.preventDefault(); return; }
+        bodNav.key(e, panel);
         return;
       }
-      if (!document.getElementById('settings').hidden) {
+
+      if (e.key === 'Escape' && !e.bodTouch) {
+        e.preventDefault();
         e.stopPropagation();
-        if (e.key === 'Escape') bodSettings(false);
-      }
-      if (!document.getElementById('menu').hidden) {
-        e.stopPropagation();
-        if (e.key === 'Escape') bodUI.openMenu(false);
-        return;
-      }
-      if (!document.getElementById('dialog').hidden) {
-        e.stopPropagation();
-        // Escape leaves the game's dialog the way its own Cancel would.
-        if (e.key === 'Escape') bodUI.send('close');
+        if (!e.repeat) bodPM.open();
         return;
       }
 
@@ -598,24 +739,218 @@
       }
     }, { capture: true });
 
+    window.addEventListener('keyup', function (e) { delete bodNav.down[e.code]; }, { capture: true });
     canvas.addEventListener('mousedown', function () { canvas.focus(); });
-    pauseButton.addEventListener('click', function () { bodSetPaused(!bodPaused); });
 
-    // ------------------------------------------------------------ touch play
+    // ------------------------------------------------- walking a panel by key
     //
-    // A phone has no keyboard, so the page grows one: the four arrows and the
-    // space bar, as five keys under the thumbs. They send the keystrokes a
-    // rider would make rather than talking to the game directly -- SDL listens
-    // for those on the window, so a KeyboardEvent dispatched there is the same
-    // press, and whatever the settings panel has bound follows along. Each key
-    // is held for as long as the thumb is on it, which is what riding asks
-    // for; the game reads the keys as a mask rather than as repeats.
+    // Every panel over the screen is walked the same way, whatever is on it:
+    // the arrows move to the control that is that way on the screen, Enter or
+    // Space presses it, and Escape goes back. Where the controls are is where
+    // they are drawn, so a row of buttons is walked across and a list down,
+    // and a dialog of the game's that nobody laid out by hand works too.
+    //
+    // A few controls keep an arrow for themselves: a text field keeps left and
+    // right for its caret, a slider for its value, a drop-down takes left and
+    // right as the previous and next choice, and a row of choices (Screen,
+    // Touch controls) picks the next one as the arrow reaches it.
+    var bodNav = {
+      items: function (panel) {
+        return Array.prototype.filter.call(
+          panel.querySelectorAll('button, input, select, [tabindex="0"]'),
+          function (el) {
+            return !el.disabled && !el.closest('[hidden]') && el.getClientRects().length > 0;
+          });
+      },
+
+      focus: function (el) {
+        if (!el) return false;
+        el.focus();
+        if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+        return document.activeElement === el;
+      },
+
+      // Where the keyboard starts in a panel it is not in yet: somewhere to
+      // type, the choice that is made, or the first thing there is -- which
+      // in a dialog is its first control rather than its default button, the
+      // default being Cancel as often as not, and Escape being that anyway.
+      start: function (panel) {
+        var items = bodNav.items(panel), prefer = ['input[type="text"]', 'input[type="search"]',
+            '[role="radio"].is-on', '.dlg__list .is-on', '.is-current'], i, found;
+        for (i = 0; i < prefer.length; i++) {
+          found = items.filter(function (el) { return el.matches(prefer[i]); })[0];
+          if (found) return bodNav.focus(found);
+        }
+        return bodNav.focus(items[0]);
+      },
+
+      // The nearest control in the direction of the arrow: for up and down,
+      // the nearest row that way and the control in it closest across; for
+      // left and right, the nearest control on the same line. Past the last
+      // row, up and down come round to the other end.
+      move: function (panel, from, key) {
+        var items = bodNav.items(panel), a = from.getBoundingClientRect(),
+            acx = (a.left + a.right) / 2, acy = (a.top + a.bottom) / 2,
+            vertical = key === 'ArrowUp' || key === 'ArrowDown',
+            forward = key === 'ArrowDown' || key === 'ArrowRight',
+            best = null, bestEdge = null, bestScore = Infinity;
+
+        items.forEach(function (el) {
+          var r, cx, cy, edge, across, score;
+          if (el === from) return;
+          r = el.getBoundingClientRect();
+          cx = (r.left + r.right) / 2;
+          cy = (r.top + r.bottom) / 2;
+          if (vertical) {
+            if (forward ? !(cy > acy + 2 && r.top > a.top + 2) : !(cy < acy - 2 && r.bottom < a.bottom - 2)) return;
+            edge = forward ? r.top : -r.bottom;
+            if (bestEdge !== null && edge > bestEdge + 4) return;
+            across = Math.max(0, r.left - a.right, a.left - r.right) * 1000 + Math.abs(cx - acx);
+            if (bestEdge === null || edge < bestEdge - 4) { bestEdge = edge; bestScore = Infinity; }
+            if (across < bestScore) { bestScore = across; best = el; }
+          } else {
+            if (forward ? !(cx > acx + 2 && r.left > a.left + 2) : !(cx < acx - 2 && r.right < a.right - 2)) return;
+            if (r.bottom <= a.top || r.top >= a.bottom) return;
+            score = (forward ? r.left - a.right : a.left - r.right) + Math.abs(cy - acy) * 4;
+            if (score < bestScore) { bestScore = score; best = el; }
+          }
+        });
+
+        if (!best && vertical && items.length > 1) best = forward ? items[0] : items[items.length - 1];
+        // Into a row of choices from above or below, the keyboard lands on
+        // the one that is chosen, not whichever is nearest.
+        if (best && vertical && best.getAttribute('role') === 'radio' && !best.classList.contains('is-on')) {
+          best = best.closest('[role="radiogroup"]').querySelector('[role="radio"].is-on:not(:disabled)') || best;
+        }
+        if (best) bodNav.focus(best);
+      },
+
+      // Tab stays inside the panel, going round.
+      cycle: function (panel, from, step) {
+        var items = bodNav.items(panel), i = from ? items.indexOf(from) : -1;
+        if (!items.length) return;
+        if (i < 0) i = step > 0 ? -1 : 0;
+        bodNav.focus(items[(i + step + items.length) % items.length]);
+      },
+
+      // A row of choices: the arrow picks the next one.
+      radio: function (group, from, step) {
+        var radios = Array.prototype.filter.call(group.querySelectorAll('[role="radio"]'),
+                                                 function (b) { return !b.disabled; }),
+            i = radios.indexOf(from), next = radios[i + step];
+        if (i < 0 || !next) return;
+        next.click();
+        bodNav.focus(next);
+      },
+
+      select: function (el, step) {
+        var i = Math.max(0, Math.min(el.options.length - 1, el.selectedIndex + step));
+        if (i === el.selectedIndex) return;
+        el.selectedIndex = i;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+
+      // The keys pressed while a panel was up. A key already held when one
+      // came up -- pedalling as a level ends and the game asks for a name --
+      // goes on repeating, and those repeats were meant for the bike, so they
+      // are not allowed to walk the panel.
+      down: {},
+
+      key: function (e, panel) {
+        var el = document.activeElement, k = e.key, group,
+            inside = !!el && el !== panel && panel.contains(el),
+            typing = inside && el.tagName === 'INPUT' && /^(text|search)$/.test(el.type);
+
+        if (!e.repeat) {
+          bodNav.down[e.code] = true;
+        } else if (!bodNav.down[e.code]) {
+          e.preventDefault();
+          return;
+        }
+
+        if (k === 'Escape') {
+          e.preventDefault();
+          if (!e.repeat) bodBack(panel);
+          return;
+        }
+
+        if (k === 'Tab') {
+          e.preventDefault();
+          bodNav.cycle(panel, inside ? el : null, e.shiftKey ? -1 : 1);
+          return;
+        }
+
+        if (!/^Arrow(Up|Down|Left|Right)$/.test(k)) {
+          // Enter or Space with nothing chosen yet chooses where to start.
+          if (!inside && (k === 'Enter' || k === ' ')) {
+            e.preventDefault();
+            bodNav.start(panel);
+          }
+          return;
+        }
+
+        if (!inside) {
+          e.preventDefault();
+          bodNav.start(panel);
+          return;
+        }
+
+        if (k === 'ArrowLeft' || k === 'ArrowRight') {
+          if (typing || (el.tagName === 'INPUT' && el.type === 'range')) return;
+          if (el.tagName === 'SELECT') {
+            e.preventDefault();
+            bodNav.select(el, k === 'ArrowRight' ? 1 : -1);
+            return;
+          }
+          if ((group = el.closest('[role="radiogroup"]')) !== null) {
+            e.preventDefault();
+            bodNav.radio(group, el, k === 'ArrowRight' ? 1 : -1);
+            return;
+          }
+        }
+
+        e.preventDefault();
+        bodNav.move(panel, el, k);
+      }
+    };
+
+    // Escape, in whichever panel is in front.
+    function bodBack(panel) {
+      if (panel === bodPack.panel) {
+        if (bodPack.filter.value && document.activeElement === bodPack.filter) {
+          bodPack.filter.value = '';
+          bodPack.draw();
+        } else {
+          bodPack.close(true);
+        }
+      } else if (panel === bodUI.panel) {
+        bodUI.dismiss();
+      } else if (panel === bodPM.panel) {
+        bodPM.back();
+      }
+    }
+
+    // ---------------------------------------------------------- touch controls
+    //
+    // A phone has no keyboard, so the page can grow one: the four arrows and
+    // the space bar, as five keys under the thumbs. They are off unless they
+    // are asked for -- Settings -> Touch controls, kept in this browser, or
+    // ?touch=1 and ?touch=0 for one visit -- and they come and go without a
+    // reload, since the game would go with it.
+    //
+    // They send the keystrokes a rider would make rather than talking to the
+    // game directly -- SDL listens for those on the window, so a KeyboardEvent
+    // dispatched there is the same press, and whatever the Controls page has
+    // bound follows along. Each key is held for as long as the thumb is on it,
+    // which is what riding asks for; the game reads the keys as a mask rather
+    // than as repeats.
     //
     // They are not in the tab order: a keyboard has the keys they stand in
     // for, and space on a focused one would be both a flip and whatever the
     // key is. A pointer is what they are for, and assistive technology reaches
     // them without the tab order's help.
-    var bodTouchOn = false;
+    var BOD_TOUCH_STORE = 'bod.touch';
+    var bodTouchOn = false, bodTouchWired = false;
 
     function bodPadKey(btn, down) {
       var e;
@@ -717,36 +1052,298 @@
       requestAnimationFrame(function () { bodFitPending = false; bodFit(); });
     }
 
-    (function () {
-      var q = null;
-
-      // A coarse pointer is a thumb. ?touch=1 and ?touch=0 say so outright,
-      // which is how the layout is looked at on a desktop.
-      try { q = new URLSearchParams(location.search).get('touch'); } catch (e) { /* no query string */ }
-      bodTouchOn = q === null ? matchMedia('(pointer: coarse)').matches : q !== '0';
-      if (!bodTouchOn) return;
-
-      document.documentElement.classList.add('touch');
-      // One line of controls rather than two: the heading says nothing a phone
-      // has room for, so its buttons join the rest and it goes.
-      document.querySelector('.tools').appendChild(document.querySelector('.bar__actions'));
-      document.querySelector('#packs-open .lbl').textContent = 'Pack';
-      // And the status line goes over the screen, there being no line spare.
-      document.querySelector('.screen').appendChild(statusEl);
-
-      Array.prototype.forEach.call(document.querySelectorAll('.key'), bodPadWire);
-      window.addEventListener('blur', bodPadReleaseAll);
-      document.addEventListener('visibilitychange', function () {
-        if (document.hidden) bodPadReleaseAll();
+    function bodDrawTouch() {
+      Array.prototype.forEach.call(document.querySelectorAll('#touch-modes button'), function (b) {
+        var on = (b.dataset.touch === 'on') === bodTouchOn;
+        b.classList.toggle('is-on', on);
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
       });
+    }
 
-      bodFit();
-      window.addEventListener('resize', bodFitSoon);
-      window.addEventListener('orientationchange', bodFitSoon);
-      // The visible height changes as the browser's own bars come and go,
-      // which is not a resize.
-      if (window.visualViewport) window.visualViewport.addEventListener('resize', bodFitSoon);
+    function bodSetTouch(on, keep) {
+      var root = document.documentElement, actions = document.querySelector('.bar__actions');
+
+      on = !!on;
+      if (keep) {
+        try { localStorage.setItem(BOD_TOUCH_STORE, on ? 'on' : 'off'); } catch (e) { /* private window */ }
+      }
+      if (on !== bodTouchOn) {
+        bodTouchOn = on;
+        if (on) {
+          root.classList.add('touch');
+          // One line of controls rather than two: the heading says nothing a
+          // phone has room for, so its buttons join the rest and it goes. And
+          // the status line goes over the screen, there being no line spare.
+          document.querySelector('.tools').appendChild(actions);
+          document.querySelector('#packs-open .lbl').textContent = 'Pack';
+          document.querySelector('.screen').appendChild(statusEl);
+          if (!bodTouchWired) {
+            bodTouchWired = true;
+            Array.prototype.forEach.call(document.querySelectorAll('.key'), bodPadWire);
+            window.addEventListener('blur', bodPadReleaseAll);
+            document.addEventListener('visibilitychange', function () {
+              if (document.hidden) bodPadReleaseAll();
+            });
+            window.addEventListener('resize', bodFitSoon);
+            window.addEventListener('orientationchange', bodFitSoon);
+            // The visible height changes as the browser's own bars come and
+            // go, which is not a resize.
+            if (window.visualViewport) window.visualViewport.addEventListener('resize', bodFitSoon);
+          }
+          bodFit();
+        } else {
+          bodPadReleaseAll();
+          root.classList.remove('touch');
+          document.querySelector('.bar').appendChild(actions);
+          document.querySelector('#packs-open .lbl').textContent = 'Level pack';
+          document.querySelector('.stage').after(statusEl);
+          canvas.style.width = canvas.style.height = '';
+          root.style.removeProperty('--key');
+        }
+      }
+      bodDrawTouch();
+    }
+
+    (function () {
+      var q = null, stored = null;
+      try { q = new URLSearchParams(location.search).get('touch'); } catch (e) { /* no query string */ }
+      try { stored = localStorage.getItem(BOD_TOUCH_STORE); } catch (e) { /* private window */ }
+      Array.prototype.forEach.call(document.querySelectorAll('#touch-modes button'), function (b) {
+        b.onclick = function () { bodSetTouch(b.dataset.touch === 'on', true); };
+      });
+      bodSetTouch(q !== null ? q !== '0' : stored === 'on', false);
     })();
+
+    // ---------------------------------------------------------- the pause menu
+    //
+    // Escape, or Pause, and the game stops -- really stops: the runtime holds
+    // the game's thread and leaves the time out of its clock ("pause 1",
+    // bodui.c), so it carries on from the same moment rather than from
+    // wherever the bike would have got to. The audio goes quiet with it.
+    //
+    // Over it, everything that is not riding: the level, the level packs, the
+    // keys, the settings, and the rest of the game's own menu. The game's
+    // dialogs open from here the way they open from its menu, with the game
+    // still held, and when one is dismissed the menu comes back to where it
+    // was. One that is left some other way -- Play this level, a replay --
+    // lets the game go instead, since that is what was asked for.
+    var bodPM = {
+      panel: document.getElementById('pm'),
+      title: document.getElementById('pm-title'),
+      where: document.getElementById('pm-where'),
+      TITLES: { main: 'Paused', controls: 'Controls', settings: 'Settings',
+                records: 'Profiles & records', help: 'Help' },
+      // The game's menu items with a place of their own in the menu already,
+      // or none: the level items are on the first page, the game's own pause
+      // is this, Quit ends the game for good in a page, and beaming it to
+      // another Palm has nowhere to go.
+      SKIP: { 100: 1, 101: 1, 102: 1, 110: 1, 120: 1, 198: 1, 199: 1 },
+      page: 'main',
+      session: false,     // the game is held for the menu
+      returnTo: null,     // where to come back to when the game's dialog closes
+      memo: {},           // the item last chosen on each page
+      waiting: null,      // a game menu item that may or may not open a dialog
+      built: false,
+
+      ready: function () { return bodUI.ready(); },
+      isOpen: function () { return !bodPM.panel.hidden; },
+
+      hold: function (on) {
+        if (bodPM.session === on) return;
+        bodPM.session = on;
+        try {
+          Module.ccall('bod_ui_command', 'number', ['string'], [on ? 'pause 1' : 'pause 0']);
+        } catch (e) {
+          console.warn('could not pause the game:', e);
+        }
+        bodPaused = on;
+        bodSyncAudio();
+        pauseButton.querySelector('.lbl').textContent = on ? 'Resume' : 'Pause';
+        pauseButton.setAttribute('aria-expanded', on ? 'true' : 'false');
+      },
+
+      open: function (page, key) {
+        var fresh = !bodPM.session;
+        if (!bodPM.ready()) return;
+        if (bodPack.isOpen()) bodPack.close(true);
+        bodPM.hold(true);
+        // A new pause starts on Resume, so that Escape twice is always
+        // there and back.
+        bodPM.show(page || 'main', key || (fresh && !page ? 'resume' : undefined));
+      },
+
+      show: function (page, key) {
+        var target;
+
+        bodStopListening();
+        bodPM.page = bodPM.TITLES[page] ? page : 'main';
+        Array.prototype.forEach.call(bodPM.panel.querySelectorAll('.pm__page'), function (p) {
+          p.hidden = p.dataset.page !== bodPM.page;
+        });
+        bodPM.title.textContent = bodPM.TITLES[bodPM.page];
+        bodPM.where.textContent = bodPM.page === 'main' ? bodPack.title : '';
+        bodDrawKeys();
+        bodDrawScreen();
+        bodDrawTouch();
+        bodPM.build();
+        bodPM.panel.hidden = false;
+        bodPM.panel.scrollTop = 0;
+        target = bodPM.find(key || bodPM.memo[bodPM.page]);
+        if (!bodNav.focus(target)) bodNav.start(bodPM.panel);
+      },
+
+      hide: function () {
+        bodStopListening();
+        bodPM.panel.hidden = true;
+      },
+
+      // What an item is remembered by, to come back to it.
+      keyOf: function (b) {
+        var d = b.dataset;
+        return d.do ? d.do : d.page ? 'page:' + d.page : d.bind ? 'bind:' + d.bind :
+               d.menu ? 'menu:' + d.menu : d.screen ? 'screen' : d.touch ? 'touch' : '';
+      },
+
+      find: function (key) {
+        var page = bodPM.panel.querySelector('.pm__page[data-page="' + bodPM.page + '"]'), found;
+        if (!key || !page) return null;
+        found = Array.prototype.filter.call(page.querySelectorAll('button'), function (b) {
+          return bodPM.keyOf(b) === key;
+        });
+        return found.filter(function (b) { return b.classList.contains('is-on'); })[0] || found[0] || null;
+      },
+
+      // Leaves the menu and lets the game go.
+      resume: function () {
+        clearTimeout(bodPM.waiting);
+        bodPM.waiting = null;
+        bodPM.panel.classList.remove('is-waiting');
+        bodPM.returnTo = null;
+        bodPM.hide();
+        bodPM.hold(false);
+        if (!bodTopPanel()) canvas.focus();
+      },
+
+      back: function () {
+        if (bodPM.page === 'main') bodPM.resume();
+        else bodPM.show('main', 'page:' + bodPM.page);
+      },
+
+      // One of the game's dialogs, opened from here. The menu stays up until
+      // the dialog does, so that there is never a moment with nothing on the
+      // screen to press; an item that opens nothing -- a toggle, a replay --
+      // leaves it where it is.
+      dialog: function (send) {
+        bodPM.returnTo = { page: bodPM.page, key: bodPM.memo[bodPM.page] };
+        bodPM.panel.classList.add('is-waiting');
+        bodUI.expect();
+        send();
+        clearTimeout(bodPM.waiting);
+        bodPM.waiting = setTimeout(function () {
+          bodPM.waiting = null;
+          bodPM.panel.classList.remove('is-waiting');
+          if (bodUI.panel.hidden) bodPM.returnTo = null;
+        }, 1200);
+      },
+
+      // The game's dialog has closed. It was dismissed, or it was not.
+      dialogClosed: function (dismissed) {
+        var r = bodPM.returnTo;
+        bodPM.returnTo = null;
+        if (!r || !bodPM.session) return;
+        if (dismissed) bodPM.show(r.page, r.key);
+        else bodPM.resume();
+      },
+
+      act: function (b) {
+        if (bodPM.waiting) return;
+        var key = bodPM.keyOf(b);
+        if (key) bodPM.memo[bodPM.page] = key;
+
+        if (b.dataset.page) {
+          bodPM.show(b.dataset.page);
+        } else if (b.dataset.menu) {
+          bodPM.dialog(function () { bodUI.send('pick ' + b.dataset.menu); });
+        } else {
+          switch (b.dataset.do) {
+            case 'resume':  bodPM.resume(); break;
+            case 'restart': bodPM.resume(); bodPack.menu('Restart Level'); break;
+            case 'next':    bodPM.resume(); bodPack.menu('Next Level'); break;
+            case 'prev':    bodPM.resume(); bodPack.menu('Previous Level'); break;
+            case 'levels':  bodPM.dialog(function () { bodPack.menu('Select Level'); }); break;
+            case 'packs':   bodPack.open(); break;
+            case 'back':    bodPM.back(); break;
+            case 'default-keys':
+              bodKeys = bodParseKeys(BOD_KEYS_DEFAULT);
+              bodSaveKeys();
+              break;
+            case 'game-controls':
+              var item = bodUI.menuItem(301);    // Options -> Control
+              if (item) bodPM.dialog(function () { bodUI.send('pick ' + item); });
+              break;
+          }
+        }
+      },
+
+      // The game's own menu, spread over the pages it belongs on: its Options
+      // under Settings, its Help under Help, and the rest -- profiles,
+      // statistics, recordings -- on a page of their own. Built once, out of
+      // the menu bar the game publishes.
+      build: function () {
+        var lists = { options: document.getElementById('pm-options'),
+                      records: document.getElementById('pm-records'),
+                      help: document.getElementById('pm-help') },
+            HEADINGS = { Options: 'The game’s options', Rec: 'Recordings' };
+
+        if (bodPM.built || !bodUI.menuBar.length) return;
+        bodPM.built = true;
+
+        bodUI.menuBar.forEach(function (menu) {
+          var into = /^options$/i.test(menu.title) ? lists.options :
+                     /^help$/i.test(menu.title) ? lists.help : lists.records,
+              count = 0, gap = false;
+
+          menu.items.forEach(function (it) {
+            var b, h;
+            if (it.sep) { gap = count > 0; return; }
+            if (bodPM.SKIP[it.id]) return;
+            if (!count && into !== lists.help) {
+              h = document.createElement('h3');
+              h.textContent = HEADINGS[menu.title] || menu.title;
+              into.appendChild(h);
+            } else if (gap) {
+              into.appendChild(document.createElement('hr'));
+            }
+            gap = false;
+            b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'pm__item';
+            b.dataset.menu = menu.n + ' ' + it.n;
+            b.textContent = it.label;
+            into.appendChild(b);
+            count++;
+          });
+        });
+      }
+    };
+
+    bodPM.panel.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b || !bodPM.panel.contains(b)) return;
+      // The key bindings and the rows of choices answer for themselves.
+      if (b.dataset.bind || b.dataset.screen || b.dataset.touch) return;
+      bodPM.act(b);
+    });
+
+    pauseButton.addEventListener('click', function () {
+      if (bodPM.session) bodPM.resume(); else bodPM.open();
+    });
+
+    // A tab put away while the bike is moving is a game left running with
+    // nobody at it.
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && bodPM.ready() && !bodPM.session && !bodTopPanel()) bodPM.open();
+    });
 
     // ------------------------------------------------ level packs and levels
     //
@@ -766,6 +1363,7 @@
       names: [],
       title: '',
       poll: null,
+      fromPM: false,      // opened from the pause menu, and going back to it
 
       ready: function () {
         return !!(window.Module && Module.ccall && !pauseButton.disabled);
@@ -802,13 +1400,13 @@
       setTitle: function (title) {
         bodPack.title = title;
         document.getElementById('packs-cur').textContent = title || '';
+        if (bodPM.isOpen() && bodPM.page === 'main') bodPM.where.textContent = title || '';
       },
 
       // Runs `cmd`, then polls until the state is one of `until`, or an error,
       // or the game has stayed silent for `timeout` ms.
       run: function (cmd, until, done, timeout) {
         if (!bodPack.ready()) { bodPack.say('the game is still loading'); return; }
-        if (bodPaused) bodSetPaused(false);
         if (bodPack.poll) { clearInterval(bodPack.poll); bodPack.poll = null; }
         if (!bodPack.send(cmd)) return;
         var started = Date.now();
@@ -838,16 +1436,18 @@
 
       open: function () {
         if (bodPack.isOpen()) return;
-        bodSettings(false);
-        bodPack.list.innerHTML = '<div class="none">Asking the game for its packs\u2026</div>';
+        bodPack.fromPM = bodPM.session;
+        bodPM.hide();
+        bodPack.list.innerHTML = '<div class="none">Asking the game for its packs…</div>';
         bodPack.filter.value = '';
         bodPack.panel.hidden = false;
         bodPack.button.setAttribute('aria-expanded', 'true');
+        bodPack.filter.focus();
         bodPack.run('open', ['listed'], function (r) {
           if (r.state !== 'listed') { bodPack.close(false); return; }
           bodPack.names = r.names || [];
           bodPack.draw();
-          bodPack.filter.focus();
+          if (!bodPack.panel.hidden) bodPack.filter.focus();
         });
       },
 
@@ -865,7 +1465,7 @@
       },
 
       draw: function () {
-        var q = bodPack.filter.value.trim().toLowerCase(), cur = bodPack.current(), shown = 0;
+        var q = bodPack.filter.value.trim().toLowerCase(), cur = bodPack.current(), shown = 0, mine = null;
         bodPack.list.innerHTML = '';
         bodPack.names.forEach(function (name, i) {
           if (q && name.toLowerCase().indexOf(q) < 0) return;
@@ -873,7 +1473,7 @@
           b.type = 'button';
           b.setAttribute('role', 'option');
           b.textContent = name;
-          if (i === cur) b.className = 'is-current';
+          if (i === cur) { b.className = 'is-current'; mine = b; }
           b.onclick = function () { bodPack.pick(i); };
           bodPack.list.appendChild(b);
           shown++;
@@ -881,31 +1481,43 @@
         if (!shown) {
           bodPack.list.innerHTML = '<div class="none">' + (bodPack.names.length ? 'No pack by that name' : 'No packs') + '</div>';
         }
+        // The pack the game is on, in view, for Down to reach from the filter.
+        if (mine && !q) bodPack.list.scrollTop = Math.max(0, mine.offsetTop - bodPack.list.offsetTop - 60);
       },
 
       pick: function (i) {
         var name = bodPack.names[i] || '';
-        bodPack.list.innerHTML = '<div class="none">Starting ' + name.trim() + '\u2026</div>';
+        // A pack is somewhere to ride: the pause, if there was one, is over.
+        if (bodPack.fromPM) { bodPack.fromPM = false; bodPM.resume(); }
+        bodPack.list.innerHTML = '<div class="none">Starting ' + name.trim() + '…</div>';
+        bodPack.filter.focus();
         bodPack.run('pick ' + i, ['done', 'idle'], function (r) {
           bodPack.close(false);
           if (r.state === 'done') bodPack.say('');
         });
       },
 
-      // Closing the panel without a choice closes the game's dialogs too.
+      // Closing the panel without a choice closes the game's dialogs too, and
+      // goes back to the pause menu if that is where it came from.
       close: function (cancel) {
         if (!bodPack.isOpen()) return;
         bodPack.panel.hidden = true;
         bodPack.button.setAttribute('aria-expanded', 'false');
         if (cancel) bodPack.run('cancel', ['done', 'idle'], function () { });
-        canvas.focus();
+        if (bodPack.fromPM && bodPM.session) {
+          bodPack.fromPM = false;
+          bodPM.show('main', 'packs');
+        } else {
+          bodPack.fromPM = false;
+          canvas.focus();
+        }
       },
 
       // A menu item for the game itself.
       menu: function (label) {
         bodPack.run('menu ' + label, ['done', 'idle'], function (r) {
           if (r.state === 'done') bodPack.say('');
-          canvas.focus();
+          if (!bodTopPanel()) canvas.focus();
         });
       }
     };
@@ -928,10 +1540,23 @@
         if (first) first.click();
       }
     });
-    document.getElementById('levels').addEventListener('click', function () { bodPack.menu('Select Level'); });
-    document.getElementById('level-prev').addEventListener('click', function () { bodPack.menu('Previous Level'); });
-    document.getElementById('level-next').addEventListener('click', function () { bodPack.menu('Next Level'); });
-    document.getElementById('level-restart').addEventListener('click', function () { bodPack.menu('Restart Level'); });
+    // The level buttons above the screen are for riding, so they end a pause.
+    function bodLevelButton(id, label) {
+      document.getElementById(id).addEventListener('click', function () {
+        if (label === 'Select Level' && bodPM.session) {
+          bodPM.open('main', 'levels');
+          bodPM.act(bodPM.find('levels'));
+          return;
+        }
+        if (bodPM.session) bodPM.resume();
+        if (label === 'Select Level') bodUI.expect();
+        bodPack.menu(label);
+      });
+    }
+    bodLevelButton('levels', 'Select Level');
+    bodLevelButton('level-prev', 'Previous Level');
+    bodLevelButton('level-next', 'Next Level');
+    bodLevelButton('level-restart', 'Restart Level');
 
     // ------------------------------------------------- the game's own UI
     //
@@ -950,20 +1575,65 @@
       head: document.getElementById('dialog-head'),
       body: document.getElementById('dialog-body'),
       foot: document.getElementById('dialog-foot'),
-      menuPanel: document.getElementById('menu'),
-      menuList: document.getElementById('menu-list'),
-      menuButton: document.getElementById('menu-open'),
-      seq: -1, form: null, shown: null, settling: 0, since: 0, menus: false,
+      menuBar: [],
+      seq: -1, form: null, shown: null, settling: 0, since: 0,
+      expected: 0,        // when a dialog was last asked for on purpose
+      dismissed: true,    // whether what last left a dialog was a way out of it
+      chain: false,       // a dialog opened from the pause menu is up
+      closedAt: 0,
+      queue: [], sent: 0, sentAt: 0, flushing: false,
       SETTLE: 450,
+      // What pressing a button called this does is leave the dialog alone.
+      WAYS_OUT: /^(cancel|close|done|ok|no|back)$/i,
 
       ready: function () {
         return !!(window.Module && Module.ccall && !pauseButton.disabled);
       },
 
+      // The runtime keeps one command at a time, and one sent before the last
+      // was taken replaces it. So what is sent together goes as one, a line
+      // each, and what is sent after waits until the game has taken what went
+      // before -- for a second at most, in case it never does.
       send: function (cmd) {
-        try { Module.ccall('bod_ui_command', null, ['string'], [cmd]); } catch (e) {
+        bodUI.queue.push(cmd);
+        if (bodUI.flushing) return;
+        bodUI.flushing = true;
+        Promise.resolve().then(bodUI.flush);
+      },
+
+      flush: function () {
+        var taken;
+        try { taken = Module.ccall('bod_ui_taken', 'number', [], []) >>> 0; } catch (e) { taken = bodUI.sent; }
+        if (taken < bodUI.sent && Date.now() - bodUI.sentAt < 1000) {
+          setTimeout(bodUI.flush, 15);
+          return;
+        }
+        var cmd = bodUI.queue.join('\n');
+        bodUI.queue = [];
+        bodUI.flushing = false;
+        try {
+          bodUI.sent = Module.ccall('bod_ui_command', 'number', ['string'], [cmd]) >>> 0;
+          bodUI.sentAt = Date.now();
+        } catch (e) {
           console.warn('could not send to the game:', e);
         }
+      },
+
+      // A dialog is on its way because somebody asked for it: it is shown as
+      // soon as it is up, rather than after the wait for the ones that come
+      // and go by themselves.
+      expect: function () { bodUI.expected = Date.now(); },
+
+      // Pressing a control of the dialog: whether it was a way out of it is
+      // what decides, if the dialog closes, whether the pause menu comes back.
+      press: function (label, cmd) {
+        bodUI.dismissed = bodUI.WAYS_OUT.test((label || '').trim());
+        bodUI.send(cmd);
+      },
+
+      dismiss: function () {
+        bodUI.dismissed = true;
+        bodUI.send('close');
       },
 
       // Read twice around the sequence number, so a change under the read is
@@ -1035,7 +1705,7 @@
         var r;
         if (!bodUI.ready()) return;
 
-        if (!bodUI.menus) {
+        if (!bodUI.menuBar.length) {
           r = bodUI.read('bod_ui_menubar', 'bod_ui_menubar_seq');
           if (r && r.text) bodUI.buildMenus(r.text);
         }
@@ -1055,13 +1725,24 @@
       },
 
       reconcile: function () {
-        var form = bodUI.form;
+        var form = bodUI.form, now = Date.now();
         if (!form) return;
 
         // The level pack panel drives the game's own level and pack lists
         // from the outside; while it is doing that they are its business.
         if (!bodPack.panel.hidden || bodPack.poll) { bodUI.close(); return; }
-        if (!form.id) { bodUI.close(); return; }
+
+        if (!form.id) {
+          bodUI.close();
+          // A dialog opened from the pause menu is over once the game has had
+          // the screen back for a moment: one dialog can close on the way to
+          // the next, and that is not the end of it.
+          if (bodUI.chain && now - bodUI.closedAt > 300) {
+            bodUI.chain = false;
+            bodPM.dialogClosed(bodUI.dismissed);
+          }
+          return;
+        }
 
         if (!bodUI.panel.hidden) {
           if (form.sig !== bodUI.shown) bodUI.present(form); else bodUI.update(form);
@@ -1071,8 +1752,8 @@
         // A dialog that has only just come up waits a moment: some of the
         // game's own are answered on the way in and gone again in a fraction
         // of a second, and a panel that flashed for those would be a dialog
-        // nobody asked for.
-        if (Date.now() - bodUI.since < bodUI.SETTLE) return;
+        // nobody asked for. One that was asked for is shown straight away.
+        if (now - bodUI.since < bodUI.SETTLE && now - bodUI.expected > 3000) return;
         bodUI.present(form);
       },
 
@@ -1106,7 +1787,7 @@
       },
 
       control: function (form, o, group) {
-        var el, i;
+        var el;
 
         if (o.kind === 'label' || (o.kind === 'field' && !bodUI.enabled(o))) {
           el = document.createElement('span');
@@ -1118,7 +1799,9 @@
         if (o.kind === 'check') {
           el = document.createElement('button');
           el.type = 'button';
-          el.textContent = (o.value ? '☑ ' : '☐ ') + o.text;
+          el.dataset.nav = 'o' + o.idx;
+          el.setAttribute('role', 'checkbox');
+          bodUI.check(el, o);
           el.disabled = !bodUI.enabled(o);
           el.onclick = function () { bodUI.send('press ' + o.idx); };
           return el;
@@ -1130,6 +1813,7 @@
           group.forEach(function (g) {
             var b = document.createElement('button');
             b.type = 'button';
+            b.dataset.nav = 'o' + g.idx;
             b.textContent = g.text;
             if (g.value) b.className = 'is-on';
             b.disabled = !bodUI.enabled(g);
@@ -1144,11 +1828,13 @@
           if (!list) {
             el = document.createElement('button');
             el.type = 'button';
+            el.dataset.nav = 'o' + o.idx;
             el.textContent = o.text || '…';
-            el.onclick = function () { bodUI.send('press ' + o.idx); };
+            el.onclick = function () { bodUI.press(o.text, 'press ' + o.idx); };
             return el;
           }
           el = document.createElement('select');
+          el.dataset.nav = 'o' + o.idx;
           list.items.forEach(function (name, n) {
             var opt = document.createElement('option');
             opt.textContent = name;
@@ -1166,13 +1852,27 @@
           el.type = 'text';
           el.value = o.text;
           el.dataset.idx = o.idx;
-          el.onchange = function () { bodUI.send('text ' + o.idx + ' ' + el.value); };
+          el.dataset.nav = 'o' + o.idx;
+          el.onchange = function () {
+            if (el.bodSent === el.value) return;
+            bodUI.send('text ' + o.idx + ' ' + el.value);
+          };
+          // Return in a field is the dialog's own Return: what was typed, and
+          // then the button it would press.
+          el.onkeydown = function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            el.bodSent = el.value;
+            bodUI.send('text ' + o.idx + ' ' + el.value);
+            if (form.def >= 0) bodUI.press(bodUI.label(form, form.def), 'press ' + form.def);
+          };
           return el;
         }
 
         if (o.kind === 'slider') {
           el = document.createElement('input');
           el.type = 'range';
+          el.dataset.nav = 'o' + o.idx;
           el.min = o.low; el.max = o.high > o.low ? o.high : o.low + 1; el.value = o.value;
           el.disabled = !bodUI.enabled(o);
           // One event when it is let go of, not one per pixel: the game
@@ -1188,11 +1888,14 @@
           o.items.forEach(function (name, n) {
             var b = document.createElement('button');
             b.type = 'button';
+            b.dataset.nav = 'o' + o.idx + '.' + n;
             b.textContent = name;
             if (n === o.sel) b.className = 'is-on';
-            b.onclick = function () {
-              bodUI.send('select ' + o.idx + ' ' + n);
-              if (form.def >= 0) bodUI.send('press ' + form.def);
+            b.onclick = function () { bodUI.choose(form, o, el, n); };
+            // A double click is a choice and the button that acts on it.
+            b.ondblclick = function () {
+              var go = bodUI.affirmative();
+              if (go) go.click();
             };
             el.appendChild(b);
           });
@@ -1200,19 +1903,69 @@
           return el;
         }
 
-        el = document.createElement('button');   // button, repeat, anything else
+        el = document.createElement('button');   // button, repeat, push on its own, anything else
         el.type = 'button';
+        el.dataset.nav = 'o' + o.idx;
         el.textContent = o.text;
         el.disabled = !bodUI.enabled(o);
         if (o.flags & 4) el.className = 'is-default';
-        el.onclick = function () { bodUI.send('press ' + o.idx); };
+        if (o.kind === 'push' && o.value) el.classList.add('is-on');
+        el.onclick = o.kind === 'push' ? function () { bodUI.send('press ' + o.idx); }
+                                       : function () { bodUI.press(o.text, 'press ' + o.idx); };
         return el;
       },
 
-      present: function (form) {
-        var objects = bodUI.layout(form), rows = [], row = [], y = -1000, bottom = 0, done = {};
+      // Choosing an item of a list. Where the dialog's default button is
+      // something to do with the choice -- Select, OK -- the two go together,
+      // in one send so that neither can take the other's place on the way to
+      // the game. Where the default is a way out, as it is on the game's
+      // level list, pressing it would throw the choice away: the item is
+      // chosen, and the keyboard goes to the button that acts on it instead,
+      // the first in the row that is not a way out -- Play this level.
+      choose: function (form, o, el, n) {
+        var def = form.def >= 0 ? bodUI.label(form, form.def) : '', go;
 
-        bodSettings(false);
+        Array.prototype.forEach.call(el.children, function (b, i) { b.classList.toggle('is-on', i === n); });
+        if (form.def >= 0 && !bodUI.WAYS_OUT.test(def.trim())) {
+          bodUI.press(def, 'select ' + o.idx + ' ' + n + '\npress ' + form.def);
+          return;
+        }
+        bodUI.send('select ' + o.idx + ' ' + n);
+        if ((go = bodUI.affirmative()) !== null) bodNav.focus(go);
+      },
+
+      affirmative: function () {
+        return Array.prototype.filter.call(bodUI.foot.querySelectorAll('button'), function (b) {
+          return !b.disabled && !bodUI.WAYS_OUT.test(b.textContent.trim());
+        })[0] || null;
+      },
+
+      check: function (el, o) {
+        el.textContent = (o.value ? '☑ ' : '☐ ') + o.text;
+        el.setAttribute('aria-checked', o.value ? 'true' : 'false');
+      },
+
+      label: function (form, idx) {
+        var found = form.objects.filter(function (o) { return o.idx === idx; })[0];
+        return found ? found.text : '';
+      },
+
+      present: function (form) {
+        var objects = bodUI.layout(form), rows = [], row = [], y = -1000, bottom = 0, done = {},
+            active = document.activeElement,
+            had = !bodUI.panel.hidden && active && bodUI.panel.contains(active) ? active.dataset.nav : null;
+
+        // Over the pause menu, if it is up: the game stays held, and the menu
+        // comes back when this is over.
+        if (bodPM.session) {
+          if (!bodPM.returnTo) bodPM.returnTo = { page: bodPM.page, key: bodPM.memo[bodPM.page] };
+          clearTimeout(bodPM.waiting);
+          bodPM.waiting = null;
+          bodPM.panel.classList.remove('is-waiting');
+          bodPM.hide();
+          bodUI.chain = true;
+        }
+
         bodUI.head.textContent = form.title || 'Bike or Die';
         bodUI.body.innerHTML = '';
         bodUI.foot.innerHTML = '';
@@ -1252,22 +2005,29 @@
         if (!bodUI.foot.childNodes.length) {
           var close = document.createElement('button');
           close.type = 'button';
+          close.dataset.nav = 'close';
           close.textContent = 'Close';
-          close.onclick = function () { bodUI.send('close'); };
+          close.onclick = function () { bodUI.dismiss(); };
           bodUI.foot.appendChild(close);
         }
 
         bodUI.shown = form.sig;
         bodUI.panel.hidden = false;
-        var field = bodUI.body.querySelector('input[type="text"]');
-        if (field) field.focus();
+
+        // The keyboard stays on the control it was on, if that is still
+        // there; otherwise it starts where it would in a dialog just opened.
+        var again = had ? bodUI.panel.querySelector('[data-nav="' + had + '"]') : null;
+        if (!bodNav.focus(again)) bodNav.start(bodUI.panel);
       },
 
       // The same form again with something on it changed: the values move and
-      // the controls stay where they are, so what is being typed is not lost.
+      // the controls stay where they are, so what is being typed is not lost
+      // and the keyboard stays where it was.
       update: function (form) {
+        var find = function (nav) { return bodUI.panel.querySelector('[data-nav="' + nav + '"]'); };
+
         form.objects.forEach(function (o) {
-          var el;
+          var el, list;
           if (o.kind === 'field' && bodUI.enabled(o)) {
             el = bodUI.body.querySelector('input[data-idx="' + o.idx + '"]');
             if (el && document.activeElement !== el && el.value !== o.text) el.value = o.text;
@@ -1275,8 +2035,20 @@
             el = bodUI.body.querySelector('.dlg__list[data-idx="' + o.idx + '"]');
             if (el) {
               Array.prototype.forEach.call(el.children, function (b, n) {
-                b.className = n === o.sel ? 'is-on' : '';
+                b.classList.toggle('is-on', n === o.sel);
               });
+            }
+          } else if (o.kind === 'check') {
+            if ((el = find('o' + o.idx)) !== null) bodUI.check(el, o);
+          } else if (o.kind === 'push') {
+            if ((el = find('o' + o.idx)) !== null) el.classList.toggle('is-on', !!o.value);
+          } else if (o.kind === 'slider') {
+            if ((el = find('o' + o.idx)) !== null && document.activeElement !== el) el.value = o.value;
+          } else if (o.kind === 'popup' || o.kind === 'selector') {
+            list = bodUI.listFor(form, o);
+            el = find('o' + o.idx);
+            if (el && el.tagName === 'SELECT' && list && list.sel >= 0 && el.selectedIndex !== list.sel) {
+              el.selectedIndex = list.sel;
             }
           }
         });
@@ -1287,63 +2059,49 @@
         if (bodUI.panel.hidden) return;
         bodUI.panel.hidden = true;
         bodUI.shown = null;
-        canvas.focus();
+        bodUI.closedAt = Date.now();
+        if (!bodTopPanel()) canvas.focus();
       },
 
       // The game's own menu bar, in its own order. An item is picked by where
       // it is rather than by what it says: the game has two menus called
       // "Control" and three called "Hall of Fame".
       buildMenus: function (text) {
-        var items = 0;
-        bodUI.menuList.innerHTML = '';
+        var bar = [], menu = null;
         text.split('\n').forEach(function (line) {
-          var w = line.split(' '), label, el;
+          var w = line.split(' '), label;
           if (w[0] === 'menu') {
-            el = document.createElement('h3');
-            el.textContent = bodUI.rest(line, 2);
-            bodUI.menuList.appendChild(el);
-          } else if (w[0] === 'mitem' && w.length >= 4) {
+            menu = { n: +w[1], title: bodUI.rest(line, 2), items: [] };
+            bar.push(menu);
+          } else if (w[0] === 'mitem' && w.length >= 4 && menu) {
             label = bodUI.rest(line, 4);
-            if (label.charAt(0) === '-') {
-              bodUI.menuList.appendChild(document.createElement('hr'));
-              return;
-            }
-            el = document.createElement('button');
-            el.type = 'button';
-            el.textContent = label;
-            el.onclick = function () {
-              bodUI.menuPanel.hidden = true;
-              bodUI.menuButton.setAttribute('aria-expanded', 'false');
-              bodUI.send('pick ' + w[1] + ' ' + w[2]);
-            };
-            bodUI.menuList.appendChild(el);
-            items++;
+            menu.items.push({ n: +w[2], id: +w[3], label: label, sep: label.charAt(0) === '-' });
           }
         });
-        if (items) bodUI.menus = true;
+        if (!bar.some(function (m) { return m.items.length; })) return;
+        bodUI.menuBar = bar;
+        if (bodPM.isOpen()) bodPM.build();
       },
 
-      openMenu: function (open) {
-        if (open) bodSettings(false);
-        bodUI.menuPanel.hidden = !open;
-        bodUI.menuButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-        if (!open) canvas.focus();
+      // "menu item", for a pick, of the item with this id.
+      menuItem: function (id) {
+        var found = null;
+        bodUI.menuBar.forEach(function (m) {
+          m.items.forEach(function (it) { if (it.id === id) found = m.n + ' ' + it.n; });
+        });
+        return found;
       }
     };
 
-    bodUI.menuButton.addEventListener('click', function () {
-      bodUI.openMenu(bodUI.menuPanel.hidden);
-    });
-    document.getElementById('menu-close').addEventListener('click', function () { bodUI.openMenu(false); });
     setInterval(function () { try { bodUI.tick(); } catch (e) { /* not loaded yet */ } }, 200);
 
     // Safari parks an AudioContext in "interrupted" -- not the "suspended"
     // that SDL's own autoplay recovery looks for, so neither its resume-on-
     // gesture handler nor its silence fallback ever fires, and the game plays
     // to a device that is not listening. Keep it synchronized from gestures
-    // and state changes, without letting that recovery undo an explicit game
-    // pause. The audio session can go away again whenever another application
-    // wants it, or the tab is hidden.
+    // and state changes, without letting that recovery undo the pause menu.
+    // The audio session can go away again whenever another application wants
+    // it, or the tab is hidden.
     function bodSyncAudio() {
       var sdl = window.Module && Module.SDL2, ctx = sdl && sdl.audioContext;
       if (!ctx || ctx.state === 'closed') return;
