@@ -79,6 +79,39 @@
     #packs-list button.is-current::after { content: ' \2713'; color: #8b94a2; font-weight: 400; }
     #packs-list .none { color: #6f7885; padding: 4px 8px; }
     #packs-note { color: #7d8593; margin: 0; }
+    /* The game's own menus and dialogs, drawn by the page (bodui.c). The
+       rows follow the form's own layout: what shared a line on a Palm screen
+       shares one here. */
+    #menu-list { width: 100%; display: flex; flex-direction: column; gap: 1px; }
+    #menu-list h3 { font-size: 11px; font-weight: 600; margin: 10px 0 2px; letter-spacing: .06em;
+                    text-transform: uppercase; color: #6f7885; }
+    #menu-list h3:first-child { margin-top: 0; }
+    #menu-list button { text-align: left; background: none; border: 0; border-radius: 4px; padding: 4px 8px; }
+    #menu-list button:hover, #menu-list button:focus { background: #262b33; outline: none; }
+    #menu-list hr { border: 0; border-top: 1px solid #262b33; width: 100%; margin: 4px 0; }
+    #dialog { max-height: 100%; }
+    #dialog-body { width: 100%; display: flex; flex-direction: column; gap: 8px;
+                   overflow: auto; min-height: 0; }
+    .dlg__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .dlg__text { color: #c9ced6; }
+    .dlg__note { color: #8b94a2; }
+    .dlg__group { display: flex; gap: 0; }
+    .dlg__group button { border-radius: 0; margin-left: -1px; }
+    .dlg__group button:first-child { border-radius: 5px 0 0 5px; margin-left: 0; }
+    .dlg__group button:last-child { border-radius: 0 5px 5px 0; }
+    .dlg__group button.is-on { color: #14161a; background: #c9ced6; border-color: #c9ced6; }
+    .dlg__list { width: 100%; max-height: 40vh; overflow: auto; display: flex; flex-direction: column;
+                 gap: 1px; border: 1px solid #333941; border-radius: 5px; padding: 3px; }
+    .dlg__list button { text-align: left; background: none; border: 0; border-radius: 4px; padding: 3px 7px;
+                        white-space: pre; font-variant-numeric: tabular-nums; }
+    .dlg__list button:hover, .dlg__list button:focus { background: #262b33; outline: none; }
+    .dlg__list button.is-on { color: #fff; background: #303741; }
+    #dialog select, #dialog input[type="text"] {
+      font: inherit; color: #c9ced6; background: #20242b;
+      border: 1px solid #333941; border-radius: 5px; padding: 4px 8px;
+    }
+    #dialog select:focus, #dialog input[type="text"]:focus { outline: none; border-color: #5a6371; }
+    #dialog button.is-default { color: #14161a; background: #c9ced6; border-color: #c9ced6; }
     #binds { border-collapse: collapse; }
     #binds td { padding: 3px 12px 3px 0; }
     #binds td:first-child { color: #8b94a2; }
@@ -241,6 +274,7 @@
       <span class="lbl">Level pack</span> <span class="cur" id="packs-cur"></span> <span class="caret">&#9660;</span>
     </button>
     <button id="levels" type="button" title="Choose a level in this pack" disabled>Levels&hellip;</button>
+    <button id="menu-open" type="button" title="The game's own menus" aria-expanded="false" disabled>Menu&hellip;</button>
     <span class="tools__group">
       <button id="level-prev" type="button" title="Previous level" disabled>&#9664;</button>
       <button id="level-restart" type="button" title="Restart level" disabled>&#8635;</button>
@@ -261,6 +295,20 @@
         <div class="row">
           <button id="packs-cancel">Cancel</button>
         </div>
+      </div>
+
+      <div id="menu" class="panel" hidden>
+        <h2>Menu</h2>
+        <div id="menu-list"></div>
+        <div class="row">
+          <button id="menu-close">Close</button>
+        </div>
+      </div>
+
+      <div id="dialog" class="panel" hidden>
+        <h2 id="dialog-head"></h2>
+        <div id="dialog-body"></div>
+        <div class="row" id="dialog-foot"></div>
       </div>
 
       <div id="settings" class="panel" hidden>
@@ -297,7 +345,6 @@
   <div class="keys">
     <div class="legend" id="legend"></div>
     <div class="legend">
-      <span><kbd>F5</kbd> menu</span>
       <span><kbd>F1</kbd>&ndash;<kbd>F4</kbd> Palm buttons</span>
       <span><kbd>Esc</kbd> back</span>
     </div>
@@ -473,7 +520,7 @@
           if (window.PThread && Object.keys(PThread.pthreads).length) {
             clearInterval(pauseReady);
             pauseButton.disabled = false;
-            ['packs-open', 'levels', 'level-prev', 'level-restart', 'level-next'].forEach(function (id) {
+            ['packs-open', 'levels', 'menu-open', 'level-prev', 'level-restart', 'level-next'].forEach(function (id) {
               document.getElementById(id).disabled = false;
             });
           }
@@ -532,6 +579,17 @@
       if (!document.getElementById('settings').hidden) {
         e.stopPropagation();
         if (e.key === 'Escape') bodSettings(false);
+      }
+      if (!document.getElementById('menu').hidden) {
+        e.stopPropagation();
+        if (e.key === 'Escape') bodUI.openMenu(false);
+        return;
+      }
+      if (!document.getElementById('dialog').hidden) {
+        e.stopPropagation();
+        // Escape leaves the game's dialog the way its own Cancel would.
+        if (e.key === 'Escape') bodUI.send('close');
+        return;
       }
 
       if (claimed.indexOf(e.code) >= 0 || claimed.indexOf(e.key) >= 0) e.preventDefault();
@@ -874,6 +932,410 @@
     document.getElementById('level-prev').addEventListener('click', function () { bodPack.menu('Previous Level'); });
     document.getElementById('level-next').addEventListener('click', function () { bodPack.menu('Next Level'); });
     document.getElementById('level-restart').addEventListener('click', function () { bodPack.menu('Restart Level'); });
+
+    // ------------------------------------------------- the game's own UI
+    //
+    // None of the game's menus and dialogs is drawn any more: bodui.c keeps
+    // every form off the screen and publishes what is on it, and this draws
+    // it in the page instead. One renderer for all of them, built out of what
+    // each form says about itself -- its objects, their kinds and where they
+    // sit -- so a dialog nobody thought about comes out as controls too. A
+    // Palm form is laid out in absolute coordinates, so the objects that
+    // shared a line on its screen share a row here.
+    //
+    // Everything done to those controls goes back as a command: press,
+    // select, text, slider, close. The page never decides what a form means.
+    var bodUI = {
+      panel: document.getElementById('dialog'),
+      head: document.getElementById('dialog-head'),
+      body: document.getElementById('dialog-body'),
+      foot: document.getElementById('dialog-foot'),
+      menuPanel: document.getElementById('menu'),
+      menuList: document.getElementById('menu-list'),
+      menuButton: document.getElementById('menu-open'),
+      seq: -1, form: null, shown: null, settling: 0, since: 0, menus: false,
+      SETTLE: 450,
+
+      ready: function () {
+        return !!(window.Module && Module.ccall && !pauseButton.disabled);
+      },
+
+      send: function (cmd) {
+        try { Module.ccall('bod_ui_command', null, ['string'], [cmd]); } catch (e) {
+          console.warn('could not send to the game:', e);
+        }
+      },
+
+      // Read twice around the sequence number, so a change under the read is
+      // noticed and read again.
+      read: function (state, seq) {
+        var s1, s2, text, tries;
+        for (tries = 0; tries < 5; tries++) {
+          s1 = Module.ccall(seq, 'number', [], []);
+          text = Module.ccall(state, 'string', [], []);
+          s2 = Module.ccall(seq, 'number', [], []);
+          if (s1 === s2) return { text: text || '', seq: s1 };
+        }
+        return null;
+      },
+
+      // The rest of a line after `n` spaces: the text of an object may hold
+      // spaces of its own, so it is never split.
+      rest: function (line, n) {
+        var at = 0, i;
+        for (i = 0; i < n; i++) {
+          at = line.indexOf(' ', at);
+          if (at < 0) return '';
+          at++;
+        }
+        return line.slice(at);
+      },
+
+      parse: function (text) {
+        var form = { id: 0, modal: false, w: 160, h: 160, title: '', def: -1, objects: [], sig: '' },
+            byIndex = {}, sig = [], self = this;
+        text.split('\n').forEach(function (line) {
+          var w = line.split(' '), o;
+          if (!line) return;
+          if (w[0] === 'form') {
+            form.id = +w[1] || 0;
+            form.modal = +w[2] === 1;
+            form.w = +w[3] || 160;
+            form.h = +w[4] || 160;
+          } else if (w[0] === 'title') {
+            form.title = self.rest(line, 1);
+          } else if (w[0] === 'default') {
+            form.def = +w[1];
+          } else if (w[0] === 'obj' && w.length >= 12) {
+            o = { idx: +w[1], kind: w[2], id: +w[3], flags: +w[4], value: +w[5], group: +w[6],
+                  link: +w[7], x: +w[8], y: +w[9], w: +w[10], h: +w[11],
+                  text: self.rest(line, 12), items: [], sel: -1, low: 0, high: 1 };
+            form.objects.push(o);
+            byIndex[o.idx] = o;
+            sig.push(o.idx + ':' + o.kind + ':' + o.id + ':' + (o.flags & 3) + ':' + o.text);
+          } else if (w[0] === 'items' && byIndex[+w[1]]) {
+            byIndex[+w[1]].sel = +w[3];
+          } else if (w[0] === 'item' && byIndex[+w[1]]) {
+            byIndex[+w[1]].items.push(self.rest(line, 3));
+            sig.push('i');
+          } else if (w[0] === 'slider' && byIndex[+w[1]]) {
+            o = byIndex[+w[1]];
+            o.value = +w[2]; o.low = +w[3]; o.high = +w[4];
+            sig.push('s' + o.low + '-' + o.high);
+          }
+        });
+        form.sig = form.id + '/' + form.title + '/' + sig.join('|');
+        return form;
+      },
+
+      visible: function (o) { return (o.flags & 1) !== 0; },
+      enabled: function (o) { return (o.flags & 2) !== 0; },
+
+      tick: function () {
+        var r;
+        if (!bodUI.ready()) return;
+
+        if (!bodUI.menus) {
+          r = bodUI.read('bod_ui_menubar', 'bod_ui_menubar_seq');
+          if (r && r.text) bodUI.buildMenus(r.text);
+        }
+
+        r = bodUI.read('bod_ui_state', 'bod_ui_seq');
+        if (!r) return;
+        if (r.seq !== bodUI.seq) {
+          bodUI.seq = r.seq;
+          var form = bodUI.parse(r.text);
+          if (!bodUI.form || form.id !== bodUI.form.id) {
+            bodUI.settling = form.id;
+            bodUI.since = Date.now();
+          }
+          bodUI.form = form;
+        }
+        bodUI.reconcile();
+      },
+
+      reconcile: function () {
+        var form = bodUI.form;
+        if (!form) return;
+
+        // The level pack panel drives the game's own level and pack lists
+        // from the outside; while it is doing that they are its business.
+        if (!bodPack.panel.hidden || bodPack.poll) { bodUI.close(); return; }
+        if (!form.id) { bodUI.close(); return; }
+
+        if (!bodUI.panel.hidden) {
+          if (form.sig !== bodUI.shown) bodUI.present(form); else bodUI.update(form);
+          return;
+        }
+
+        // A dialog that has only just come up waits a moment: some of the
+        // game's own are answered on the way in and gone again in a fraction
+        // of a second, and a panel that flashed for those would be a dialog
+        // nobody asked for.
+        if (Date.now() - bodUI.since < bodUI.SETTLE) return;
+        bodUI.present(form);
+      },
+
+      // What is worth drawing, in the form's own reading order.
+      layout: function (form) {
+        var out = [];
+        form.objects.forEach(function (o) {
+          var text = (o.text || '').trim();
+          if (!bodUI.visible(o)) return;
+          if (['title', 'bitmap', 'gadget', 'scroll', 'other'].indexOf(o.kind) >= 0) return;
+          if (o.kind === 'list' && o.link) return;            // a popup's own
+          if ((o.kind === 'label' || o.kind === 'button' || o.kind === 'push') && !text) return;
+          // Parked off the side of the form: a Palm dialog keeps the controls
+          // of the page it is not showing out there rather than hiding them.
+          if (o.x >= form.w || o.y >= form.h) return;
+          out.push(o);
+        });
+        out.sort(function (a, b) {
+          if (Math.abs(a.y - b.y) > 5) return a.y - b.y;
+          return a.x - b.x;
+        });
+        return out;
+      },
+
+      listFor: function (form, trigger) {
+        var found = null;
+        form.objects.forEach(function (o) {
+          if (o.kind === 'list' && o.id === trigger.link) found = o;
+        });
+        return found;
+      },
+
+      control: function (form, o, group) {
+        var el, i;
+
+        if (o.kind === 'label' || (o.kind === 'field' && !bodUI.enabled(o))) {
+          el = document.createElement('span');
+          el.className = o.kind === 'label' ? 'dlg__text' : 'dlg__note';
+          el.textContent = o.text;
+          return el;
+        }
+
+        if (o.kind === 'check') {
+          el = document.createElement('button');
+          el.type = 'button';
+          el.textContent = (o.value ? '☑ ' : '☐ ') + o.text;
+          el.disabled = !bodUI.enabled(o);
+          el.onclick = function () { bodUI.send('press ' + o.idx); };
+          return el;
+        }
+
+        if (o.kind === 'push' && group.length > 1) {
+          el = document.createElement('span');
+          el.className = 'dlg__group';
+          group.forEach(function (g) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = g.text;
+            if (g.value) b.className = 'is-on';
+            b.disabled = !bodUI.enabled(g);
+            b.onclick = function () { bodUI.send('press ' + g.idx); };
+            el.appendChild(b);
+          });
+          return el;
+        }
+
+        if (o.kind === 'popup' || o.kind === 'selector') {
+          var list = bodUI.listFor(form, o);
+          if (!list) {
+            el = document.createElement('button');
+            el.type = 'button';
+            el.textContent = o.text || '…';
+            el.onclick = function () { bodUI.send('press ' + o.idx); };
+            return el;
+          }
+          el = document.createElement('select');
+          list.items.forEach(function (name, n) {
+            var opt = document.createElement('option');
+            opt.textContent = name;
+            opt.value = String(n);
+            el.appendChild(opt);
+          });
+          if (list.sel >= 0) el.selectedIndex = list.sel;
+          el.disabled = !bodUI.enabled(o);
+          el.onchange = function () { bodUI.send('select ' + list.idx + ' ' + el.selectedIndex); };
+          return el;
+        }
+
+        if (o.kind === 'field') {
+          el = document.createElement('input');
+          el.type = 'text';
+          el.value = o.text;
+          el.dataset.idx = o.idx;
+          el.onchange = function () { bodUI.send('text ' + o.idx + ' ' + el.value); };
+          return el;
+        }
+
+        if (o.kind === 'slider') {
+          el = document.createElement('input');
+          el.type = 'range';
+          el.min = o.low; el.max = o.high > o.low ? o.high : o.low + 1; el.value = o.value;
+          el.disabled = !bodUI.enabled(o);
+          // One event when it is let go of, not one per pixel: the game
+          // answers a slider by redrawing the form it is on.
+          el.onchange = function () { bodUI.send('slider ' + o.idx + ' ' + el.value); };
+          return el;
+        }
+
+        if (o.kind === 'list' || o.kind === 'table') {
+          el = document.createElement('div');
+          el.className = 'dlg__list';
+          el.dataset.idx = o.idx;
+          o.items.forEach(function (name, n) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = name;
+            if (n === o.sel) b.className = 'is-on';
+            b.onclick = function () {
+              bodUI.send('select ' + o.idx + ' ' + n);
+              if (form.def >= 0) bodUI.send('press ' + form.def);
+            };
+            el.appendChild(b);
+          });
+          if (!o.items.length) el.textContent = '';
+          return el;
+        }
+
+        el = document.createElement('button');   // button, repeat, anything else
+        el.type = 'button';
+        el.textContent = o.text;
+        el.disabled = !bodUI.enabled(o);
+        if (o.flags & 4) el.className = 'is-default';
+        el.onclick = function () { bodUI.send('press ' + o.idx); };
+        return el;
+      },
+
+      present: function (form) {
+        var objects = bodUI.layout(form), rows = [], row = [], y = -1000, bottom = 0, done = {};
+
+        bodSettings(false);
+        bodUI.head.textContent = form.title || 'Bike or Die';
+        bodUI.body.innerHTML = '';
+        bodUI.foot.innerHTML = '';
+
+        objects.forEach(function (o) {
+          if (o.y > y + 5 && row.length) { rows.push(row); row = []; }
+          if (!row.length) y = o.y;
+          row.push(o);
+          bottom = Math.max(bottom, o.y);
+        });
+        if (row.length) rows.push(row);
+
+        rows.forEach(function (line) {
+          // The bottom row of a Palm dialog is its buttons; here they belong
+          // under the panel, where a page keeps them.
+          var action = line[0].y >= bottom - 5 && line.every(function (o) { return o.kind === 'button'; }),
+              div = action ? bodUI.foot : document.createElement('div');
+
+          if (!action) div.className = 'dlg__row';
+          line.forEach(function (o) {
+            var group = [];
+            if (done[o.idx]) return;
+            if (o.kind === 'push' && o.group) {
+              objects.forEach(function (g) {
+                if (g.kind === 'push' && g.group === o.group) { group.push(g); done[g.idx] = 1; }
+              });
+            } else {
+              done[o.idx] = 1;
+            }
+            div.appendChild(bodUI.control(form, o, group));
+          });
+          if (!action && div.childNodes.length) bodUI.body.appendChild(div);
+        });
+
+        // Every dialog needs a way out, even one whose buttons the game has
+        // taken away while it thinks.
+        if (!bodUI.foot.childNodes.length) {
+          var close = document.createElement('button');
+          close.type = 'button';
+          close.textContent = 'Close';
+          close.onclick = function () { bodUI.send('close'); };
+          bodUI.foot.appendChild(close);
+        }
+
+        bodUI.shown = form.sig;
+        bodUI.panel.hidden = false;
+        var field = bodUI.body.querySelector('input[type="text"]');
+        if (field) field.focus();
+      },
+
+      // The same form again with something on it changed: the values move and
+      // the controls stay where they are, so what is being typed is not lost.
+      update: function (form) {
+        form.objects.forEach(function (o) {
+          var el;
+          if (o.kind === 'field' && bodUI.enabled(o)) {
+            el = bodUI.body.querySelector('input[data-idx="' + o.idx + '"]');
+            if (el && document.activeElement !== el && el.value !== o.text) el.value = o.text;
+          } else if (o.kind === 'list' && !o.link) {
+            el = bodUI.body.querySelector('.dlg__list[data-idx="' + o.idx + '"]');
+            if (el) {
+              Array.prototype.forEach.call(el.children, function (b, n) {
+                b.className = n === o.sel ? 'is-on' : '';
+              });
+            }
+          }
+        });
+        bodUI.form = form;
+      },
+
+      close: function () {
+        if (bodUI.panel.hidden) return;
+        bodUI.panel.hidden = true;
+        bodUI.shown = null;
+        canvas.focus();
+      },
+
+      // The game's own menu bar, in its own order. An item is picked by where
+      // it is rather than by what it says: the game has two menus called
+      // "Control" and three called "Hall of Fame".
+      buildMenus: function (text) {
+        var items = 0;
+        bodUI.menuList.innerHTML = '';
+        text.split('\n').forEach(function (line) {
+          var w = line.split(' '), label, el;
+          if (w[0] === 'menu') {
+            el = document.createElement('h3');
+            el.textContent = bodUI.rest(line, 2);
+            bodUI.menuList.appendChild(el);
+          } else if (w[0] === 'mitem' && w.length >= 4) {
+            label = bodUI.rest(line, 4);
+            if (label.charAt(0) === '-') {
+              bodUI.menuList.appendChild(document.createElement('hr'));
+              return;
+            }
+            el = document.createElement('button');
+            el.type = 'button';
+            el.textContent = label;
+            el.onclick = function () {
+              bodUI.menuPanel.hidden = true;
+              bodUI.menuButton.setAttribute('aria-expanded', 'false');
+              bodUI.send('pick ' + w[1] + ' ' + w[2]);
+            };
+            bodUI.menuList.appendChild(el);
+            items++;
+          }
+        });
+        if (items) bodUI.menus = true;
+      },
+
+      openMenu: function (open) {
+        if (open) bodSettings(false);
+        bodUI.menuPanel.hidden = !open;
+        bodUI.menuButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (!open) canvas.focus();
+      }
+    };
+
+    bodUI.menuButton.addEventListener('click', function () {
+      bodUI.openMenu(bodUI.menuPanel.hidden);
+    });
+    document.getElementById('menu-close').addEventListener('click', function () { bodUI.openMenu(false); });
+    setInterval(function () { try { bodUI.tick(); } catch (e) { /* not loaded yet */ } }, 200);
 
     // Safari parks an AudioContext in "interrupted" -- not the "suspended"
     // that SDL's own autoplay recovery looks for, so neither its resume-on-
