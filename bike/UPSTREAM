@@ -5,6 +5,6 @@ unedited (less pumpkin.html, a duplicate of index.html). Change the game there
 and run ./sync-bike.sh to bring it here.
 
 source     /Users/tonyradtke/dev/bike_or_die
-commit     58e5aa8  Touch keys: on for a phone again, and a cross a thumb can ride with
+commit     4945feb  On a phone: a fraction of the work a frame took, with the compiler doing the least
 pumpkinos  matches patches/pumpkinos.patch
-built      2026-09-16T23:19:45Z
+built      2026-09-17T05:01:49Z

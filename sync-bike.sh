@@ -6,7 +6,7 @@
 #
 # bike/ is a build product and nothing else: the whole of bike_or_die's
 # tools/make_web.sh output, copied in unedited. It is committed here because
-# this site is served straight out of the repository and the game is 37 MB of
+# this site is served straight out of the repository and the game is 16 MB of
 # wasm that no step here builds -- but it is not source, and editing it here
 # only means the next refresh throws the edit away. The game changes in
 # bike_or_die; this brings the change over.
