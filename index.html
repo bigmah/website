@@ -294,67 +294,78 @@
     96%           { opacity: 0; translate: 0 5px; scale: 1; }
   }
 
-  /* ---------- the dots: grow / shrink the tile ---------- */
+  /* ---------- the size picker: four squares, one per size ---------- */
 
-  .dots {
+  /* Each square is drawn at the size it stands for, bottom-aligned so the row
+     reads as a ramp, and the one the tile is at now is filled in. */
+  .sizes {
     flex: none;
     display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0.45rem 0.35rem;
+    align-items: flex-end;
+    gap: 1px;
+    margin: 0;
+  }
+
+  .sizes button {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0.4rem 0.18rem;
     margin: 0;
     background: none;
     border: 0;
-    border-radius: 5px;
+    border-radius: 4px;
     cursor: pointer;
     touch-action: manipulation;
   }
 
-  .dots i {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--faint);
-    transition: background-color 160ms ease, transform 200ms cubic-bezier(.2,.7,.3,1);
+  .sizes i {
+    display: block;
+    border: 1px solid var(--faint);
+    border-radius: 2px;
+    transition: background-color 160ms ease, border-color 160ms ease;
   }
 
-  .tile:hover .dots i { background: var(--icon); }
-  .tile--big .dots i { background: var(--accent-soft); }
+  .sizes button:nth-child(1) i { width: 5px;  height: 5px; }
+  .sizes button:nth-child(2) i { width: 7px;  height: 7px; }
+  .sizes button:nth-child(3) i { width: 9px;  height: 9px; }
+  .sizes button:nth-child(4) i { width: 11px; height: 11px; }
 
-  /* the dots are their own control, so pointing at them beats the two rules
-     above — both of which are specific enough to win on source order alone */
-  .tile .dots:hover i,
-  .tile .dots:focus-visible i { background: var(--accent); }
-
-  /* they pull apart to grow the tile, and pull together to shrink it again */
-  .dots:hover i:first-child  { transform: translateX(-1px); }
-  .dots:hover i:last-child   { transform: translateX(1px); }
-  .tile--big .dots:hover i:first-child { transform: translateX(1px); }
-  .tile--big .dots:hover i:last-child  { transform: translateX(-1px); }
-
-  /* Until someone has actually used them, the dots pull apart every few seconds
-     to show they do something. First click retires the hint for good. */
-  .board--hint .dots i { animation: dot-hint 6s cubic-bezier(.4, 0, .2, 1) infinite; }
-  .board--hint .dots i:first-child  { --push: -3.5px; }
-  .board--hint .dots i:nth-child(2) { --push: 0px; }
-  .board--hint .dots i:last-child   { --push: 3.5px; }
-
-  @keyframes dot-hint {
-    0%, 66%, 100% { transform: translateX(0) scale(1); }
-    76%, 88%      { transform: translateX(var(--push)) scale(1.35); }
+  .tile:hover .sizes i { border-color: var(--icon); }
+  .sizes [aria-pressed="true"] i,
+  .tile:hover .sizes [aria-pressed="true"] i {
+    background: var(--accent-soft);
+    border-color: var(--accent-soft);
   }
 
-  /* hovering, or hauling a tile around, takes precedence over the hint */
-  .dots:hover i,
-  body.is-dragging .dots i { animation: none; }
+  /* the square under the pointer is the size a click would make it */
+  .tile .sizes button:hover i,
+  .tile .sizes button:focus-visible i { border-color: var(--accent); }
+  .tile .sizes [aria-pressed="true"]:hover i { background: var(--accent); border-color: var(--accent); }
 
-  body.is-dragging .tile--drag-hint,
-  body.is-dragging .tile--drag-hint .hand { animation: none; }
-
-  .dots:focus-visible {
+  .sizes button:focus-visible {
     outline: 1px solid var(--accent);
     outline-offset: -1px;
   }
+
+  /* Until someone has actually used them, the squares light up smallest to
+     largest every few seconds to show what they do. First use retires it. */
+  .board--hint .sizes i { animation: size-hint 6s cubic-bezier(.4, 0, .2, 1) infinite; }
+  .board--hint .sizes button:nth-child(2) i { animation-delay: 0.12s; }
+  .board--hint .sizes button:nth-child(3) i { animation-delay: 0.24s; }
+  .board--hint .sizes button:nth-child(4) i { animation-delay: 0.36s; }
+
+  @keyframes size-hint {
+    0%, 70%, 100% { border-color: var(--faint); }
+    76%, 84%      { border-color: var(--accent); }
+  }
+
+  /* hovering, or hauling a tile around, takes precedence over the hint */
+  .sizes:hover i,
+  body.is-dragging .sizes i { animation: none; }
+
+  body.is-dragging .tile--drag-hint,
+  body.is-dragging .tile--drag-hint .hand { animation: none; }
 
   .tile__title {
     font-size: 0.6rem;
@@ -383,6 +394,30 @@
   }
 
   .tile--flush .tile__body { padding: 0; overflow: hidden; }
+
+  /* Tiny, a tile is a label and nothing else: the body shows its .mini glyph
+     in place of what is in it, and the bar keeps only the picker and a name. */
+  .mini { display: none; }
+
+  .board:not(.board--static) .tile--xs .tile__body > :not(.mini) { display: none; }
+  .board:not(.board--static) .tile--xs .tile__body {
+    display: grid;
+    place-items: center;
+    padding: 0.5rem;
+    overflow: hidden;
+  }
+  .board:not(.board--static) .tile--xs:not(.is-live) .mini { display: grid; justify-items: center; gap: 0.5rem; }
+  .board:not(.board--static) .tile--xs .tile__bar { gap: 0.3rem; padding-right: 0.5rem; }
+  .board:not(.board--static) .tile--xs .tile__bar a { display: none; }
+
+  .mini svg { width: 26px; height: 26px; color: var(--cube); }
+  .mini span {
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    color: var(--dim);
+    text-align: center;
+  }
+  .mini .mini__word { font-size: 1.05rem; letter-spacing: -0.02em; color: var(--fg); }
 
   /* a click anywhere on a small tile grows it — the bar keeps its own cursor,
      being the drag handle as well */
@@ -497,7 +532,7 @@
     font-style: normal;
   }
 
-  /* ---------- the part you only get when the tile is big ---------- */
+  /* ---------- the part you only get at medium and up ---------- */
 
   .more {
     display: none;
@@ -514,31 +549,17 @@
   /* a tile can get wide; keep the line length readable */
   .more p { max-width: 64ch; }
 
-  /* eight projects only fit a small tile at full size from about 1500px up */
-  @media (max-width: 1540px) {
-    .board:not(.board--static) .tile:not(.tile--big) .projects { gap: 0.18rem; }
-    .board:not(.board--static) .tile:not(.tile--big) .project { padding: 0.22rem 0.55rem; }
-    .board:not(.board--static) .tile:not(.tile--big) .project .name { line-height: 1.3; }
-  }
-
   /* on a narrower board an enlarged tile is a smaller square, so the revealed
      copy tightens up rather than spilling past the bottom of it */
   @media (max-width: 1400px) {
     .board:not(.board--static) .more p { font-size: 0.7rem; line-height: 1.8; }
     .board:not(.board--static) .now { font-size: 0.72rem; line-height: 1.8; }
-    /* ...closer, since that spacing stops fitting at about 1350px... */
-    .board:not(.board--static) .tile:not(.tile--big) .projects { gap: 0.1rem; }
-    .board:not(.board--static) .tile:not(.tile--big) .project { padding: 0.15rem 0.55rem; }
   }
 
   @media (max-width: 1260px) {
     .board:not(.board--static) .more p { font-size: 0.63rem; line-height: 1.75; }
     .board:not(.board--static) .more { margin-top: 0.9rem; padding-top: 0.9rem; }
     .board:not(.board--static) .now { font-size: 0.68rem; line-height: 1.75; margin-top: 0.95rem; }
-    /* ...and on the narrowest boards, where that stops at about 1225px, packed this close */
-    .board:not(.board--static) .tile:not(.tile--big) .projects { gap: 0.08rem; }
-    .board:not(.board--static) .tile:not(.tile--big) .project { padding: 0.1rem 0.55rem; }
-    .board:not(.board--static) .tile:not(.tile--big) .project .name { line-height: 1.2; }
   }
 
   @keyframes reveal {
@@ -596,10 +617,16 @@
     color: var(--muted);
   }
 
-  /* projects: every one named while the tile is small, and each a row with its
-     description once it is big — the tile scrolls if they outgrow it */
+  /* exposition: every post named while the tile is small, and each a row with
+     its date and a line about it once it is medium or larger — the tile
+     scrolls if they outgrow it */
 
-  .projects {
+  .tile--ex .tile__body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .posts {
     display: flex;
     flex-direction: column;
     gap: 0.22rem;
@@ -608,10 +635,8 @@
     list-style: none;
   }
 
-  .project {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
+  .post {
+    display: block;
     padding: 0.3rem 0.6rem;
     text-decoration: none;
     background: var(--card-tint);
@@ -620,43 +645,37 @@
     transition: border-color 160ms ease;
   }
 
-  .project svg {
-    width: 16px;
-    height: 16px;
-    flex: none;
-    color: var(--cube);
-    transition: color 160ms ease;
-  }
-
-  .project .name {
+  .post .name {
     display: block;
     font-size: 0.72rem;
     line-height: 1.4;
     color: var(--fg);
   }
 
-  .project .what { display: none; }
+  .post time,
+  .post .what { display: none; }
 
   /* Small, a row is only a name, and the click goes through it to grow the tile
-     the way it would anywhere else on one. Big, each row is the link it looks like. */
-  .tile:not(.tile--big) .project { pointer-events: none; }
+     the way it would anywhere else on one. Bigger, each row is the link it looks like. */
+  .tile:not(.tile--big) .post { pointer-events: none; }
 
-  .tile--big .projects { gap: 0.5rem; }
+  .tile--big .posts { gap: 0.5rem; }
+  .tile--big .post { padding: 0.8rem 0.9rem; }
 
-  .tile--big .project {
-    align-items: flex-start;
-    gap: 0.85rem;
-    padding: 0.8rem 0.9rem;
-  }
-
-  .tile--big .project svg { width: 22px; height: 22px; }
-
-  .tile--big .project .name {
+  .tile--big .post .name {
     font-size: 0.78rem;
     margin-bottom: 0.25rem;
   }
 
-  .tile--big .project .what {
+  .tile--big .post time {
+    display: block;
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+    margin-bottom: 0.35rem;
+  }
+
+  .tile--big .post .what {
     display: block;
     font-size: 0.72rem;
     line-height: 1.75;
@@ -664,10 +683,8 @@
     animation: reveal 320ms 130ms both cubic-bezier(.2,.7,.3,1);
   }
 
-  .tile--big .project:hover,
-  .tile--big .project:focus-visible { border-color: var(--line-strong); }
-
-  .tile--big .project:hover svg { color: var(--cube-hover); }
+  .tile--big .post:hover,
+  .tile--big .post:focus-visible { border-color: var(--line-strong); }
 
   /* emulator */
 
@@ -783,7 +800,7 @@
   }
 
   /* the whole tile is the handle, so nothing inside it takes the pointer —
-     not the links, not the dots, not the emulator */
+     not the links, not the size picker, not the emulator */
   .board--gravity .tile * { pointer-events: none; }
 
   .board--gravity .tile.is-held { z-index: 50; cursor: grabbing; }
@@ -813,14 +830,9 @@
 
   .board--static .tile__bar { cursor: default; }
   .board--static .cells { display: none; }
-  /* nothing to reveal on the three that are already whole pages */
-  .board--static .tile--gba .dots,
-  .board--static .tile--llm .dots,
-  .board--static .tile--bike .dots { display: none; }
-  /* ...and with no dots to close them again, a click does not open them either */
-  .board--static .tile--gba .tile__body,
-  .board--static .tile--llm .tile__body,
-  .board--static .tile--bike .tile__body { cursor: auto; }
+  /* stacked, every tile is as wide as the column and shows all it has, so
+     there is no size to pick */
+  .board--static .sizes { display: none; }
   .board--static .ph,
   .board--static::before { display: none; }
   /* stacked, the tiles size to their content — an iframe filling one has no
@@ -833,20 +845,22 @@
 
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
-    /* no nudge, so the dots just sit a little brighter until they are used */
-    .board--hint .dots:not(:hover) i { background: var(--icon); }
+    /* no nudge, so the squares just sit a little brighter until they are used */
+    .board--hint .sizes:not(:hover) i { border-color: var(--icon); }
   }
 </style>
 <noscript><style>
   .board { opacity: 1; max-width: 34rem; }
   .tile { position: relative; margin-bottom: 0.85rem; }
   .tile__bar { cursor: default; }
-  .dots { display: none; }
+  .sizes, .mini { display: none; }
   .ph { display: none; }
+  /* nothing ever resizes a tile, so it shows all it has from the start */
+  .more, .post time, .post .what { display: block; }
   /* no script to swap the iframe in, so the button is just the link it already is */
   .start .go { text-decoration: underline; }
-  /* nothing ever enlarges the tile, so its rows are links from the start */
-  .tile .projects .project { pointer-events: auto; }
+  /* ...and its rows are links from the start */
+  .tile .posts .post { pointer-events: auto; }
   /* nothing to reveal or copy the address with, so it is just there */
   .links .js-mail, .email button { display: none; }
   .links .email[hidden] { display: inline-flex; }
@@ -884,11 +898,12 @@
   <div class="ph" id="ph" hidden></div>
 
   <article class="tile tile--id" data-id="id">
-    <header class="tile__bar" tabindex="0" aria-label="bigmah tile — arrow keys nudge it half a cell, shift for a whole one">
-      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+    <header class="tile__bar" tabindex="0" aria-label="bigmah tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="Tiny" title="Tiny"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="Small" title="Small"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="Medium" title="Medium"><i></i></button><button type="button" data-size="3" aria-pressed="false" aria-label="Large" title="Large"><i></i></button></span>
       <span class="tile__title">bigmah</span>
     </header>
     <div class="tile__body">
+      <div class="mini" aria-hidden="true"><span class="mini__word">bigmah</span></div>
       <h1>bigmah</h1>
       <nav class="links">
         <a href="https://github.com/bigmah" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub">
@@ -923,133 +938,26 @@
     </div>
   </article>
 
-  <article class="tile" data-id="dol">
-    <header class="tile__bar" tabindex="0" aria-label="projects tile — arrow keys nudge it half a cell, shift for a whole one">
-      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
-      <span class="tile__title">projects</span>
+  <article class="tile tile--ex" data-id="ex">
+    <header class="tile__bar" tabindex="0" aria-label="exposition tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="Tiny" title="Tiny"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="Small" title="Small"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="Medium" title="Medium"><i></i></button><button type="button" data-size="3" aria-pressed="false" aria-label="Large" title="Large"><i></i></button></span>
+      <span class="tile__title">exposition</span>
     </header>
     <div class="tile__body">
-      <ul class="projects">
+      <div class="mini" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 6.2C9.8 4.6 6.6 4 3 4.3v14.2c3.6-.3 6.8.3 9 1.9V6.2Z" opacity=".55"/>
+          <path d="M12 6.2c2.2-1.6 5.4-2.2 9-1.9v14.2c-3.6-.3-6.8.3-9 1.9V6.2Z" opacity=".95"/>
+        </svg>
+        <span>exposition</span>
+      </div>
+      <!-- one <li> per post, newest first -->
+      <ul class="posts">
         <li>
-          <a class="project" href="https://pullspace.dev/#/bigmah/dolbundler/blob/README.md" target="_blank" rel="noopener noreferrer">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-              <path d="M12 2 21.5 7.25v9.5L12 22 2.5 16.75v-9.5L12 2Z" opacity=".2"/>
-              <path d="M12 2.6 20.9 7.5 12 12.4 3.1 7.5 12 2.6Z" opacity=".95"/>
-              <path d="M3.1 8.55 11.45 13.15v8.05L3.1 16.6V8.55Z" opacity=".5"/>
-              <path d="M20.9 8.55 12.55 13.15v8.05L20.9 16.6V8.55Z" opacity=".72"/>
-            </svg>
-            <span>
-              <span class="name">dolbundler</span>
-              <span class="what">gamecube static recompilation toolkit — turn GC ROMs into native macOS / iOS apps.</span>
-            </span>
-          </a>
-        </li>
-        <li>
-          <a class="project" href="https://pullspace.dev/#/bigmah/n64bundler/blob/README.md" target="_blank" rel="noopener noreferrer">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-              <path d="M4 3.5h16V17l-2.6 3.5H6.6L4 17V3.5Z" opacity=".3"/>
-              <path d="M7 6.2h10v7.3H7V6.2Z" opacity=".95"/>
-              <path d="M7.4 16.2h9.2v1.5H7.4v-1.5Z" opacity=".6"/>
-            </svg>
-            <span>
-              <span class="name">n64bundler</span>
-              <span class="what">n64 static recompilation toolkit — dolbundler's counterpart, turning N64 ROMs into native macOS apps.</span>
-            </span>
-          </a>
-        </li>
-        <li>
-          <a class="project" href="https://pullspace.dev/#/bigmah/bike_or_die/blob/README.md" target="_blank" rel="noopener noreferrer">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
-                 stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="5.6" cy="16.4" r="4.1" opacity=".95"/>
-              <circle cx="18.4" cy="16.4" r="4.1" opacity=".5"/>
-              <path d="M5.6 16.4h5.8L9 9 5.6 16.4M9 9h6.4l-4 7.4M15.4 9l3 7.4" opacity=".95"/>
-              <path d="M8.1 8.2h1.9" opacity=".95"/>
-            </svg>
-            <span>
-              <span class="name">bike_or_die</span>
-              <span class="what">palm os static recompilation — bike or die 2's 68k and ARM code, translated ahead of time into a native macOS app and a webassembly build.</span>
-            </span>
-          </a>
-        </li>
-        <li>
-          <a class="project" href="https://pullspace.dev/#/bigmah/connect4/blob/README.md" target="_blank" rel="noopener noreferrer">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-              <rect x="2.5" y="2.5" width="19" height="19" rx="2.5" opacity=".16"/>
-              <g opacity=".22">
-                <circle cx="5.25" cy="5.25" r="1.75"/><circle cx="9.75" cy="5.25" r="1.75"/><circle cx="14.25" cy="5.25" r="1.75"/>
-                <circle cx="5.25" cy="9.75" r="1.75"/><circle cx="9.75" cy="9.75" r="1.75"/>
-                <circle cx="5.25" cy="14.25" r="1.75"/>
-              </g>
-              <g opacity=".5">
-                <circle cx="18.75" cy="9.75" r="1.75"/>
-                <circle cx="14.25" cy="14.25" r="1.75"/><circle cx="18.75" cy="14.25" r="1.75"/>
-                <circle cx="9.75" cy="18.75" r="1.75"/><circle cx="18.75" cy="18.75" r="1.75"/>
-              </g>
-              <g opacity=".95">
-                <circle cx="18.75" cy="5.25" r="1.75"/>
-                <circle cx="14.25" cy="9.75" r="1.75"/>
-                <circle cx="9.75" cy="14.25" r="1.75"/>
-                <circle cx="5.25" cy="18.75" r="1.75"/><circle cx="14.25" cy="18.75" r="1.75"/>
-              </g>
-            </svg>
-            <span>
-              <span class="name">connect4</span>
-              <span class="what">connect 4 for the game boy advance — homebrew in C with sound, no SDK and no libc, against a CPU that looks five moves ahead.</span>
-            </span>
-          </a>
-        </li>
-        <li>
-          <a class="project" href="https://pullspace.dev/#/bigmah/gba_wasm/blob/README.md" target="_blank" rel="noopener noreferrer">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-              <path d="M6 6.5h12a4.5 4.5 0 0 1 4.5 4.5v2a4.5 4.5 0 0 1-4.5 4.5H6A4.5 4.5 0 0 1 1.5 13v-2A4.5 4.5 0 0 1 6 6.5Z" opacity=".3"/>
-              <rect x="7.6" y="8.6" width="8.8" height="6.8" rx=".8" opacity=".95"/>
-              <path d="M4 10.4h1.2v1h1v1.2h-1v1H4v-1H3v-1.2h1v-1Z" opacity=".6"/>
-              <circle cx="19.6" cy="11.2" r="1" opacity=".6"/>
-              <circle cx="17.9" cy="12.9" r="1" opacity=".6"/>
-            </svg>
-            <span>
-              <span class="name">gba_wasm</span>
-              <span class="what">mGBA compiled to webassembly — game boy advance ROMs in the browser, kept and saved locally, or from one html file with no server at all. connect 4 runs on it here.</span>
-            </span>
-          </a>
-        </li>
-        <li>
-          <a class="project" href="https://pullspace.dev/#/bigmah/llmoxide/blob/README.md" target="_blank" rel="noopener noreferrer">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-              <path d="M12 12.6 20.8 17.4 12 22.2 3.2 17.4 12 12.6Z" opacity=".3"/>
-              <path d="M12 7.4 20.8 12.2 12 17 3.2 12.2 12 7.4Z" opacity=".55"/>
-              <path d="M12 2.2 20.8 7 12 11.8 3.2 7 12 2.2Z" opacity=".95"/>
-            </svg>
-            <span>
-              <span class="name">llmoxide</span>
-              <span class="what">privacy-first local LLM inference in rust — written from scratch with no ML dependencies, and runs in the browser on WebGPU too.</span>
-            </span>
-          </a>
-        </li>
-        <li>
-          <a class="project" href="https://pullspace.dev/#/bigmah/fluids/blob/README.md" target="_blank" rel="noopener noreferrer">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-              <path d="M2 8.5c2.5 0 3.5-2.5 6-2.5s3.5 2.5 6 2.5 3.5-2.5 6-2.5c1 0 2 .5 2 .5V21H2V8.5Z" opacity=".25"/>
-              <path d="M2 10c2.5 0 3.5 2.5 6 2.5s3.5-2.5 6-2.5 3.5 2.5 6 2.5c1 0 2-.5 2-.5V21H2V10Z" opacity=".45"/>
-              <path d="M2 16.5c2.5 0 3.5-2.5 6-2.5s3.5 2.5 6 2.5 3.5-2.5 6-2.5c1 0 2 .5 2 .5V21H2v-4.5Z" opacity=".9"/>
-            </svg>
-            <span>
-              <span class="name">fluids</span>
-              <span class="what">3D particle water simulation in rust and bevy — offshore swell rolling in over a reef and breaking.</span>
-            </span>
-          </a>
-        </li>
-        <li>
-          <a class="project" href="https://pullspace.dev/#/bigmah/kb-agent/blob/README.md" target="_blank" rel="noopener noreferrer">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-              <path d="M12 6.2C9.8 4.6 6.6 4 3 4.3v14.2c3.6-.3 6.8.3 9 1.9V6.2Z" opacity=".55"/>
-              <path d="M12 6.2c2.2-1.6 5.4-2.2 9-1.9v14.2c-3.6-.3-6.8.3-9 1.9V6.2Z" opacity=".95"/>
-            </svg>
-            <span>
-              <span class="name">kb-agent</span>
-              <span class="what">ask a folder of books a question — every one gets read in full before it answers.</span>
-            </span>
+          <a class="post" href="blog_1.html">
+            <span class="name">How does AI work?</span>
+            <time datetime="2026-09-28">sep 28, 2026</time>
+            <span class="what">a chatbot, in spirit, built up from the line of best fit you drew in high school statistics. no computer science required.</span>
           </a>
         </li>
       </ul>
@@ -1057,13 +965,35 @@
   </article>
 
   <article class="tile tile--flush tile--gba" data-id="gba">
-    <header class="tile__bar" tabindex="0" aria-label="connect 4 tile — arrow keys nudge it half a cell, shift for a whole one">
-      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+    <header class="tile__bar" tabindex="0" aria-label="connect 4 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="Tiny" title="Tiny"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="Small" title="Small"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="Medium" title="Medium"><i></i></button><button type="button" data-size="3" aria-pressed="false" aria-label="Large" title="Large"><i></i></button></span>
       <span class="tile__title">connect 4</span>
       <span class="spacer"></span>
       <a class="ln" href="gba/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
     </header>
     <div class="tile__body">
+      <div class="mini" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <rect x="2.5" y="2.5" width="19" height="19" rx="2.5" opacity=".16"/>
+          <g opacity=".22">
+            <circle cx="5.25" cy="5.25" r="1.75"/><circle cx="9.75" cy="5.25" r="1.75"/><circle cx="14.25" cy="5.25" r="1.75"/>
+            <circle cx="5.25" cy="9.75" r="1.75"/><circle cx="9.75" cy="9.75" r="1.75"/>
+            <circle cx="5.25" cy="14.25" r="1.75"/>
+          </g>
+          <g opacity=".5">
+            <circle cx="18.75" cy="9.75" r="1.75"/>
+            <circle cx="14.25" cy="14.25" r="1.75"/><circle cx="18.75" cy="14.25" r="1.75"/>
+            <circle cx="9.75" cy="18.75" r="1.75"/><circle cx="18.75" cy="18.75" r="1.75"/>
+          </g>
+          <g opacity=".95">
+            <circle cx="18.75" cy="5.25" r="1.75"/>
+            <circle cx="14.25" cy="9.75" r="1.75"/>
+            <circle cx="9.75" cy="14.25" r="1.75"/>
+            <circle cx="5.25" cy="18.75" r="1.75"/><circle cx="14.25" cy="18.75" r="1.75"/>
+          </g>
+        </svg>
+        <span>connect 4</span>
+      </div>
       <div class="start">
         <!-- a board that has just been won: the bright diagonal, from bottom left -->
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
@@ -1101,8 +1031,8 @@
        to TILES and HOME. -->
   <template id="off">
     <article class="tile tile--flush tile--llm" data-id="llm">
-      <header class="tile__bar" tabindex="0" aria-label="local llm tile — arrow keys nudge it half a cell, shift for a whole one">
-        <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+      <header class="tile__bar" tabindex="0" aria-label="local llm tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+        <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="Tiny" title="Tiny"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="Small" title="Small"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="Medium" title="Medium"><i></i></button><button type="button" data-size="3" aria-pressed="false" aria-label="Large" title="Large"><i></i></button></span>
         <span class="tile__title">local llm</span>
         <span class="spacer"></span>
         <a class="ln" href="llm.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
@@ -1126,13 +1056,23 @@
   </template>
 
   <article class="tile tile--flush tile--bike" data-id="bike">
-    <header class="tile__bar" tabindex="0" aria-label="bike or die 2 tile — arrow keys nudge it half a cell, shift for a whole one">
-      <button class="dots" type="button" aria-expanded="false"><i></i><i></i><i></i></button>
+    <header class="tile__bar" tabindex="0" aria-label="bike or die 2 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="Tiny" title="Tiny"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="Small" title="Small"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="Medium" title="Medium"><i></i></button><button type="button" data-size="3" aria-pressed="false" aria-label="Large" title="Large"><i></i></button></span>
       <span class="tile__title">bike or die 2</span>
       <span class="spacer"></span>
       <a class="ln" href="bike/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
     </header>
     <div class="tile__body">
+      <div class="mini" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="5.6" cy="16.4" r="4.1" opacity=".95"/>
+          <circle cx="18.4" cy="16.4" r="4.1" opacity=".5"/>
+          <path d="M5.6 16.4h5.8L9 9 5.6 16.4M9 9h6.4l-4 7.4M15.4 9l3 7.4" opacity=".95"/>
+          <path d="M8.1 8.2h1.9" opacity=".95"/>
+        </svg>
+        <span>bike or die 2</span>
+      </div>
       <div class="start">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
              stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -1156,34 +1096,45 @@
 (function () {
   'use strict';
 
-  var COLS = 4;        // the board is four cells wide...
-  var ROWS = 2;        // ...and two tall, plus the half row GH adds below them
+  var COLS = 4;        // the board is four cells wide, and as tall as its tiles need...
   var SUB  = 2;        // ...and every cell splits into this many steps, so tiles can sit half-offset
   var GAP  = 14;       // gutter, px
   var GRID_AT = 1150;  // narrower than this the cells get cramped, so we stack
-  var KEY = 'board.v10';
+  var KEY = 'board.v11';
 
-  // Everything below counts in steps rather than cells: a small tile is SUB
-  // steps square, a big one twice that, and the board is this many across.
+  // Everything below counts in steps rather than cells, and the board is this
+  // many across.
   var GW = COLS * SUB;
-  // Half a row of spare grid hangs below the last full one, so there is always
-  // somewhere to drop into without giving a whole cell of height up to it.
-  var GH = ROWS * SUB + SUB / 2;
+
+  // The four sizes a tile can be, as the side of its square in steps: tiny is
+  // a single step, small a cell, medium two by two cells, large three by
+  // three. The picker in each bar has a square for each, in this order.
+  var SIZES = [1, SUB, 2 * SUB, 3 * SUB];
+  var SIZE_NAMES = ['Tiny', 'Small', 'Medium', 'Large'];
+  var MEDIUM = 2;      // from here up a tile shows everything it has
+
+  // The board is only ever as deep as its lowest tile, plus half a row of
+  // spare grid hanging below it so there is always somewhere to drop into.
+  // Tiles shoved aside may land further down than that; the board follows.
+  var SPARE = SUB / 2;
+  var GH = 0;
 
   // The model is parked in the template above; this list is the other half of
   // that, and the board is built from it alone. It is not missed by the code —
   // what is not named here is simply not on the board.
-  var TILES = ['id', 'dol', 'gba', 'bike'];
+  var TILES = ['id', 'ex', 'gba', 'bike'];
 
-  // where everything starts, and what the reset button goes back to: two
-  // across and two beneath, centred with a column spare either side, in
-  // reading order — bigmah and the projects, then the two games.
+  // where everything starts, and what the reset button goes back to: one
+  // column down the middle of the board — bigmah at medium, the writing at
+  // medium under it, and the two games small and side by side at the bottom.
   var HOME = {
-    id:   { x: 2, y: 0 },
-    dol:  { x: 4, y: 0 },
-    gba:  { x: 2, y: 1 * SUB },
-    bike: { x: 4, y: 1 * SUB }
+    id:   { x: SUB, y: 0 },
+    ex:   { x: SUB, y: 2 * SUB },
+    gba:  { x: SUB, y: 4 * SUB },
+    bike: { x: 2 * SUB, y: 4 * SUB }
   };
+  var HOME_SIZE = { id: MEDIUM, ex: MEDIUM, gba: 1, bike: 1 };
+  var HOME_ROWS = 5 * SUB + SPARE;   // the depth that layout takes
 
   var board = document.getElementById('board');
   var ph    = document.getElementById('ph');
@@ -1195,14 +1146,14 @@
 
   var saved = readSaved();
   var pos   = saved ? saved.pos : copy(HOME);
-  var bigId = saved ? saved.big : null;   // the one enlarged tile, or null
-  if (!valid(pos)) { pos = copy(HOME); bigId = null; }
+  var sz    = saved ? saved.sz : copySize(HOME_SIZE);   // each tile's index into SIZES
+  if (!valid(pos)) { pos = copy(HOME); sz = copySize(HOME_SIZE); }
 
   var isStatic = false;
 
-  var HINT_KEY = 'dots.seen';
-  var hinted = bigId !== null;   // a saved big tile means they already found them
-  try { hinted = hinted || localStorage.getItem(HINT_KEY) === '1'; } catch (e) {}
+  var HINT_KEY = 'sizes.seen';
+  var hinted = false;
+  try { hinted = localStorage.getItem(HINT_KEY) === '1'; } catch (e) {}
 
   var DRAG_KEY = 'drag.seen';
   var dragHinted = false;
@@ -1284,10 +1235,33 @@
     return out;
   }
 
-  // A tile is one cell, or two-by-two when it is the enlarged one — in steps.
-  function sizeOf(id) { return (id === bigId ? 2 : 1) * SUB; }
+  function copySize(z) {
+    var out = {};
+    TILES.forEach(function (id) { out[id] = z[id]; });
+    return out;
+  }
 
-  function onBoard(x, y, s) { return x >= 0 && y >= 0 && x + s <= GW && y + s <= GH; }
+  // The side of a tile's square, in steps.
+  function sizeOf(id) { return SIZES[sz[id]]; }
+
+  // Only the sides are walls. The floor is wherever the lowest tile leaves it.
+  function onBoard(x, y, s) { return x >= 0 && y >= 0 && x + s <= GW; }
+
+  // How many steps deep the board has to be to hold `p`, spare half row and all.
+  function rowsOf(p) {
+    var low = 0;
+    TILES.forEach(function (id) { low = Math.max(low, p[id].y + sizeOf(id)); });
+    return low + SPARE;
+  }
+
+  // How far down `id` may be moved by hand: to the spare row under everything
+  // else, or as deep as the board starts out — never further, or a tile could
+  // be walked off the bottom a step at a time.
+  function reach(id, p) {
+    var low = 0;
+    TILES.forEach(function (k) { if (k !== id) low = Math.max(low, p[k].y + sizeOf(k)); });
+    return Math.max(HOME_ROWS, low + SPARE, p[id].y + sizeOf(id));
+  }
 
   function overlap(a, as, b, bs) {
     return a.x < b.x + bs && a.x + as > b.x && a.y < b.y + bs && a.y + as > b.y;
@@ -1348,9 +1322,11 @@
     for (var vy = base[id].y; vy < base[id].y + s; vy += SUB) {
       for (var vx = base[id].x; vx < base[id].x + s; vx += SUB) vacated[vx + ',' + vy] = true;
     }
-    var slots = [];
-    for (var ay = 0; ay + SUB <= GH; ay++) {
-      for (var ax = 0; ax + SUB <= GW; ax++) {
+    // Anywhere down to a large tile's depth below the board as it stands, so
+    // a tile with nowhere left on it can still be pushed off the bottom.
+    var slots = [], deep = rowsOf(next) + SIZES[SIZES.length - 1];
+    for (var ay = 0; ay < deep; ay++) {
+      for (var ax = 0; ax < GW; ax++) {
         slots.push({
           x: ax, y: ay,
           rank: vacated[ax + ',' + ay] ? 0 : (ax % SUB || ay % SUB) ? 2 : 1
@@ -1396,18 +1372,20 @@
     try {
       var s = JSON.parse(raw);
       if (!s || !s.pos) return null;
-      var p = {};
+      var p = {}, z = {};
       for (var i = 0; i < TILES.length; i++) {
         var v = s.pos[TILES[i]];
         if (!v || typeof v.x !== 'number' || typeof v.y !== 'number') return null;
         p[TILES[i]] = { x: v.x | 0, y: v.y | 0 };
+        var n = s.sz && s.sz[TILES[i]];
+        z[TILES[i]] = typeof n === 'number' && SIZES[n] ? n : HOME_SIZE[TILES[i]];
       }
-      return { pos: p, big: TILES.indexOf(s.big) === -1 ? null : s.big };
+      return { pos: p, sz: z };
     } catch (e) { return null; }
   }
 
   function save() {
-    try { localStorage.setItem(KEY, JSON.stringify({ pos: pos, big: bigId })); } catch (e) {}
+    try { localStorage.setItem(KEY, JSON.stringify({ pos: pos, sz: sz })); } catch (e) {}
   }
 
   /* ---------- drawing ---------- */
@@ -1561,6 +1539,9 @@
   function render(skip, cell) {
     if (isStatic) { fitEmulator(); fitBike(); return; }
     if (cell === undefined) cell = cellPx();
+    // Held at its depth for the length of a drag, so the board does not heave
+    // up and down under the pointer as the tiles shuffle.
+    GH = Math.max(rowsOf(pos), HOME_ROWS, drag ? drag.rows : 0);
     drawCells(cell);
 
     TILES.forEach(function (id) {
@@ -1585,15 +1566,19 @@
     }
   }
 
-  function syncDots() {
+  // Stacked, every tile is a full-width row that shows all it has, whatever
+  // size it was left at on the board.
+  function syncSizes() {
     TILES.forEach(function (id) {
-      var on = id === bigId;
-      var el = els[id];
-      var btn = el.querySelector('.dots');
-      el.classList.toggle('tile--big', on);
-      btn.setAttribute('aria-expanded', on ? 'true' : 'false');
-      btn.setAttribute('aria-label', (on ? 'Collapse' : 'Expand') + ' the ' + el.querySelector('.tile__title').textContent + ' tile');
-      btn.title = on ? 'Collapse' : 'Expand';
+      var el = els[id], n = sz[id];
+      el.classList.toggle('tile--xs', !isStatic && n === 0);
+      el.classList.toggle('tile--big', isStatic || n >= MEDIUM);
+      var name = el.querySelector('.tile__title').textContent;
+      Array.prototype.forEach.call(el.querySelectorAll('.sizes button'), function (b) {
+        var k = +b.dataset.size;
+        b.setAttribute('aria-pressed', k === n ? 'true' : 'false');
+        b.setAttribute('aria-label', SIZE_NAMES[k] + ' ' + name + ' tile');
+      });
     });
   }
 
@@ -1601,11 +1586,12 @@
     var next = window.innerWidth < GRID_AT;
     // Stacked, the tiles are as wide as the window and the pile is taller than
     // it — there is nowhere for them to fall to, so the button goes away with
-    // the board, the same as the dots on the emulator do.
+    // the board, the same as the size pickers do.
     gravBtn.hidden = next;
     if (next === isStatic) { render(); return; }
     isStatic = next;
     board.classList.toggle('board--static', isStatic);
+    syncSizes();
     if (isStatic) {
       board.style.height = '';
       readingOrder().forEach(function (id) {
@@ -1644,6 +1630,7 @@
     var g = geo(pos[id], sizeOf(id), cellPx());
     drag = {
       el: el, id: id,
+      rows: reach(id, pos),
       sx: e.clientX, sy: e.clientY,
       left: g.left, top: g.top,
       w: g.w, h: g.h,
@@ -1692,7 +1679,7 @@
     var s = sizeOf(drag.id);
     var best = null, bestD = Infinity, bestG = null;
 
-    for (var y = 0; y + s <= GH; y++) {
+    for (var y = 0; y + s <= drag.rows; y++) {
       for (var x = 0; x + s <= GW; x++) {
         var cand = tryPlace(drag.id, x, y, drag.base);
         if (!cand) continue;
@@ -1733,19 +1720,20 @@
   board.addEventListener('pointerup', letGo);
   board.addEventListener('pointercancel', letGo);
 
-  /* ---------- grow / shrink ---------- */
+  /* ---------- sizes ---------- */
 
-  // Only one tile is ever big; enlarging a second shrinks the first.
-  function setBig(id) {
-    var was = bigId;
-    bigId = id;
-    if (!id) return true;
+  // Put `id` at size `n`: where it stands if it fits there, shoving the others
+  // aside as a drag would, or else at the nearest spot that takes it.
+  function setSize(id, n) {
+    if (!SIZES[n] || n === sz[id]) return false;
+    var was = sz[id];
+    sz[id] = n;
 
     var next = tryPlace(id, pos[id].x, pos[id].y, pos);
-    if (!next) {                       // no room where it stands — find the closest spot
-      var bestD = Infinity;
-      for (var y = 0; y + 2 * SUB <= GH; y++) {
-        for (var x = 0; x + 2 * SUB <= GW; x++) {
+    if (!next) {
+      var s = SIZES[n], bestD = Infinity, deep = rowsOf(pos);
+      for (var y = 0; y < deep; y++) {
+        for (var x = 0; x + s <= GW; x++) {
           var cand = tryPlace(id, x, y, pos);
           if (!cand) continue;
           var d = Math.abs(x - pos[id].x) + Math.abs(y - pos[id].y);
@@ -1753,9 +1741,16 @@
         }
       }
     }
-    if (!next) { bigId = was; return false; }
+    if (!next) { sz[id] = was; return false; }
     pos = next;
     return true;
+  }
+
+  function resized() {
+    syncSizes();
+    render();
+    showTug();
+    save();
   }
 
   board.addEventListener('click', function (e) {
@@ -1770,39 +1765,49 @@
     if (!tile) return;
     var id = tile.dataset.id;
 
-    if (e.target.closest('.dots')) {
-      // the dots are the one thing that shrinks a tile back down
+    var pick = e.target.closest('.sizes button');
+    if (pick) {
       retireHint();
-      if (!setBig(bigId === id ? null : id)) return;
-    } else {
-      // Anywhere else on a small tile grows it; a big one keeps its clicks for
-      // what is in it. Links still go where they go, the click that ends a drag
-      // or a text selection isn't asking for anything (the email address is
-      // one, a click selecting all of it), and a tile whose dots are hidden
-      // would have no way to close again.
-      if (id === bigId || dragged || e.target.closest('a, button, .email')) return;
-      if (!window.getSelection().isCollapsed) return;
-      if (!tile.querySelector('.dots').offsetWidth) return;
-      if (!setBig(id)) return;
+      if (setSize(id, +pick.dataset.size)) resized();
+      return;
     }
-    syncDots();
-    render();
-    showTug();
-    save();
+
+    // Anywhere else on a tiny or small tile brings it up to medium; a bigger
+    // one keeps its clicks for what is in it. Links still go where they go,
+    // the click that ends a drag or a text selection isn't asking for anything
+    // (the email address is one, a click selecting all of it), and stacked
+    // there are no sizes at all.
+    if (sz[id] >= MEDIUM || isStatic || dragged || e.target.closest('a, button, .email')) return;
+    if (!window.getSelection().isCollapsed) return;
+    if (setSize(id, MEDIUM)) resized();
   });
 
   /* ---------- keyboard ---------- */
 
   var STEP = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
+  var GROW = { '+': 1, '=': 1, '-': -1, '_': -1 };
+
   board.addEventListener('keydown', function (e) {
-    if (isStatic || phys || !(e.key in STEP)) return;
+    if (isStatic || phys) return;
     var bar = e.target.closest('.tile__bar');
-    if (!bar || e.target.closest('button')) return;
+    if (!bar) return;
     var id = bar.parentElement.dataset.id;
+
+    // + and - step through the sizes, from the bar or from the picker itself
+    if (e.key in GROW && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      retireHint();
+      if (setSize(id, sz[id] + GROW[e.key])) resized();
+      return;
+    }
+
+    if (!(e.key in STEP) || e.target.closest('button')) return;
     e.preventDefault();
     var n = e.shiftKey ? SUB : 1;   // half a cell, or a whole one with shift
-    var next = tryPlace(id, pos[id].x + STEP[e.key][0] * n, pos[id].y + STEP[e.key][1] * n, pos);
+    var ty = pos[id].y + STEP[e.key][1] * n;
+    if (ty > pos[id].y && ty + sizeOf(id) > reach(id, pos)) return;
+    var next = tryPlace(id, pos[id].x + STEP[e.key][0] * n, ty, pos);
     if (!next) return;
     pos = next;
     render();
@@ -1882,8 +1887,8 @@
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
 
-  // Mass from area, inertia from the rectangle formula — so the enlarged tile
-  // is genuinely the heavy one and shoulders the others aside on the way down.
+  // Mass from area, inertia from the rectangle formula — so a large tile is
+  // genuinely the heavy one and shoulders the others aside on the way down.
   function makeBody(el, r) {
     var m = r.width * r.height / 20000;
     var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
@@ -2352,9 +2357,9 @@
 
   document.querySelector('.js-reset').addEventListener('click', function () {
     pos = copy(HOME);
-    bigId = null;
+    sz = copySize(HOME_SIZE);
     try { localStorage.removeItem(KEY); } catch (e) {}
-    syncDots();
+    syncSizes();
     if (phys) { gravityOff(); return; }   // flies home to the layout just set
     land();
     resume();
@@ -2425,7 +2430,7 @@
   });
 
   if (!hinted) board.classList.add('board--hint');
-  syncDots();
+  syncSizes();
   setMode();
   showTug();
   requestAnimationFrame(function () { board.classList.add('is-ready'); });

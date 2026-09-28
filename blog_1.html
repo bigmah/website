@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How does AI work? Built up from a line of best fit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,700;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F5F8FC; --grid:#E0E8F2; --ink:#14223D; --graphite:#556176; --faint:#98A4B6;
+  --hi:#FFD93D; --miss:#D6344D; --good:#1E8757; --panel:#FFFFFF; --rule:#C8D3E1;
+  --serif:"Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
+    --hi:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
+  --hi:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; color:var(--ink); background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px; background-position:-1px -1px;
+  font-family:var(--serif); font-size:clamp(18px,1.1vw + 12px,21px); line-height:1.62;
+  font-optical-sizing:auto; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px; margin:0 auto; padding:0 22px}
+.wide{max-width:1000px; margin-left:auto; margin-right:auto; padding:0 22px}
+p{margin:0 0 1em}
+a{color:inherit}
+h1,h2,h3{font-weight:500; line-height:1.1; letter-spacing:-0.01em}
+h1{font-size:clamp(52px,9vw,112px); margin:0; letter-spacing:-0.035em; font-weight:500}
+h2{font-size:clamp(32px,4.4vw,46px); margin:0 0 .55em; display:flex; gap:.45em; align-items:baseline}
+h2 .n{font-family:var(--mono); font-size:.42em; font-weight:500; color:var(--paper); background:var(--ink); border-radius:3px; padding:.12em .45em; transform:translateY(-.35em)}
+h3{font-size:1.15em; margin:1.6em 0 .4em; font-weight:700}
+em{font-style:italic}
+code,.eq{font-family:var(--mono); font-size:.84em}
+.eq{display:block; margin:.6em 0 1.1em; padding:.7em 1em; background:var(--panel); border:1px solid var(--rule); border-left:4px solid var(--ink); border-radius:2px; overflow-x:auto; white-space:pre; line-height:1.7}
+.p{background:linear-gradient(transparent 38%,var(--hi) 38%,var(--hi) 88%,transparent 88%); color:var(--ink); padding:0 .1em}
+:root[data-theme="dark"] .p{color:#14223D}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .p{color:#14223D}}
+mark{background:linear-gradient(transparent 45%,var(--hi) 45%,var(--hi) 90%,transparent 90%); color:inherit}
+:root[data-theme="dark"] mark,.dark-mark{color:#14223D}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) mark{color:#14223D}}
+
+/* hero */
+header{padding:9vh 0 2vh}
+.dek{font-size:clamp(21px,1.6vw + 12px,28px); line-height:1.4; max-width:30ch; margin:.5em 0 0; color:var(--graphite)}
+.hero-fig{margin-top:5vh}
+.hero-fig canvas{display:block; width:100%}
+.hero-cap{display:flex; justify-content:space-between; flex-wrap:wrap; gap:.4em 1.5em; font-size:.8em; color:var(--graphite); border-top:1.5px solid var(--ink); padding-top:.5em; margin-top:.2em}
+.hero-cap b{font-family:var(--mono); font-weight:500; color:var(--ink); font-size:.95em}
+
+section{padding:9vh 0 2vh}
+.lede{font-size:1.12em}
+.aside{font-size:.86em; color:var(--graphite); border-left:2px solid var(--rule); padding-left:1em; margin:1.4em 0}
+
+/* figures */
+figure{margin:1.8em 0 2.2em}
+.fig{background:var(--panel); border:1px solid var(--rule); border-radius:4px; padding:18px; box-shadow:0 1px 0 var(--rule)}
+.fig canvas{display:block; width:100%; touch-action:manipulation}
+figcaption{font-size:.8em; color:var(--graphite); margin-top:.7em; line-height:1.5}
+.pair{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+.pair > div{min-width:0}
+@media (max-width:720px){.pair{grid-template-columns:1fr}}
+.ptitle{font-size:.85em; font-weight:700; margin:0 0 .3em}
+
+.controls{display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; margin-top:14px; font-size:.82em}
+.ctl{display:flex; align-items:center; gap:10px; flex:1 1 230px; min-width:0}
+.ctl label{white-space:nowrap}
+.ctl input[type=range]{flex:1; min-width:80px; accent-color:var(--ink)}
+.ctl output{font-family:var(--mono); font-size:.9em; min-width:6.5ch; text-align:right}
+button{
+  font-family:var(--serif); font-size:.95em; cursor:pointer; color:var(--ink); background:transparent;
+  border:1.5px solid var(--ink); border-radius:3px; padding:.4em .9em; line-height:1.2;
+}
+button:hover{background:var(--grid)}
+button.go{background:var(--hi); color:#14223D; border-color:#14223D; font-weight:500}
+button.go:hover{filter:brightness(.95)}
+button:disabled{opacity:.45; cursor:default}
+button:focus-visible,input:focus-visible{outline:3px solid var(--hi); outline-offset:2px}
+input[type=text],input[type=number]{
+  font-family:var(--mono); font-size:1em; color:var(--ink); background:var(--paper);
+  border:1.5px solid var(--ink); border-radius:3px; padding:.35em .55em; width:9ch;
+}
+.check{display:flex; gap:.45em; align-items:center; cursor:pointer}
+.check input{accent-color:var(--ink); width:1.05em; height:1.05em}
+
+.readout{display:flex; flex-wrap:wrap; gap:10px 28px; margin-top:12px; font-size:.82em; color:var(--graphite)}
+.readout b{display:block; font-family:var(--mono); font-weight:500; font-size:1.35em; color:var(--ink)}
+.bad{color:var(--miss)!important}
+.good{color:var(--good)!important}
+
+.log{font-family:var(--mono); font-size:.72em; line-height:1.7; margin-top:12px; min-height:7.2em; color:var(--graphite); overflow-x:auto; white-space:pre}
+.log .k{color:var(--good)} .log .t{color:var(--faint)}
+
+/* parameter bars */
+.bars{display:grid; grid-template-columns:minmax(120px,auto) 1fr auto; gap:9px 14px; align-items:center; font-size:.82em}
+.bars .bar{height:16px; background:var(--hi); border:1.5px solid #14223D; border-radius:2px; min-width:3px; transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.bars .num{font-family:var(--mono); font-size:.9em; text-align:right}
+
+/* letters */
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin:10px 0}
+.chip{font-family:var(--mono); border:1.5px solid var(--ink); border-radius:3px; padding:.15em .5em; font-size:.85em; display:inline-flex; flex-direction:column; align-items:center; min-width:2.6em; line-height:1.3}
+.chip small{color:var(--graphite); font-size:.78em}
+.abc{display:grid; grid-template-columns:repeat(13,1fr); gap:4px; font-family:var(--mono); font-size:.78em; margin-top:10px}
+.abc div{border:1px solid var(--rule); border-radius:2px; text-align:center; padding:3px 0; line-height:1.25}
+.abc .o{font-weight:500}
+.abc .o.x{color:var(--miss)}
+@media (max-width:520px){.abc{grid-template-columns:repeat(7,1fr)}}
+
+.probs{display:grid; grid-template-columns:2.2em 1fr 4.2em; gap:5px 10px; align-items:center; font-family:var(--mono); font-size:.8em; margin-top:10px}
+.probs .pb{height:14px; background:var(--grid); border-radius:2px; overflow:hidden}
+.probs .pb span{display:block; height:100%; background:var(--graphite); transition:width .25s}
+.probs .pb.top span{background:var(--hi); box-shadow:inset 0 0 0 1.5px #14223D}
+.probs .l{text-align:center; font-weight:500}
+.call{font-family:var(--mono); font-size:.85em; margin-top:10px; overflow-x:auto; white-space:nowrap}
+
+.gen-steps{font-family:var(--mono); font-size:.8em; line-height:1.9; min-height:11em; margin-top:10px; overflow-x:auto; white-space:pre}
+.gen-steps .new{background:var(--hi); color:#14223D; padding:0 .2em}
+.gen-word{font-size:2.2em; font-weight:500; letter-spacing:.02em; min-height:1.3em; margin:.2em 0 0}
+.history{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+.history span{font-family:var(--mono); font-size:.78em; border:1px solid var(--rule); border-radius:2px; padding:.1em .45em}
+.note{font-size:.8em; color:var(--graphite); margin-top:8px}
+.warn{color:var(--miss)}
+
+details{margin-top:12px; font-size:.8em}
+details summary{cursor:pointer; color:var(--graphite)}
+details p{font-family:var(--mono); font-size:.9em; line-height:1.6; margin-top:.5em; color:var(--graphite)}
+
+.stack{list-style:none; padding:0; margin:1.2em 0; counter-reset:s}
+.stack li{counter-increment:s; display:grid; grid-template-columns:2.4em 1fr; gap:.6em; padding:.55em 0; border-bottom:1px solid var(--rule)}
+.stack li::before{content:counter(s); font-family:var(--mono); font-size:.8em; background:var(--ink); color:var(--paper); border-radius:3px; text-align:center; height:1.7em; line-height:1.7em; margin-top:.25em}
+footer{padding:6vh 0 10vh; font-size:.8em; color:var(--graphite)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>How does AI work?</h1>
+    <p class="dek">We'll build a chatbot, in spirit, out of the line of best fit you drew in high school statistics. No computer science required.</p>
+  </div>
+  <div class="wide hero-fig">
+    <canvas id="hero" aria-label="A line fitting itself through scattered house price data"></canvas>
+    <div class="hero-cap"><span>A line teaching itself to predict house prices</span><span>average miss <b id="heroMiss">—</b></span></div>
+  </div>
+</header>
+
+<main>
+<section id="why">
+  <div class="wrap">
+    <p class="lede">There is essentially no computer science in standard American K–12 education. That's a shame for many reasons, but especially now, because it leaves most people without a foundation to build intuition about AI and other advanced software.</p>
+    <p>Imagine if biology were missing from school, and then gene editing arrived. How would anyone make sense of CRISPR with no notion of cells or DNA? It would sound like magic, or like a threat, and there'd be no way to tell which.</p>
+    <p>So let's lay a foundation. We'll use nothing beyond high school stats, add one brick at a time, and end up with an approximate but <em>valid</em> understanding of how modern AI models work. Everything on this page is live: drag it, train it, break it.</p>
+  </div>
+</section>
+
+<section id="fit">
+  <div class="wrap">
+    <h2><span class="n">1</span>A line of best fit</h2>
+    <p>The first brick is a familiar one. Here's some data on house prices: each dot is a house, with its size along the bottom (square feet) and its sale price up the side.</p>
+    <p>Even at a glance it matches intuition: in general, bigger house, bigger price. So we can draw a line through the cloud of dots and use it to predict the price of a house we haven't seen yet. Try it. Drag the sliders until the line looks right to you.</p>
+  </div>
+  <div class="wrap">
+    <figure class="fig">
+      <canvas id="fitCanvas"></canvas>
+      <div class="controls">
+        <div class="ctl"><label for="mS">slope <span class="p">m</span></label><input id="mS" type="range" min="0" max="400" step="1" value="60"><output id="mO"></output></div>
+        <div class="ctl"><label for="bS">intercept <span class="p">b</span></label><input id="bS" type="range" min="-200" max="500" step="5" value="330"><output id="bO"></output></div>
+      </div>
+      <div class="controls">
+        <label class="check"><input type="checkbox" id="missT"> Show the misses</label>
+        <span style="display:flex;gap:8px;align-items:center">Predict a <input type="number" id="predIn" value="2500" min="0" step="100" aria-label="House size in square feet"> sq ft house</span>
+      </div>
+      <div class="readout">
+        <div>the line<b id="fitEq">—</b></div>
+        <div>predicted price<b id="fitPred">—</b></div>
+      </div>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>To predict a price, find the house's size on the bottom axis, go up to the line, and read off the height. In math terms, we plug <code>x</code> into the equation of the line we drew:</p>
+    <span class="eq">price = <span class="p">m</span> × size + <span class="p">b</span>        (y = mx + b)</span>
+    <p>That's it. That's <em>linear regression</em>, and it's the seed of everything that follows.</p>
+  </div>
+</section>
+
+<section id="loss">
+  <div class="wrap">
+    <h2><span class="n">2</span>Loss: what makes a fit “best”</h2>
+    <p>Some lines through the data are clearly better than others. But “clearly better” isn't something a computer can work with. We need a number.</p>
+    <p>That number is called the <mark>loss</mark>. To find it, measure the gap between each dot and the line (how much the line missed that house's real price), then add up all the gaps. Here's a bad line and a good line, side by side:</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <div class="pair">
+        <div><p class="ptitle">A bad line</p><canvas id="badCanvas"></canvas><div class="readout"><div>total miss<b id="badTot" class="bad">—</b></div><div>average miss<b id="badAvg">—</b></div></div></div>
+        <div><p class="ptitle">A good line</p><canvas id="goodCanvas"></canvas><div class="readout"><div>total miss<b id="goodTot" class="good">—</b></div><div>average miss<b id="goodAvg">—</b></div></div></div>
+      </div>
+      <figcaption>Red segments are the misses. The loss is their total length, in dollars. Go back up and tick “Show the misses” to watch the loss change as you drag.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>So the line of <em>best</em> fit is simply the line with the <em>lowest</em> loss. Throughout this page we'll report the average miss rather than the total, since “off by $40k per house” is easier to picture than a giant sum, but it's the same idea: lower is better.</p>
+    <p class="aside">In practice people usually square each miss before adding them up, which punishes big misses extra hard. The spirit is identical: one number that says how wrong the line is.</p>
+  </div>
+</section>
+
+<section id="train">
+  <div class="wrap">
+    <h2><span class="n">3</span>Training: from a guess to the best fit</h2>
+    <p>You found a good line by eye. How would a computer do it, with no eyes and no intuition?</p>
+    <p>Remember the line is <code>y = <span class="p">m</span>x + <span class="p">b</span></code>. The <code>x</code> and <code>y</code> values come from the data, pairs like (1,200 sq ft, $290k) and (2,000 sq ft, $440k). Those are fixed. The only things we can change are <span class="p">m</span> and <span class="p">b</span>. So the simplest possible strategy is:</p>
+    <ol>
+      <li>Pick a random <span class="p">m</span> and <span class="p">b</span>.</li>
+      <li>Calculate the loss for that line.</li>
+      <li>If it's the lowest loss so far, remember that <span class="p">m</span> and <span class="p">b</span>. Otherwise throw them out.</li>
+      <li>Repeat a bunch of times.</li>
+    </ol>
+    <p>This loop is called <mark>training</mark>. Press the button and watch it happen. On the right is a map of every possible line: each spot is one choice of <span class="p">m</span> and <span class="p">b</span>, shaded by its loss. The yellow valley is where the good lines live.</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <div class="pair">
+        <div><p class="ptitle">The lines it tried</p><canvas id="trainCanvas"></canvas></div>
+        <div><p class="ptitle">Map of every possible line, by loss</p><canvas id="landCanvas"></canvas></div>
+      </div>
+      <div class="controls">
+        <button class="go" id="randBtn">Guess 25 random lines</button>
+        <button id="nudgeBtn">Nudge downhill 25 times</button>
+        <button id="resetTrain">Start over</button>
+      </div>
+      <div class="readout">
+        <div>lines tried<b id="trTries">0</b></div>
+        <div>best average miss<b id="trBest">—</b></div>
+        <div>best line<b id="trEq">—</b></div>
+      </div>
+      <div class="log" id="trLog" aria-live="polite"></div>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>Random guessing works, sort of. After 25 tries you usually have a decent line, and more tries can only help. But look at the map: most guesses land nowhere near the valley. Wasted effort.</p>
+    <p>A smarter move is to start somewhere and <em>nudge</em>. Try a slightly bigger and slightly smaller <span class="p">m</span>, and the same for <span class="p">b</span>. Keep whichever nudge lowers the loss, and when no nudge helps, take smaller steps. Hit “Nudge downhill” and watch the path walk into the valley.</p>
+    <p class="aside">Real AI training uses a refined version of nudging called <em>gradient descent</em>. Instead of test-driving each nudge, it uses calculus to work out the downhill direction for every parameter at once. Same idea, much faster.</p>
+  </div>
+</section>
+
+<section id="params">
+  <div class="wrap">
+    <h2><span class="n">4</span>Parameters: the knobs we turn</h2>
+    <p>Our example was as simple as it gets: one input (size), one output (price), and the equation for a line. The numbers training gets to change, <span class="p">m</span> and <span class="p">b</span>, are called <mark>parameters</mark>. <code>x</code> is the <em>input</em> and <code>y</code> is the <em>output</em>.</p>
+    <p>Nothing forces us to stop at two. If we wanted to use both house size <em>and</em> lot size, we'd have two inputs and three parameters:</p>
+    <span class="eq">price = <span class="p">m</span> × house_size + <span class="p">n</span> × lot_size + <span class="p">b</span></span>
+    <p>And we could go wild, with any equation and as many parameters as we like:</p>
+    <span class="eq">y = <span class="p">a</span>·x<sup><span class="p">b</span></sup> / <span class="p">c</span> + <span class="p">d</span>·z + <span class="p">e</span>·x·z + <span class="p">f</span> + …</span>
+    <p>Training works exactly the same way no matter how many there are: tweak the parameters, check the loss, keep what helps. And here's the punchline: <strong>parameter count is exactly how we measure the size of modern AI models.</strong> Look at the scale.</p>
+  </div>
+  <div class="wrap">
+    <figure class="fig">
+      <div class="bars" id="bars"></div>
+      <figcaption>Bars use a logarithmic scale: each step to the right is ten times more parameters. Without it, everything but the largest model would be invisible. Frontier labs often don't publish counts for their latest models; outside estimates run from hundreds of billions to trillions.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="nn">
+  <div class="wrap">
+    <h2><span class="n">5</span>Neural networks: a function that can bend</h2>
+    <p>If parameter count is what matters, what equation do those billions of parameters live in? It isn't a line. A line can only ever be straight, and most things in the world aren't. Try fitting a line to a wave: no setting of <span class="p">m</span> and <span class="p">b</span> will ever do it.</p>
+    <p>The trick is small. Take a line, <code><span class="p">w</span>x + <span class="p">c</span></code>, and squash it through an S-shaped curve so it flattens out at both ends. That gives you a smooth <em>step</em> instead of a straight line. Scale it by another parameter <span class="p">v</span>. That squashed, scaled line is one <mark>neuron</mark>.</p>
+    <span class="eq">neuron(x) = <span class="p">v</span> · squash(<span class="p">w</span>·x + <span class="p">c</span>)</span>
+    <p>Now add a bunch of neurons together. Each one contributes a step somewhere, going up or down, sharp or gentle. Stack enough steps and you can trace out almost any shape. This is a <mark>neural network</mark>, and the fact that enough neurons can approximate <em>any</em> reasonable function is a real theorem, called the <em>universal approximation theorem</em>.</p>
+    <p>Pick a shape, press Train, and watch the network bend itself to the data. It's the same training loop as before: nudge every parameter downhill on the loss. Click the plot to add your own dots.</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <canvas id="nnCanvas" aria-label="Neural network fitting data points; click to add points"></canvas>
+      <div class="controls">
+        <button class="go" id="nnPlay">Train</button>
+        <button id="nnShuffle">Scramble the parameters</button>
+        <span style="display:flex;gap:6px;flex-wrap:wrap" role="group" aria-label="Data shape">
+          <button data-shape="wave">Wave</button><button data-shape="steps">Steps</button><button data-shape="bump">Bump</button><button data-shape="clear">Clear dots</button>
+        </span>
+      </div>
+      <div class="controls">
+        <div class="ctl"><label for="nnH">neurons</label><input id="nnH" type="range" min="1" max="24" value="6"><output id="nnHO"></output></div>
+        <label class="check"><input type="checkbox" id="nnParts"> Show each neuron</label>
+      </div>
+      <div class="readout">
+        <div>parameters<b id="nnP">—</b></div>
+        <div>average miss<b id="nnL">—</b></div>
+        <div>training steps<b id="nnS">0</b></div>
+      </div>
+      <figcaption>Try 1 neuron on the wave: it can only make one step, so it can't bend enough. Then try 12. Tick “Show each neuron” to see the individual steps being added up.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>Real models use many inputs instead of one, and stack neurons in layers, feeding outputs of one layer into the next. But every piece is this: lines, squashed, scaled, added, with every <span class="p">highlighted</span> number learned by nudging downhill on a loss.</p>
+  </div>
+</section>
+
+<section id="text">
+  <div class="wrap">
+    <h2><span class="n">6</span>Text: turning letters into numbers</h2>
+    <p>So far everything has been numbers in, numbers out. How do we get <em>words</em>? Simple: number the letters.</p>
+    <span class="eq">a = 1, b = 2, c = 3, … , z = 26</span>
+    <p>Type anything to see it encoded:</p>
+  </div>
+  <div class="wrap">
+    <figure class="fig">
+      <input type="text" id="encIn" value="hello" maxlength="16" style="width:14ch" aria-label="Word to encode">
+      <div class="chips" id="encChips"></div>
+      <hr style="border:0;border-top:1px solid var(--rule);margin:16px 0">
+      <p class="ptitle">Now run every letter through a line</p>
+      <div class="call" id="encEq"></div>
+      <div class="controls">
+        <div class="ctl"><label for="eM"><span class="p">m</span></label><input id="eM" type="range" min="-3" max="3" step="1" value="3"><output id="eMO"></output></div>
+        <div class="ctl"><label for="eB"><span class="p">b</span></label><input id="eB" type="range" min="-10" max="30" step="1" value="23"><output id="eBO"></output></div>
+      </div>
+      <div class="abc" id="abc"></div>
+      <figcaption>With y = 3x + 23, the letter a (1) becomes 3·1 + 23 = 26, which is z. Red question marks are outputs outside 1 to 26: there's no letter there.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>The same kind of equation from our house example now translates letters into other letters. Not a useful translation yet, but notice nothing about the machinery changed. Numbers in, numbers out, the numbers just stand for letters now.</p>
+    <p class="aside">A caveat worth knowing: letters don't really behave like points on a number line. <em>b</em> isn't “closer” to <em>c</em> than to <em>z</em> in any meaningful way. So real models give every letter its own separate input switch, and output a score for every possible letter rather than a single number. They also usually work in chunks of words called <em>tokens</em> instead of single letters. The principle stays the same.</p>
+  </div>
+</section>
+
+<section id="auto">
+  <div class="wrap">
+    <h2><span class="n">7</span>Autocomplete</h2>
+    <p>Just like <code>y = mx + b</code> can be written as a function, <code>f(x) = mx + b</code>, a function can take several inputs: <code>f(x, y, z, q)</code>. Let's build one with four inputs, a small neural network, and call it <code>our_model</code>. Its job: given the first four letters of a five-letter word, guess the fifth.</p>
+    <p>Before training, its parameters are random, so it's useless. Ask it to finish <code>w a t e _</code> and it might say <em>b</em>. We want <em>water</em>.</p>
+    <p>So we need <mark>training data</mark>: a list of real words. For every word, we feed in the first four letters, check how much probability the model gave the real fifth letter, and turn that into a loss. Then we nudge all the parameters downhill, over and over. Same loop as the house prices, just with {{PARAMS}} parameters instead of two.</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <div class="pair">
+        <div>
+          <p class="ptitle">Training</p>
+          <canvas id="lossCanvas"></canvas>
+          <div class="controls"><button class="go" id="trainChar">Train the model</button></div>
+          <div class="readout">
+            <div>parameters<b id="cmP">—</b></div>
+            <div>passes over the data<b id="cmE">0</b></div>
+            <div>loss<b id="cmL">—</b></div>
+          </div>
+          <details><summary>See the training data</summary><p id="wordList"></p></details>
+        </div>
+        <div>
+          <p class="ptitle">Ask it to finish a word</p>
+          <input type="text" id="acIn" value="wate" maxlength="4" aria-label="Up to four letters">
+          <div class="call" id="acCall"></div>
+          <div class="probs" id="acProbs" aria-live="polite"></div>
+          <p class="note" id="acNote"></p>
+        </div>
+      </div>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>Try <code>wate</code>, <code>hell</code>, <code>pian</code>, <code>zebr</code> before and after training. Notice the model doesn't output one letter; it outputs a score for <em>every</em> letter, and we pick the likeliest. Those percentages will matter in the next step.</p>
+    <p class="aside">Why nudge instead of random guessing here? With two parameters, random guessing found a decent line in 25 tries. With {{PARAMS}} parameters the space of possibilities is so vast that random guessing would never stumble into a good spot, not in the lifetime of the universe. Nudging every parameter downhill at once gets there in seconds.</p>
+  </div>
+</section>
+
+<section id="chat">
+  <div class="wrap">
+    <h2><span class="n">8</span>From autocomplete to conversation</h2>
+    <p>Our model takes four letters and predicts the next one. Now for the one move that turns autocomplete into a generator: <strong>feed the output back in as input.</strong></p>
+    <p>Start with just <code>h</code>. The model predicts the next letter, say <code>e</code>. Now the input is <code>he</code>, and it predicts <code>l</code>. Then <code>hel</code> → <code>l</code>. Then <code>hell</code> → <code>o</code>. Then <code>hello</code> → end of word.</p>
+    <span class="eq">f('h')                → 'e'
+f('h','e')            → 'l'
+f('h','e','l')        → 'l'
+f('h','e','l','l')    → 'o'</span>
+    <p>Our model handles short inputs by padding the missing letters with blanks. Try it with the model you trained above. Each time, instead of always taking the top letter, we roll weighted dice using the model's percentages, so you get different words each run. The <em>temperature</em> slider flattens or sharpens those odds.</p>
+  </div>
+  <div class="wrap">
+    <figure class="fig">
+      <div class="controls" style="margin-top:0">
+        <span style="display:flex;gap:8px;align-items:center"><label for="genIn">Start with</label><input type="text" id="genIn" value="h" maxlength="6"></span>
+        <div class="ctl"><label for="genT">temperature</label><input id="genT" type="range" min="0.05" max="1.6" step="0.05" value="0.6"><output id="genTO"></output></div>
+        <button class="go" id="genBtn">Generate</button>
+      </div>
+      <p class="note warn" id="genWarn"></p>
+      <div class="gen-steps" id="genSteps" aria-live="polite"></div>
+      <div class="gen-word" id="genWord"></div>
+      <div class="history" id="genHist"></div>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>Low temperature sticks to the safest letter and mostly reproduces words it studied. High temperature takes risks and invents new, word-shaped nonsense. That's the same dial chatbots have.</p>
+    <p>Scale this up and you have the core of a chatbot. Instead of a couple hundred words, train on a large fraction of everything humans have written. Instead of four letters of context, give it hundreds of thousands of tokens. Instead of {{PARAMS}} parameters, use billions. Then train it further on examples of helpful conversations, so that the most likely continuation of a question is a good answer.</p>
+    <p>Each word a chatbot writes to you is one of these steps: predict the next token, add it, repeat. <strong>It isn't magic. It's math, done at enormous scale.</strong></p>
+  </div>
+</section>
+
+<section id="ood">
+  <div class="wrap">
+    <h2><span class="n">9</span>Off the map: why models make things up</h2>
+    <p>One last brick, and it's an important one. A trained model is only reliable in the kind of territory where it had training data. Outside that territory it doesn't say “I don't know.” It still produces an answer, because producing an answer is just running the math.</p>
+    <p>Here's a network trained on a wave, but only on the stretch between the dashed walls. Zoom out to see what it predicts beyond them.</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <canvas id="oodCanvas"></canvas>
+      <div class="controls"><button class="go" id="oodZoom">Zoom out</button></div>
+      <figcaption>Dashed curve: the true pattern. Yellow: what the model predicts. Inside the shaded region the two agree. Outside it the model keeps extending whatever its last neurons were doing, confidently and wrongly.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>Our house-price line has the same problem. It happily prices houses it was never shown:</p>
+    <figure class="fig">
+      <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Price a <input type="number" id="oodIn" value="40000" step="500" aria-label="House size in square feet"> sq ft house</span>
+      <div class="readout"><div>the line says<b id="oodOut">—</b></div></div>
+      <p class="note" id="oodNote"></p>
+      <figcaption>Try 0, try 40,000, try −500. The line answers them all with the same confidence.</figcaption>
+    </figure>
+    <p>And so does our letter model. It has never seen a word starting like this:</p>
+    <figure class="fig">
+      <input type="text" id="oodChar" value="zqxj" maxlength="4" aria-label="Four letters of nonsense">
+      <div class="readout"><div>its best guess<b id="oodCharOut">—</b></div><div>how sure it is<b id="oodCharConf">—</b></div></div>
+      <p class="note" id="oodCharNote"></p>
+    </figure>
+    <p>This is the honest root of why chatbots sometimes “hallucinate”: state false things fluently. When you ask about something thin or absent in its training data, the model still predicts the most plausible-<em>looking</em> next token. Plausible-looking and true usually overlap. Off the map, they can quietly part ways. A good habit follows directly: trust these tools more on common, well-documented ground, and check them on the obscure.</p>
+  </div>
+</section>
+
+<section id="recap">
+  <div class="wrap">
+    <h2>What we built</h2>
+    <ol class="stack">
+      <li><span>A <strong>line of best fit</strong> turns an input into a prediction.</span></li>
+      <li><span><strong>Loss</strong> is one number that says how wrong a prediction is.</span></li>
+      <li><span><strong>Training</strong> adjusts the line to make the loss as low as possible.</span></li>
+      <li><span>The adjustable numbers are <strong>parameters</strong>. Model size is counted in them.</span></li>
+      <li><span>A <strong>neural network</strong> is lines, squashed and added, so it can bend to fit anything.</span></li>
+      <li><span>Encode <strong>text as numbers</strong> and the same machinery works on language.</span></li>
+      <li><span><strong>Autocomplete</strong> is a network trained to predict the next letter.</span></li>
+      <li><span>Feed predictions back in and you get <strong>generation</strong>: the core of a chatbot.</span></li>
+      <li><span>Far from their training data, models still answer. That's where they <strong>go wrong</strong>.</span></li>
+    </ol>
+    <p>That's an approximate but valid picture. The real systems add important machinery we skipped: tokens instead of letters, <em>embeddings</em> that give each token a rich numeric fingerprint, an architecture called the <em>transformer</em> that lets the model weigh every earlier word when predicting the next one, and extra training rounds with human feedback to make it helpful and careful. But every one of those pieces is built on the bricks above. Parameters, a loss, and a loop that nudges downhill.</p>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">Everything on this page runs in your browser. The models here are real, just tiny: they train from scratch each time you load it.</div></footer>
+
+<script>
+(() => {
+"use strict";
+/* ---------- utilities ---------- */
+const $ = s => document.querySelector(s);
+const root = document.documentElement;
+const C = n => getComputedStyle(root).getPropertyValue(n).trim();
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r());}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ease=t=>1-Math.pow(1-t,3);
+const money=k=>{const v=Math.round(k*1000);return (v<0?'−$':'$')+Math.abs(v).toLocaleString('en-US');};
+const kfmt=k=>(k<0?'−$':'$')+Math.round(Math.abs(k)).toLocaleString('en-US')+'k';
+function hexRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+
+/* ---------- canvas plumbing ---------- */
+const canvases=[];
+function makeCanvas(el, ratio, draw){
+  const o={el,ratio,draw,ctx:el.getContext('2d'),w:0,h:0};
+  canvases.push(o); sizeCanvas(o); return o;
+}
+function sizeCanvas(o){
+  const dpr=window.devicePixelRatio||1;
+  const w=o.el.clientWidth||300;
+  const r=typeof o.ratio==='function'?o.ratio(w):o.ratio;
+  const h=Math.round(w*r);
+  o.el.style.height=h+'px';
+  o.el.width=Math.round(w*dpr); o.el.height=Math.round(h*dpr);
+  o.ctx.setTransform(dpr,0,0,dpr,0,0);
+  o.w=w; o.h=h; o.draw(o);
+}
+let rsT; window.addEventListener('resize',()=>{clearTimeout(rsT);rsT=setTimeout(()=>canvases.forEach(sizeCanvas),80);});
+const redrawAll=()=>canvases.forEach(o=>o.draw(o));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{landCache=null;redrawAll();});
+
+function frame(o,xr,yr,pad){
+  pad=Object.assign({l:58,r:14,t:12,b:40},pad||{});
+  if(o.w<420){pad.l=Math.min(pad.l,46);}
+  const pw=o.w-pad.l-pad.r, ph=o.h-pad.t-pad.b;
+  return {pad,xr,yr,
+    X:v=>pad.l+(v-xr[0])/(xr[1]-xr[0])*pw,
+    Y:v=>pad.t+ph-(v-yr[0])/(yr[1]-yr[0])*ph,
+    iX:px=>xr[0]+(px-pad.l)/pw*(xr[1]-xr[0]),
+    iY:py=>yr[0]+(pad.t+ph-py)/ph*(yr[1]-yr[0])};
+}
+function axes(o,f,opt){
+  const c=o.ctx; if(!opt.keep)c.clearRect(0,0,o.w,o.h);
+  const {pad}=f, small=o.w<420;
+  c.font=(small?'10px ':'11px ')+C('--mono');
+  c.lineWidth=1;
+  c.strokeStyle=C('--grid'); c.fillStyle=C('--graphite');
+  c.textAlign='center'; c.textBaseline='top';
+  (opt.xt||[]).forEach(v=>{const x=Math.round(f.X(v))+.5;c.beginPath();c.moveTo(x,pad.t);c.lineTo(x,o.h-pad.b);c.stroke();c.fillText((opt.xf||String)(v),x,o.h-pad.b+6);});
+  c.textAlign='right'; c.textBaseline='middle';
+  (opt.yt||[]).forEach(v=>{const y=Math.round(f.Y(v))+.5;c.beginPath();c.moveTo(pad.l,y);c.lineTo(o.w-pad.r,y);c.stroke();c.fillText((opt.yf||String)(v),pad.l-7,y);});
+  c.strokeStyle=C('--ink'); c.lineWidth=1.5;
+  c.beginPath(); c.moveTo(pad.l,pad.t); c.lineTo(pad.l,o.h-pad.b); c.lineTo(o.w-pad.r,o.h-pad.b); c.stroke();
+  c.fillStyle=C('--graphite');
+  if(opt.xl){c.textAlign='right';c.textBaseline='bottom';c.fillText(opt.xl,o.w-pad.r,o.h-2);}
+  if(opt.yl){c.textAlign='left';c.textBaseline='top';c.fillText(opt.yl,pad.l+6,pad.t+2);}
+}
+function clip(o,f){const c=o.ctx;c.save();c.beginPath();c.rect(f.pad.l,f.pad.t,o.w-f.pad.l-f.pad.r,o.h-f.pad.t-f.pad.b);c.clip();}
+function highlighterLine(c,pts,w){
+  c.save(); c.lineCap='round'; c.lineJoin='round';
+  c.strokeStyle=C('--hi'); c.globalAlpha=.9; c.lineWidth=w||7;
+  c.beginPath(); pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.stroke();
+  c.globalAlpha=1; c.strokeStyle=C('--ink'); c.lineWidth=1.25;
+  c.beginPath(); pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.stroke();
+  c.restore();
+}
+function dots(c,f,pts,r){c.fillStyle=C('--ink');pts.forEach(([x,y])=>{c.beginPath();c.arc(f.X(x),f.Y(y),r||3.6,0,7);c.fill();});}
+
+/* ---------- house data ---------- */
+const hr=mulberry32(42), houses=[];
+for(let i=0;i<26;i++){const x=Math.round((800+hr()*2700)/10)*10;const y=Math.max(110,0.19*x+55+gauss(hr)*42);houses.push([x,y]);}
+const HX=[500,3800], HY=[0,900];
+const mae=(m,b)=>houses.reduce((s,[x,y])=>s+Math.abs(y-(m*x+b)),0)/houses.length;
+const tot=(m,b)=>houses.reduce((s,[x,y])=>s+Math.abs(y-(m*x+b)),0);
+// least squares reference
+const ls=(()=>{const n=houses.length;let sx=0,sy=0,sxx=0,sxy=0;houses.forEach(([x,y])=>{sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;});const m=(n*sxy-sx*sy)/(n*sxx-sx*sx);return{m,b:(sy-m*sx)/n};})();
+const minX=Math.min(...houses.map(h=>h[0])), maxX=Math.max(...houses.map(h=>h[0]));
+const houseAxes=(o,f)=>axes(o,f,{xt:[1000,2000,3000],yt:[0,200,400,600,800],xf:v=>v.toLocaleString('en-US'),yf:v=>'$'+v+'k',xl:'house size (sq ft)',yl:'price'});
+function drawHouseLine(o,f,m,b,w){clip(o,f);highlighterLine(o.ctx,[[f.X(HX[0]),f.Y(m*HX[0]+b)],[f.X(HX[1]),f.Y(m*HX[1]+b)]],w);o.ctx.restore();}
+function drawMisses(o,f,m,b){const c=o.ctx;c.save();c.strokeStyle=C('--miss');c.lineWidth=1.6;c.setLineDash([3,2.5]);houses.forEach(([x,y])=>{c.beginPath();c.moveTo(f.X(x),f.Y(y));c.lineTo(f.X(x),clamp(f.Y(m*x+b),f.pad.t,o.h-f.pad.b));c.stroke();});c.restore();}
+const houseRatio=w=>w<520?0.78:0.56;
+
+/* ---------- hero ---------- */
+let heroT=reduceMotion?1:0;
+const heroStart={m:0,b:HY[1]*0.55};
+const hero=makeCanvas($('#hero'),w=>w<520?0.7:0.34,o=>{
+  const f=frame(o,HX,HY,{l:8,r:8,t:10,b:8});
+  const c=o.ctx; c.clearRect(0,0,o.w,o.h);
+  const t=ease(heroT), m=heroStart.m+(ls.m-heroStart.m)*t, b=heroStart.b+(ls.b-heroStart.b)*t;
+  c.save(); c.globalAlpha=.55*(1-t)+.15; drawMisses(o,f,m,b); c.restore();
+  drawHouseLine(o,f,m,b,10);
+  dots(c,f,houses,4.5);
+  $('#heroMiss').textContent=kfmt(mae(m,b));
+});
+if(!reduceMotion){
+  const t0=performance.now()+500, dur=2600;
+  const tick=now=>{heroT=clamp((now-t0)/dur,0,1);hero.draw(hero);if(heroT<1)requestAnimationFrame(tick);};
+  requestAnimationFrame(tick);
+}
+
+/* ---------- 1: fit ---------- */
+const mS=$('#mS'), bS=$('#bS'), missT=$('#missT'), predIn=$('#predIn');
+const fitC=makeCanvas($('#fitCanvas'),houseRatio,o=>{
+  const f=frame(o,HX,HY), m=+mS.value/1000, b=+bS.value, c=o.ctx;
+  houseAxes(o,f);
+  if(missT.checked) drawMisses(o,f,m,b);
+  drawHouseLine(o,f,m,b);
+  dots(c,f,houses);
+  const px=+predIn.value;
+  if(isFinite(px)&&px>=HX[0]&&px<=HX[1]){
+    const py=m*px+b; c.save(); c.strokeStyle=C('--graphite'); c.setLineDash([4,4]); c.lineWidth=1;
+    c.beginPath(); c.moveTo(f.X(px),o.h-f.pad.b); c.lineTo(f.X(px),clamp(f.Y(py),f.pad.t,o.h-f.pad.b)); c.lineTo(f.pad.l,clamp(f.Y(py),f.pad.t,o.h-f.pad.b)); c.stroke(); c.restore();
+    c.fillStyle=C('--miss'); c.beginPath(); c.arc(f.X(px),f.Y(py),6,0,7); c.fill();
+  }
+  if(missT.checked){c.fillStyle=C('--miss');c.font='12px '+C('--mono');c.textAlign='right';c.textBaseline='top';c.fillText('average miss '+kfmt(mae(m,b)),o.w-f.pad.r-4,f.pad.t+4);}
+});
+function updFit(){
+  $('#mO').textContent='$'+mS.value+'/ft²'; $('#bO').textContent=kfmt(+bS.value);
+  $('#fitEq').textContent=`y = ${(+mS.value/1000).toFixed(3)}x ${+bS.value<0?'−':'+'} ${Math.abs(+bS.value)}`;
+  const px=+predIn.value; $('#fitPred').textContent=isFinite(px)?money(+mS.value/1000*px+ +bS.value):'—';
+  fitC.draw(fitC);
+}
+[mS,bS,missT,predIn].forEach(e=>e.addEventListener('input',updFit)); updFit();
+
+/* ---------- 2: loss ---------- */
+const BAD={m:0.04,b:430};
+function lossPanel(el,L,tId,aId,cls){
+  makeCanvas(el,w=>w<520?0.78:0.7,o=>{const f=frame(o,HX,HY,{l:48});houseAxes(o,f);drawMisses(o,f,L.m,L.b);drawHouseLine(o,f,L.m,L.b);dots(o.ctx,f,houses,3.2);});
+  $(tId).textContent=kfmt(tot(L.m,L.b)); $(aId).textContent=kfmt(mae(L.m,L.b));
+}
+lossPanel($('#badCanvas'),BAD,'#badTot','#badAvg');
+lossPanel($('#goodCanvas'),ls,'#goodTot','#goodAvg');
+
+/* ---------- 3: training ---------- */
+const MR=[0,0.4], BR=[-200,500];
+let tries=[], best=null, path=[], busy=false, landCache=null;
+const trR=mulberry32(99);
+const landGrid=(()=>{const W=100,H=70,g=new Float32Array(W*H);let lo=Infinity,hi=-Infinity;
+  for(let j=0;j<H;j++)for(let i=0;i<W;i++){const m=MR[0]+(i+.5)/W*(MR[1]-MR[0]);const b=BR[1]-(j+.5)/H*(BR[1]-BR[0]);const v=Math.log(mae(m,b));g[j*W+i]=v;lo=Math.min(lo,v);hi=Math.max(hi,v);}
+  return{W,H,g,lo,hi};})();
+function landImage(){
+  if(landCache)return landCache;
+  const {W,H,g,lo,hi}=landGrid, cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const cx=cv.getContext('2d'), img=cx.createImageData(W,H);
+  const A=hexRgb(C('--hi')), B=hexRgb(C('--panel')), D=hexRgb(C('--rule'));
+  for(let k=0;k<W*H;k++){let t=(g[k]-lo)/(hi-lo);t=Math.floor(Math.pow(t,.7)*11)/11;
+    let col; if(t<.5){const u=t/.5;col=A.map((a,i)=>a+(B[i]-a)*u);}else{const u=(t-.5)/.5;col=B.map((a,i)=>a+(D[i]-a)*u);}
+    img.data.set([col[0],col[1],col[2],255],k*4);}
+  cx.putImageData(img,0,0); landCache=cv; return cv;
+}
+const trainC=makeCanvas($('#trainCanvas'),w=>w<520?0.78:0.72,o=>{
+  const f=frame(o,HX,HY,{l:48}),c=o.ctx; houseAxes(o,f);
+  clip(o,f); c.strokeStyle=C('--faint'); c.lineWidth=1; c.globalAlpha=.55;
+  tries.slice(-25).forEach(t=>{c.beginPath();c.moveTo(f.X(HX[0]),f.Y(t.m*HX[0]+t.b));c.lineTo(f.X(HX[1]),f.Y(t.m*HX[1]+t.b));c.stroke();});
+  c.restore(); c.globalAlpha=1;
+  if(best) drawHouseLine(o,f,best.m,best.b);
+  dots(c,f,houses,3.2);
+});
+const landC=makeCanvas($('#landCanvas'),w=>w<520?0.78:0.72,o=>{
+  const f=frame(o,[MR[0]*1000,MR[1]*1000],BR,{l:48}),c=o.ctx;
+  c.clearRect(0,0,o.w,o.h);
+  c.imageSmoothingEnabled=true;
+  c.drawImage(landImage(),f.pad.l,f.pad.t,o.w-f.pad.l-f.pad.r,o.h-f.pad.t-f.pad.b);
+  // axes on top
+  axes(o,f,{keep:true,xt:[100,200,300],yt:[-200,0,200,400],xf:v=>'$'+v,yf:v=>kfmt(v),xl:'slope m ($ per ft²)',yl:'intercept b'});
+  clip(o,f);
+  tries.forEach(t=>{const x=f.X(t.m*1000),y=f.Y(t.b);
+    if(t.kind==='nudge')return;
+    if(t.kept){c.fillStyle=C('--ink');c.beginPath();c.arc(x,y,3.5,0,7);c.fill();}
+    else{c.strokeStyle=C('--miss');c.lineWidth=1.4;c.beginPath();c.moveTo(x-3,y-3);c.lineTo(x+3,y+3);c.moveTo(x+3,y-3);c.lineTo(x-3,y+3);c.stroke();}});
+  if(path.length>1){c.strokeStyle=C('--ink');c.lineWidth=2;c.beginPath();path.forEach((p,i)=>{const x=f.X(p.m*1000),y=f.Y(p.b);i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();
+    c.fillStyle=C('--ink');path.forEach(p=>{c.beginPath();c.arc(f.X(p.m*1000),f.Y(p.b),2,0,7);c.fill();});}
+  if(best){const x=f.X(best.m*1000),y=f.Y(best.b);c.lineWidth=3;c.strokeStyle='#14223D';c.fillStyle=C('--hi');c.beginPath();c.arc(x,y,7,0,7);c.fill();c.stroke();}
+  c.restore();
+});
+function trainLog(lines){$('#trLog').innerHTML=lines.slice(-6).join('\n');}
+let logLines=[];
+function updTrain(){
+  $('#trTries').textContent=tries.length;
+  $('#trBest').textContent=best?kfmt(best.loss):'—';
+  $('#trEq').textContent=best?`y = ${best.m.toFixed(3)}x ${best.b<0?'−':'+'} ${Math.abs(best.b).toFixed(0)}`:'—';
+  trainC.draw(trainC); landC.draw(landC);
+}
+function setBusy(v){busy=v;['#randBtn','#nudgeBtn','#resetTrain'].forEach(s=>$(s).disabled=v);}
+async function runSteps(n,fn){setBusy(true);for(let i=0;i<n;i++){fn(i);updTrain();if(!reduceMotion)await new Promise(r=>setTimeout(r,90));}setBusy(false);updTrain();}
+$('#randBtn').onclick=()=>runSteps(25,()=>{
+  const m=MR[0]+trR()*(MR[1]-MR[0]), b=BR[0]+trR()*(BR[1]-BR[0]), loss=mae(m,b);
+  const kept=!best||loss<best.loss; const t={m,b,loss,kept,kind:'rand'}; tries.push(t); if(kept){best={m,b,loss};path=[];}
+  logLines.push(`try ${String(tries.length).padStart(3)}:  m=${m.toFixed(3)}  b=${b.toFixed(0).padStart(4)}  avg miss ${kfmt(loss).padStart(7)}  `+(kept?'<span class="k">best so far, keep</span>':'<span class="t">worse, throw out</span>'));
+  trainLog(logLines);
+});
+let steps={m:0.03,b:60};
+$('#nudgeBtn').onclick=()=>{
+  if(!best){const m=0.35,b=-150;best={m,b,loss:mae(m,b)};tries.push({m,b,loss:best.loss,kept:true,kind:'rand'});logLines.push('start from a guess: m=0.350  b=-150');}
+  if(!path.length){path=[{m:best.m,b:best.b}];steps={m:0.03,b:60};}
+  runSteps(25,()=>{
+    const cands=[[steps.m,0],[-steps.m,0],[0,steps.b],[0,-steps.b],[steps.m,-steps.b],[-steps.m,steps.b]].map(([dm,db])=>{const m=clamp(best.m+dm,MR[0],MR[1]),b=clamp(best.b+db,BR[0],BR[1]);return{m,b,loss:mae(m,b)};});
+    cands.sort((a,z)=>a.loss-z.loss); const c=cands[0];
+    tries.push({...c,kept:c.loss<best.loss,kind:'nudge'});
+    if(c.loss<best.loss){best=c;path.push({m:c.m,b:c.b});logLines.push(`nudge:     m=${c.m.toFixed(3)}  b=${c.b.toFixed(0).padStart(4)}  avg miss ${kfmt(c.loss).padStart(7)}  <span class="k">downhill, keep</span>`);}
+    else{steps.m/=2;steps.b/=2;logLines.push(`nudge:     no nudge helps. <span class="t">take smaller steps</span>`);}
+    trainLog(logLines);
+  });
+};
+$('#resetTrain').onclick=()=>{tries=[];best=null;path=[];logLines=[];trainLog([]);updTrain();};
+updTrain();
+
+/* ---------- 5: neural network 1D ---------- */
+class Net1D{
+  constructor(H,seed){this.H=H;const r=mulberry32(seed);
+    this.w=Float64Array.from({length:H},()=>(r()*2-1)*5);
+    this.c=Float64Array.from({length:H},()=>(r()*2-1)*3);
+    this.v=Float64Array.from({length:H},()=>(r()*2-1)*.6);
+    this.d=0; const P=3*H+1; this.m1=new Float64Array(P); this.m2=new Float64Array(P); this.t=0; this.g=new Float64Array(P); this.tt=new Float64Array(H);}
+  f(x){let y=this.d;for(let j=0;j<this.H;j++)y+=this.v[j]*Math.tanh(this.w[j]*x+this.c[j]);return y;}
+  part(j,x){return this.v[j]*Math.tanh(this.w[j]*x+this.c[j]);}
+  step(pts,lr){const H=this.H,N=pts.length,g=this.g,t=this.tt;if(!N)return 0;g.fill(0);let L=0;
+    for(const [x,y] of pts){let yp=this.d;for(let j=0;j<H;j++){t[j]=Math.tanh(this.w[j]*x+this.c[j]);yp+=this.v[j]*t[j];}
+      const e=yp-y;L+=e*e;const ge=2*e/N;
+      for(let j=0;j<H;j++){g[j]+=ge*t[j];const a=ge*this.v[j]*(1-t[j]*t[j]);g[H+j]+=a*x;g[2*H+j]+=a;}g[3*H]+=ge;}
+    this.t++;const b1=.9,b2=.999,c1=1-Math.pow(b1,this.t),c2=1-Math.pow(b2,this.t);
+    for(let i=0;i<3*H+1;i++){this.m1[i]=b1*this.m1[i]+(1-b1)*g[i];this.m2[i]=b2*this.m2[i]+(1-b2)*g[i]*g[i];
+      const u=lr*(this.m1[i]/c1)/(Math.sqrt(this.m2[i]/c2)+1e-8);
+      if(i<H)this.v[i]-=u;else if(i<2*H)this.w[i-H]-=u;else if(i<3*H)this.c[i-2*H]-=u;else this.d-=u;}
+    return L/N;}
+  mae(pts){return pts.length?pts.reduce((s,[x,y])=>s+Math.abs(this.f(x)-y),0)/pts.length:0;}
+}
+const SHAPES={
+  wave:x=>0.8*Math.sin(3.4*x)+0.25*x,
+  steps:x=>x<-0.35?-0.7:(x<0.35?0.5:-0.2),
+  bump:x=>1.5*Math.exp(-14*x*x)-0.55,
+};
+function makePts(fn,n,seed){const r=mulberry32(seed),p=[];for(let i=0;i<n;i++){const x=-1+2*(i+r()*.8)/n;p.push([x,fn(x)+gauss(r)*0.05]);}return p;}
+let nnPts=makePts(SHAPES.wave,34,5), nnSeed=11, nn=new Net1D(6,nnSeed), nnRun=false, nnSteps=0;
+const nnH=$('#nnH'), NX=[-1.15,1.15], NY=[-1.7,1.7];
+const nnC=makeCanvas($('#nnCanvas'),w=>w<520?0.8:0.45,o=>{
+  const f=frame(o,NX,NY,{l:40}),c=o.ctx;
+  axes(o,f,{xt:[-1,-.5,0,.5,1],yt:[-1,0,1],xl:'input x',yl:'output y'});
+  clip(o,f);
+  const N=Math.max(80,Math.round(o.w/3));
+  if($('#nnParts').checked){c.strokeStyle=C('--graphite');c.globalAlpha=.55;c.lineWidth=1;
+    for(let j=0;j<nn.H;j++){c.beginPath();for(let i=0;i<=N;i++){const x=NX[0]+(NX[1]-NX[0])*i/N,y=f.Y(nn.part(j,x));i?c.lineTo(f.X(x),y):c.moveTo(f.X(x),y);}c.stroke();}
+    c.globalAlpha=1;}
+  const pts=[];for(let i=0;i<=N;i++){const x=NX[0]+(NX[1]-NX[0])*i/N;pts.push([f.X(x),f.Y(nn.f(x))]);}
+  highlighterLine(c,pts);
+  c.restore();
+  dots(c,f,nnPts,4);
+});
+function updNN(){$('#nnHO').textContent=nnH.value;$('#nnP').textContent=(3*nn.H+1).toLocaleString('en-US');$('#nnL').textContent=nnPts.length?nn.mae(nnPts).toFixed(3):'—';$('#nnS').textContent=nnSteps.toLocaleString('en-US');nnC.draw(nnC);}
+function nnLoop(){if(!nnRun)return;for(let i=0;i<25;i++)nn.step(nnPts,0.03);nnSteps+=25;updNN();requestAnimationFrame(nnLoop);}
+$('#nnPlay').onclick=()=>{nnRun=!nnRun;$('#nnPlay').textContent=nnRun?'Pause':'Train';if(nnRun)requestAnimationFrame(nnLoop);};
+const resetNN=()=>{nn=new Net1D(+nnH.value,++nnSeed);nnSteps=0;updNN();};
+$('#nnShuffle').onclick=resetNN;
+nnH.addEventListener('input',resetNN);
+$('#nnParts').addEventListener('input',updNN);
+document.querySelectorAll('[data-shape]').forEach(bt=>bt.onclick=()=>{const s=bt.dataset.shape;nnPts=s==='clear'?[]:makePts(SHAPES[s],34,nnSeed);nnSteps=0;updNN();});
+$('#nnCanvas').addEventListener('click',e=>{const r=e.currentTarget.getBoundingClientRect();const f=frame(nnC,NX,NY,{l:40});const x=f.iX(e.clientX-r.left),y=f.iY(e.clientY-r.top);if(x<NX[0]||x>NX[1]||y<NY[0]||y>NY[1])return;nnPts.push([x,y]);updNN();});
+updNN();
+
+/* ---------- 6: encoding ---------- */
+const ABC='abcdefghijklmnopqrstuvwxyz';
+function updEnc(){
+  const s=$('#encIn').value.toLowerCase();
+  $('#encChips').innerHTML=[...s].map(ch=>{const i=ABC.indexOf(ch);return `<span class="chip">${ch===' '?'␣':ch.replace(/[<>&]/g,'')}<small>${i<0?'–':i+1}</small></span>`;}).join('');
+}
+function updLetterLine(){
+  const m=+$('#eM').value,b=+$('#eB').value;
+  $('#eMO').textContent=m;$('#eBO').textContent=b;
+  $('#encEq').innerHTML=`letter_out = <span class="p">${m}</span> × letter_in ${b<0?'−':'+'} <span class="p">${Math.abs(b)}</span>`;
+  $('#abc').innerHTML=[...ABC].map((ch,i)=>{const y=m*(i+1)+b;const ok=y>=1&&y<=26;return `<div>${ch}<br><span class="o${ok?'':' x'}">${ok?ABC[y-1]:'?'}</span></div>`;}).join('');
+}
+$('#encIn').addEventListener('input',updEnc);['#eM','#eB'].forEach(s=>$(s).addEventListener('input',updLetterLine));
+updEnc();updLetterLine();
+
+/* ---------- 7: character model ---------- */
+const WORDS=('water hello truck happy quick swell apple bread chair dance eagle faith ghost heart horse house juice knife laugh lemon light magic money mouse music night ocean paint party piano pizza plant queen radio river robot salad sheep shirt smile snake sound space spoon storm sugar table tiger toast tooth train watch whale wheel world write young zebra beach black brain brown candy chalk clock cloud coast crown dream drink earth field flame floor fruit glass grape green grass heavy honey hotel image jelly lucky lunch metal mango movie nurse olive onion peace pearl phone plate power press quiet quilt raven ready round royal scale shade shape sharp sheet shelf shine skate skill sleep slice smoke snack solar spice spine stack stamp stone sweet swing teeth thumb tower trail truth uncle under urban value video vivid voice wagon waste wheat where while white woman worry yacht yield youth zesty blend brick flock frost globe grind hatch jolly latch notch pouch ridge scarf thorn vapor wrist bench blush cabin camel cliff coral crane daisy dough dozen elbow fairy fence flute giant habit ivory jewel kayak koala lodge maple medal noble orbit otter pasta pedal polar prism puppy rhyme saint sauce scout seven shark siren sloth squid stove tulip ultra vault')
+  .split(' ');
+const VOC='.'+ABC, V=27, CTX=4, HID=64;
+class CharModel{
+  constructor(seed){const r=mulberry32(seed);
+    this.W1=new Float32Array(CTX*V*HID).map(()=>(r()*2-1)*.6);this.b1=new Float32Array(HID);
+    this.W2=new Float32Array(HID*V).map(()=>(r()*2-1)*.3);this.b2=new Float32Array(V);
+    this.h=new Float32Array(HID);this.p=new Float32Array(V);this.dl=new Float32Array(V);this.dh=new Float32Array(HID);}
+  get nParams(){return this.W1.length+this.b1.length+this.W2.length+this.b2.length;}
+  forward(ctx,temp){const{W1,b1,W2,b2,h,p}=this;temp=temp||1;
+    for(let j=0;j<HID;j++){let s=b1[j];for(let k=0;k<CTX;k++)s+=W1[(k*V+ctx[k])*HID+j];h[j]=Math.tanh(s);}
+    let mx=-Infinity;for(let o=0;o<V;o++){let s=b2[o];for(let j=0;j<HID;j++)s+=h[j]*W2[j*V+o];p[o]=s/temp;if(p[o]>mx)mx=p[o];}
+    let z=0;for(let o=0;o<V;o++){p[o]=Math.exp(p[o]-mx);z+=p[o];}for(let o=0;o<V;o++)p[o]/=z;return p;}
+  step(ctx,t,lr){const p=this.forward(ctx),loss=-Math.log(p[t]+1e-9),{W1,b1,W2,b2,h,dl,dh}=this;
+    for(let o=0;o<V;o++)dl[o]=p[o];dl[t]-=1;
+    for(let j=0;j<HID;j++){let s=0;const hj=h[j],base=j*V;for(let o=0;o<V;o++){s+=W2[base+o]*dl[o];W2[base+o]-=lr*hj*dl[o];}dh[j]=s*(1-hj*hj);}
+    for(let o=0;o<V;o++)b2[o]-=lr*dl[o];
+    for(let j=0;j<HID;j++)b1[j]-=lr*dh[j];
+    for(let k=0;k<CTX;k++){const base=(k*V+ctx[k])*HID;for(let j=0;j<HID;j++)W1[base+j]-=lr*dh[j];}
+    return loss;}
+}
+const toCtx=s=>{s=('....'+s).slice(-4);return[...s].map(ch=>Math.max(0,VOC.indexOf(ch)));};
+const EXAMPLES=[];WORDS.forEach(w=>{const s='....'+w+'.';for(let i=4;i<s.length;i++)EXAMPLES.push([toCtx(s.slice(i-4,i)),VOC.indexOf(s[i])]);});
+let cm=new CharModel(3), cmEpoch=0, cmLosses=[], cmTraining=false, cmTrained=false;
+const EPOCHS=70;
+const PARAMS=cm.nParams.toLocaleString('en-US');
+document.querySelectorAll('p,.aside').forEach(el=>{if(el.innerHTML.includes('{{PARAMS}}'))el.innerHTML=el.innerHTML.replaceAll('{{PARAMS}}',PARAMS);});
+$('#cmP').textContent=PARAMS;
+$('#wordList').textContent=WORDS.length+' words: '+WORDS.join(', ');
+const lossC=makeCanvas($('#lossCanvas'),.55,o=>{
+  const f=frame(o,[0,EPOCHS],[0,3.5],{l:36,b:34}),c=o.ctx;
+  axes(o,f,{xt:[0,20,40,60],yt:[0,1,2,3],xl:'passes over the data',yl:'loss'});
+  if(cmLosses.length){const pts=cmLosses.map((l,i)=>[f.X(i+1),f.Y(l)]);pts.unshift([f.X(0),f.Y(Math.log(27))]);highlighterLine(c,pts,5);}
+  else{c.fillStyle=C('--graphite');c.font='13px '+C('--serif');c.textAlign='center';c.textBaseline='middle';c.fillText('Not trained yet',(f.pad.l+o.w-f.pad.r)/2,(f.pad.t+o.h-f.pad.b)/2);}
+});
+const shR=mulberry32(77);
+function cmEpochRun(){
+  for(let i=EXAMPLES.length-1;i>0;i--){const j=Math.floor(shR()*(i+1));[EXAMPLES[i],EXAMPLES[j]]=[EXAMPLES[j],EXAMPLES[i]];}
+  const lr=0.1*(1-cmEpoch/EPOCHS)+0.015;let L=0;
+  for(const [ctx,t] of EXAMPLES)L+=cm.step(ctx,t,lr);
+  cmEpoch++;cmLosses.push(L/EXAMPLES.length);
+}
+function updCM(){$('#cmE').textContent=cmEpoch;$('#cmL').textContent=cmLosses.length?cmLosses[cmLosses.length-1].toFixed(2):'—';lossC.draw(lossC);updAC();updOODChar();updGenWarn();}
+function trainChar(){
+  if(cmTraining)return; cmTraining=true;
+  cm=new CharModel(3+Math.floor(Math.random()*1000));cmEpoch=0;cmLosses=[];cmTrained=false;
+  $('#trainChar').disabled=true;$('#trainChar').textContent='Training…';
+  const loop=()=>{const per=reduceMotion?EPOCHS:2;for(let i=0;i<per&&cmEpoch<EPOCHS;i++)cmEpochRun();updCM();
+    if(cmEpoch<EPOCHS)requestAnimationFrame(loop);else{cmTraining=false;cmTrained=true;$('#trainChar').disabled=false;$('#trainChar').textContent='Retrain from scratch';updCM();}};
+  requestAnimationFrame(loop);
+}
+$('#trainChar').onclick=trainChar;
+const clean=s=>s.toLowerCase().replace(/[^a-z]/g,'');
+function updAC(){
+  const inp=$('#acIn'), s=clean(inp.value);
+  const shown=('____'+s).slice(-4);
+  $('#acCall').innerHTML=`our_model(${[...shown].map(ch=>ch==='_'?'blank':`'${ch}'`).join(', ')}) →`;
+  const p=Array.from(cm.forward(toCtx(s)));
+  const rank=p.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]).slice(0,8);
+  $('#acProbs').innerHTML=rank.map(([v,i],r)=>`<div style="display:contents"><span class="l">${i===0?'end':VOC[i]}</span><span class="pb${r===0?' top':''}"><span style="width:${(v*100).toFixed(1)}%"></span></span><span>${(v*100).toFixed(1)}%</span></div>`).join('');
+  const topL=rank[0][1];
+  $('#acNote').innerHTML=cmTrained?(topL?`Best guess: <strong>${s}${VOC[topL]}</strong>`:`Best guess: the word is already finished.`):(cmTraining?'Training in progress. Watch the odds shift.':'Untrained: these odds come from random parameters. Press “Train the model”.');
+}
+$('#acIn').addEventListener('input',updAC);
+
+/* ---------- 8: generation ---------- */
+const genR=mulberry32(2024); let genBusy=false;
+const genT=$('#genT');
+function updGenWarn(){$('#genWarn').textContent=cmTrained?'':(cmTraining?'Still training above. Generating now uses a half-trained model.':'The model above is untrained, so expect gibberish. Train it first, or generate anyway to see what random parameters produce.');}
+function sample(p){let r=genR(),acc=0;for(let i=0;i<p.length;i++){acc+=p[i];if(r<=acc)return i;}return p.length-1;}
+genT.addEventListener('input',()=>$('#genTO').textContent=(+genT.value).toFixed(2));$('#genTO').textContent=(+genT.value).toFixed(2);
+$('#genBtn').onclick=async()=>{
+  if(genBusy)return;genBusy=true;$('#genBtn').disabled=true;
+  let s=clean($('#genIn').value);const lines=[];const steps=$('#genSteps');
+  $('#genWord').textContent=s;steps.innerHTML='';
+  for(let n=0;n<12;n++){
+    const p=cm.forward(toCtx(s),+genT.value);const i=sample(p);
+    const args=(s.length?[...s.slice(-4)].map(c=>`'${c}'`).join(','):'blank');
+    const pad=`f(${args})`.padEnd(19);
+    if(i===0){lines.push(`${pad}→ <span class="new">end</span>  (${(p[i]*100).toFixed(0)}%)`);steps.innerHTML=lines.join('\n');break;}
+    s+=VOC[i];lines.push(`${pad}→ <span class="new">${VOC[i]}</span>  (${(p[i]*100).toFixed(0)}%)`);
+    steps.innerHTML=lines.join('\n');$('#genWord').textContent=s;
+    if(!reduceMotion)await new Promise(r=>setTimeout(r,260));
+  }
+  const tag=document.createElement('span');tag.textContent=s+(WORDS.includes(s)?'':' (new)');$('#genHist').prepend(tag);
+  while($('#genHist').children.length>16)$('#genHist').lastChild.remove();
+  genBusy=false;$('#genBtn').disabled=false;
+};
+
+/* ---------- 9: out of distribution ---------- */
+const oodPts=makePts(SHAPES.wave,30,8);
+const oodNet=new Net1D(10,4);for(let i=0;i<4000;i++)oodNet.step(oodPts,0.03);
+let oodZoom=0,oodTarget=0;
+const oodC=makeCanvas($('#oodCanvas'),w=>w<520?0.8:0.42,o=>{
+  const z=ease(oodZoom), xr=[-1.2-2.3*z,1.2+2.3*z], yr=[-1.8-1.2*z,1.8+1.2*z];
+  const f=frame(o,xr,yr,{l:40}),c=o.ctx;
+  const xt=z>.5?[-3,-2,-1,0,1,2,3]:[-1,-.5,0,.5,1];
+  axes(o,f,{xt,yt:z>.5?[-2,0,2]:[-1,0,1],xl:'input x',yl:'output y'});
+  clip(o,f);
+  c.fillStyle=C('--grid');c.fillRect(f.X(-1),f.pad.t,f.X(1)-f.X(-1),o.h-f.pad.t-f.pad.b);
+  c.strokeStyle=C('--graphite');c.setLineDash([2,4]);c.lineWidth=1.2;[-1,1].forEach(v=>{c.beginPath();c.moveTo(f.X(v),f.pad.t);c.lineTo(f.X(v),o.h-f.pad.b);c.stroke();});
+  const N=Math.round(o.w/2.5);
+  c.setLineDash([6,5]);c.strokeStyle=C('--graphite');c.lineWidth=1.6;c.beginPath();
+  for(let i=0;i<=N;i++){const x=xr[0]+(xr[1]-xr[0])*i/N;const y=f.Y(SHAPES.wave(x));i?c.lineTo(f.X(x),y):c.moveTo(f.X(x),y);}c.stroke();c.setLineDash([]);
+  const pts=[];for(let i=0;i<=N;i++){const x=xr[0]+(xr[1]-xr[0])*i/N;pts.push([f.X(x),f.Y(oodNet.f(x))]);}
+  highlighterLine(c,pts);
+  c.fillStyle=C('--graphite');c.font='12px '+C('--serif');c.textAlign='center';c.textBaseline='top';
+  c.fillText('training data',f.X(0),f.pad.t+4);
+  c.restore(); dots(c,f,oodPts,3.4);
+});
+$('#oodZoom').onclick=()=>{
+  oodTarget=oodTarget?0:1;$('#oodZoom').textContent=oodTarget?'Zoom back in':'Zoom out';
+  if(reduceMotion){oodZoom=oodTarget;oodC.draw(oodC);return;}
+  const from=oodZoom,t0=performance.now();
+  const tick=now=>{const k=clamp((now-t0)/700,0,1);oodZoom=from+(oodTarget-from)*k;oodC.draw(oodC);if(k<1)requestAnimationFrame(tick);};requestAnimationFrame(tick);
+};
+function updOODHouse(){
+  const v=+$('#oodIn').value;if(!isFinite(v)||$('#oodIn').value===''){$('#oodOut').textContent='—';$('#oodNote').textContent='';return;}
+  const p=ls.m*v+ls.b;$('#oodOut').textContent=money(p);
+  const out=v<minX||v>maxX;
+  $('#oodNote').className='note'+(out?' warn':'');
+  $('#oodNote').textContent=out?`Every house in the training data was between ${minX.toLocaleString('en-US')} and ${maxX.toLocaleString('en-US')} sq ft. The line still gave an answer, because it always will, but nothing in its training checked this one.`+(v<=0?' A house with no floor space, or less than none, still gets a price.':''):`That's inside the range the line was trained on (${minX.toLocaleString('en-US')} to ${maxX.toLocaleString('en-US')} sq ft), so this is a reasonable estimate.`;
+}
+$('#oodIn').addEventListener('input',updOODHouse);updOODHouse();
+function updOODChar(){
+  const s=clean($('#oodChar').value);const p=Array.from(cm.forward(toCtx(s)));let bi=0;p.forEach((v,i)=>{if(v>p[bi])bi=i;});
+  $('#oodCharOut').textContent=s+(bi?VOC[bi]:' (end)');$('#oodCharConf').textContent=(p[bi]*100).toFixed(0)+'%';
+  $('#oodCharNote').textContent=cmTrained?'None of its 200-odd training words look anything like this, yet it still produces an answer. Sometimes it even sounds sure.':'Train the letter model in section 7 first to see this properly.';
+}
+$('#oodChar').addEventListener('input',updOODChar);
+
+/* ---------- 4: parameter bars ---------- */
+const BARS=[['Our house line',2],['Size + lot size',3],['Wave network (6 neurons)',19],['Our letter model',cm.nParams],['GPT-2 (2019)',1.5e9],['GPT-3 (2020)',1.75e11]];
+const fmtN=n=>n>=1e9?(n/1e9).toLocaleString('en-US',{maximumFractionDigits:1})+' billion':n.toLocaleString('en-US');
+const barsEl=$('#bars');const maxLog=Math.log10(2e11);
+barsEl.innerHTML=BARS.map(([l,n])=>`<span>${l}</span><div><div class="bar" data-w="${(Math.max(.02,Math.log10(n)/maxLog)*100).toFixed(1)}" style="width:0"></div></div><span class="num">${fmtN(n)}</span>`).join('');
+const growBars=()=>barsEl.querySelectorAll('.bar').forEach(b=>b.style.width=b.dataset.w+'%');
+if('IntersectionObserver' in window&&!reduceMotion){const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){growBars();io.disconnect();}},{threshold:.4});io.observe(barsEl);}else growBars();
+
+updCM();
+})();
+</script>
+</body>
+</html>
