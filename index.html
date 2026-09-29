@@ -327,9 +327,8 @@
   }
 
   .sizes button:nth-child(1) i { width: 5px;  height: 5px; }
-  .sizes button:nth-child(2) i { width: 7px;  height: 7px; }
-  .sizes button:nth-child(3) i { width: 9px;  height: 9px; }
-  .sizes button:nth-child(4) i { width: 11px; height: 11px; }
+  .sizes button:nth-child(2) i { width: 8px;  height: 8px; }
+  .sizes button:nth-child(3) i { width: 11px; height: 11px; }
 
   .tile:hover .sizes i { border-color: var(--icon); }
   .sizes [aria-pressed="true"] i,
@@ -353,7 +352,6 @@
   .board--hint .sizes i { animation: size-hint 6s cubic-bezier(.4, 0, .2, 1) infinite; }
   .board--hint .sizes button:nth-child(2) i { animation-delay: 0.12s; }
   .board--hint .sizes button:nth-child(3) i { animation-delay: 0.24s; }
-  .board--hint .sizes button:nth-child(4) i { animation-delay: 0.36s; }
 
   @keyframes size-hint {
     0%, 70%, 100% { border-color: var(--faint); }
@@ -395,7 +393,7 @@
 
   .tile--flush .tile__body { padding: 0; overflow: hidden; }
 
-  /* Tiny, a tile is a label and nothing else: the body shows its .mini glyph
+  /* At 1×1, a tile is a label and nothing else: the body shows its .mini glyph
      in place of what is in it, and the bar keeps only the picker and a name. */
   .mini { display: none; }
 
@@ -532,7 +530,7 @@
     font-style: normal;
   }
 
-  /* ---------- the part you only get at medium and up ---------- */
+  /* ---------- the part you only get at 4×4 ---------- */
 
   .more {
     display: none;
@@ -618,7 +616,7 @@
   }
 
   /* exposition: every post named while the tile is small, and each a row with
-     its date and a line about it once it is medium or larger — the tile
+     its date and a line about it once it is 4×4 — the tile
      scrolls if they outgrow it */
 
   .tile--ex .tile__body {
@@ -899,7 +897,7 @@
 
   <article class="tile tile--id" data-id="id">
     <header class="tile__bar" tabindex="0" aria-label="bigmah tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
-      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="Tiny" title="Tiny"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="Small" title="Small"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="Medium" title="Medium"><i></i></button><button type="button" data-size="3" aria-pressed="false" aria-label="Large" title="Large"><i></i></button></span>
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
       <span class="tile__title">bigmah</span>
     </header>
     <div class="tile__body">
@@ -940,7 +938,7 @@
 
   <article class="tile tile--ex" data-id="ex">
     <header class="tile__bar" tabindex="0" aria-label="exposition tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
-      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="Tiny" title="Tiny"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="Small" title="Small"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="Medium" title="Medium"><i></i></button><button type="button" data-size="3" aria-pressed="false" aria-label="Large" title="Large"><i></i></button></span>
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
       <span class="tile__title">exposition</span>
     </header>
     <div class="tile__body">
@@ -966,7 +964,7 @@
 
   <article class="tile tile--flush tile--gba" data-id="gba">
     <header class="tile__bar" tabindex="0" aria-label="connect 4 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
-      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="Tiny" title="Tiny"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="Small" title="Small"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="Medium" title="Medium"><i></i></button><button type="button" data-size="3" aria-pressed="false" aria-label="Large" title="Large"><i></i></button></span>
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
       <span class="tile__title">connect 4</span>
       <span class="spacer"></span>
       <a class="ln" href="gba/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
@@ -1032,7 +1030,7 @@
   <template id="off">
     <article class="tile tile--flush tile--llm" data-id="llm">
       <header class="tile__bar" tabindex="0" aria-label="local llm tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
-        <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="Tiny" title="Tiny"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="Small" title="Small"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="Medium" title="Medium"><i></i></button><button type="button" data-size="3" aria-pressed="false" aria-label="Large" title="Large"><i></i></button></span>
+        <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
         <span class="tile__title">local llm</span>
         <span class="spacer"></span>
         <a class="ln" href="llm.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
@@ -1057,7 +1055,7 @@
 
   <article class="tile tile--flush tile--bike" data-id="bike">
     <header class="tile__bar" tabindex="0" aria-label="bike or die 2 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
-      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="Tiny" title="Tiny"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="Small" title="Small"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="Medium" title="Medium"><i></i></button><button type="button" data-size="3" aria-pressed="false" aria-label="Large" title="Large"><i></i></button></span>
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
       <span class="tile__title">bike or die 2</span>
       <span class="spacer"></span>
       <a class="ln" href="bike/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
@@ -1100,18 +1098,18 @@
   var SUB  = 2;        // ...and every cell splits into this many steps, so tiles can sit half-offset
   var GAP  = 14;       // gutter, px
   var GRID_AT = 1150;  // narrower than this the cells get cramped, so we stack
-  var KEY = 'board.v11';
+  var KEY = 'board.v12';
 
   // Everything below counts in steps rather than cells, and the board is this
   // many across.
   var GW = COLS * SUB;
 
-  // The four sizes a tile can be, as the side of its square in steps: tiny is
-  // a single step, small a cell, medium two by two cells, large three by
-  // three. The picker in each bar has a square for each, in this order.
-  var SIZES = [1, SUB, 2 * SUB, 3 * SUB];
-  var SIZE_NAMES = ['Tiny', 'Small', 'Medium', 'Large'];
-  var MEDIUM = 2;      // from here up a tile shows everything it has
+  // The three sizes a tile can be, as the side of its square in steps — one
+  // dashed square, two by two of them, four by four. The picker in each bar
+  // has a square for each, in this order.
+  var SIZES = [1, 2, 4];
+  var SIZE_NAMES = ['1×1', '2×2', '4×4'];
+  var BIG = 2;         // the size at which a tile shows everything it has
 
   // The board is only ever as deep as its lowest tile, plus half a row of
   // spare grid hanging below it so there is always somewhere to drop into.
@@ -1125,16 +1123,16 @@
   var TILES = ['id', 'ex', 'gba', 'bike'];
 
   // where everything starts, and what the reset button goes back to: one
-  // column down the middle of the board — bigmah at medium, the writing at
-  // medium under it, and the two games small and side by side at the bottom.
+  // column down the middle of the board — bigmah at 2×2, the writing at 2×2
+  // under it, and the two games 1×1 and side by side at the bottom.
   var HOME = {
-    id:   { x: SUB, y: 0 },
-    ex:   { x: SUB, y: 2 * SUB },
-    gba:  { x: SUB, y: 4 * SUB },
-    bike: { x: 2 * SUB, y: 4 * SUB }
+    id:   { x: 3, y: 0 },
+    ex:   { x: 3, y: 2 },
+    gba:  { x: 3, y: 4 },
+    bike: { x: 4, y: 4 }
   };
-  var HOME_SIZE = { id: MEDIUM, ex: MEDIUM, gba: 1, bike: 1 };
-  var HOME_ROWS = 5 * SUB + SPARE;   // the depth that layout takes
+  var HOME_SIZE = { id: 1, ex: 1, gba: 0, bike: 0 };
+  var HOME_ROWS = 5 + SPARE;   // the depth that layout takes
 
   var board = document.getElementById('board');
   var ph    = document.getElementById('ph');
@@ -1322,7 +1320,7 @@
     for (var vy = base[id].y; vy < base[id].y + s; vy += SUB) {
       for (var vx = base[id].x; vx < base[id].x + s; vx += SUB) vacated[vx + ',' + vy] = true;
     }
-    // Anywhere down to a large tile's depth below the board as it stands, so
+    // Anywhere down to a 4×4 tile's depth below the board as it stands, so
     // a tile with nowhere left on it can still be pushed off the bottom.
     var slots = [], deep = rowsOf(next) + SIZES[SIZES.length - 1];
     for (var ay = 0; ay < deep; ay++) {
@@ -1572,7 +1570,7 @@
     TILES.forEach(function (id) {
       var el = els[id], n = sz[id];
       el.classList.toggle('tile--xs', !isStatic && n === 0);
-      el.classList.toggle('tile--big', isStatic || n >= MEDIUM);
+      el.classList.toggle('tile--big', isStatic || n >= BIG);
       var name = el.querySelector('.tile__title').textContent;
       Array.prototype.forEach.call(el.querySelectorAll('.sizes button'), function (b) {
         var k = +b.dataset.size;
@@ -1772,14 +1770,14 @@
       return;
     }
 
-    // Anywhere else on a tiny or small tile brings it up to medium; a bigger
-    // one keeps its clicks for what is in it. Links still go where they go,
+    // Anywhere else on a smaller tile brings it up to 4×4; a 4×4 one keeps
+    // its clicks for what is in it. Links still go where they go,
     // the click that ends a drag or a text selection isn't asking for anything
     // (the email address is one, a click selecting all of it), and stacked
     // there are no sizes at all.
-    if (sz[id] >= MEDIUM || isStatic || dragged || e.target.closest('a, button, .email')) return;
+    if (sz[id] >= BIG || isStatic || dragged || e.target.closest('a, button, .email')) return;
     if (!window.getSelection().isCollapsed) return;
-    if (setSize(id, MEDIUM)) resized();
+    if (setSize(id, BIG)) resized();
   });
 
   /* ---------- keyboard ---------- */
