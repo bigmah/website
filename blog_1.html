@@ -406,37 +406,6 @@ f('h','e','l','l')    → 'o'</span>
   </div>
 </section>
 
-<section id="ood">
-  <div class="wrap">
-    <h2><span class="n">9</span>Off the map: why models make things up</h2>
-    <p>One last brick, and it's an important one. A trained model is only reliable in the kind of territory where it had training data. Outside that territory it doesn't say “I don't know.” It still produces an answer, because producing an answer is just running the math.</p>
-    <p>Here's a network trained on a wave, but only on the stretch between the dashed walls. Zoom out to see what it predicts beyond them.</p>
-  </div>
-  <div class="wide">
-    <figure class="fig">
-      <canvas id="oodCanvas"></canvas>
-      <div class="controls"><button class="go" id="oodZoom">Zoom out</button></div>
-      <figcaption>Dashed curve: the true pattern. Yellow: what the model predicts. Inside the shaded region the two agree. Outside it the model keeps extending whatever its last neurons were doing, confidently and wrongly.</figcaption>
-    </figure>
-  </div>
-  <div class="wrap">
-    <p>Our house-price line has the same problem. It happily prices houses it was never shown:</p>
-    <figure class="fig">
-      <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Price a <input type="number" id="oodIn" value="40000" step="500" aria-label="House size in square feet"> sq ft house</span>
-      <div class="readout"><div>the line says<b id="oodOut">—</b></div></div>
-      <p class="note" id="oodNote"></p>
-      <figcaption>Try 0, try 40,000, try −500. The line answers them all with the same confidence.</figcaption>
-    </figure>
-    <p>And so does our letter model. It has never seen a word starting like this:</p>
-    <figure class="fig">
-      <input type="text" id="oodChar" value="zqxj" maxlength="4" aria-label="Four letters of nonsense">
-      <div class="readout"><div>its best guess<b id="oodCharOut">—</b></div><div>how sure it is<b id="oodCharConf">—</b></div></div>
-      <p class="note" id="oodCharNote"></p>
-    </figure>
-    <p>This is the honest root of why chatbots sometimes “hallucinate”: state false things fluently. When you ask about something thin or absent in its training data, the model still predicts the most plausible-<em>looking</em> next token. Plausible-looking and true usually overlap. Off the map, they can quietly part ways. A good habit follows directly: trust these tools more on common, well-documented ground, and check them on the obscure.</p>
-  </div>
-</section>
-
 <section id="recap">
   <div class="wrap">
     <h2>What we built</h2>
@@ -449,7 +418,6 @@ f('h','e','l','l')    → 'o'</span>
       <li><span>Encode <strong>text as numbers</strong> and the same machinery works on language.</span></li>
       <li><span><strong>Autocomplete</strong> is a network trained to predict the next letter.</span></li>
       <li><span>Feed predictions back in and you get <strong>generation</strong>: the core of a chatbot.</span></li>
-      <li><span>Far from their training data, models still answer. That's where they <strong>go wrong</strong>.</span></li>
     </ol>
     <p>That's an approximate but valid picture. The real systems add important machinery we skipped: tokens instead of letters, <em>embeddings</em> that give each token a rich numeric fingerprint, an architecture called the <em>transformer</em> that lets the model weigh every earlier word when predicting the next one, and extra training rounds with human feedback to make it helpful and careful. But every one of those pieces is built on the bricks above. Parameters, a loss, and a loop that nudges downhill.</p>
   </div>
@@ -780,7 +748,7 @@ function cmEpochRun(){
   for(const [ctx,t] of EXAMPLES)L+=cm.step(ctx,t,lr);
   cmEpoch++;cmLosses.push(L/EXAMPLES.length);
 }
-function updCM(){$('#cmE').textContent=cmEpoch;$('#cmL').textContent=cmLosses.length?cmLosses[cmLosses.length-1].toFixed(2):'—';lossC.draw(lossC);updAC();updOODChar();updGenWarn();}
+function updCM(){$('#cmE').textContent=cmEpoch;$('#cmL').textContent=cmLosses.length?cmLosses[cmLosses.length-1].toFixed(2):'—';lossC.draw(lossC);updAC();updGenWarn();}
 function trainChar(){
   if(cmTraining)return; cmTraining=true;
   cm=new CharModel(3+Math.floor(Math.random()*1000));cmEpoch=0;cmLosses=[];cmTrained=false;
@@ -826,48 +794,6 @@ $('#genBtn').onclick=async()=>{
   while($('#genHist').children.length>16)$('#genHist').lastChild.remove();
   genBusy=false;$('#genBtn').disabled=false;
 };
-
-/* ---------- 9: out of distribution ---------- */
-const oodPts=makePts(SHAPES.wave,30,8);
-const oodNet=new Net1D(10,4);for(let i=0;i<4000;i++)oodNet.step(oodPts,0.03);
-let oodZoom=0,oodTarget=0;
-const oodC=makeCanvas($('#oodCanvas'),w=>w<520?0.8:0.42,o=>{
-  const z=ease(oodZoom), xr=[-1.2-2.3*z,1.2+2.3*z], yr=[-1.8-1.2*z,1.8+1.2*z];
-  const f=frame(o,xr,yr,{l:40}),c=o.ctx;
-  const xt=z>.5?[-3,-2,-1,0,1,2,3]:[-1,-.5,0,.5,1];
-  axes(o,f,{xt,yt:z>.5?[-2,0,2]:[-1,0,1],xl:'input x',yl:'output y'});
-  clip(o,f);
-  c.fillStyle=C('--grid');c.fillRect(f.X(-1),f.pad.t,f.X(1)-f.X(-1),o.h-f.pad.t-f.pad.b);
-  c.strokeStyle=C('--graphite');c.setLineDash([2,4]);c.lineWidth=1.2;[-1,1].forEach(v=>{c.beginPath();c.moveTo(f.X(v),f.pad.t);c.lineTo(f.X(v),o.h-f.pad.b);c.stroke();});
-  const N=Math.round(o.w/2.5);
-  c.setLineDash([6,5]);c.strokeStyle=C('--graphite');c.lineWidth=1.6;c.beginPath();
-  for(let i=0;i<=N;i++){const x=xr[0]+(xr[1]-xr[0])*i/N;const y=f.Y(SHAPES.wave(x));i?c.lineTo(f.X(x),y):c.moveTo(f.X(x),y);}c.stroke();c.setLineDash([]);
-  const pts=[];for(let i=0;i<=N;i++){const x=xr[0]+(xr[1]-xr[0])*i/N;pts.push([f.X(x),f.Y(oodNet.f(x))]);}
-  highlighterLine(c,pts);
-  c.fillStyle=C('--graphite');c.font='12px '+C('--serif');c.textAlign='center';c.textBaseline='top';
-  c.fillText('training data',f.X(0),f.pad.t+4);
-  c.restore(); dots(c,f,oodPts,3.4);
-});
-$('#oodZoom').onclick=()=>{
-  oodTarget=oodTarget?0:1;$('#oodZoom').textContent=oodTarget?'Zoom back in':'Zoom out';
-  if(reduceMotion){oodZoom=oodTarget;oodC.draw(oodC);return;}
-  const from=oodZoom,t0=performance.now();
-  const tick=now=>{const k=clamp((now-t0)/700,0,1);oodZoom=from+(oodTarget-from)*k;oodC.draw(oodC);if(k<1)requestAnimationFrame(tick);};requestAnimationFrame(tick);
-};
-function updOODHouse(){
-  const v=+$('#oodIn').value;if(!isFinite(v)||$('#oodIn').value===''){$('#oodOut').textContent='—';$('#oodNote').textContent='';return;}
-  const p=ls.m*v+ls.b;$('#oodOut').textContent=money(p);
-  const out=v<minX||v>maxX;
-  $('#oodNote').className='note'+(out?' warn':'');
-  $('#oodNote').textContent=out?`Every house in the training data was between ${minX.toLocaleString('en-US')} and ${maxX.toLocaleString('en-US')} sq ft. The line still gave an answer, because it always will, but nothing in its training checked this one.`+(v<=0?' A house with no floor space, or less than none, still gets a price.':''):`That's inside the range the line was trained on (${minX.toLocaleString('en-US')} to ${maxX.toLocaleString('en-US')} sq ft), so this is a reasonable estimate.`;
-}
-$('#oodIn').addEventListener('input',updOODHouse);updOODHouse();
-function updOODChar(){
-  const s=clean($('#oodChar').value);const p=Array.from(cm.forward(toCtx(s)));let bi=0;p.forEach((v,i)=>{if(v>p[bi])bi=i;});
-  $('#oodCharOut').textContent=s+(bi?VOC[bi]:' (end)');$('#oodCharConf').textContent=(p[bi]*100).toFixed(0)+'%';
-  $('#oodCharNote').textContent=cmTrained?'None of its 200-odd training words look anything like this, yet it still produces an answer. Sometimes it even sounds sure.':'Train the letter model in section 7 first to see this properly.';
-}
-$('#oodChar').addEventListener('input',updOODChar);
 
 /* ---------- 4: parameter bars ---------- */
 const BARS=[['Our house line',2],['Size + lot size',3],['Wave network (6 neurons)',19],['Our letter model',cm.nParams],['GPT-2 (2019)',1.5e9],['GPT-3 (2020)',1.75e11]];
