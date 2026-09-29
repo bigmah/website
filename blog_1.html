@@ -10,7 +10,7 @@
 <style>
 :root{
   --paper:#F5F8FC; --grid:#E0E8F2; --ink:#14223D; --graphite:#556176; --faint:#98A4B6;
-  --hi:#FFD93D; --miss:#D6344D; --good:#1E8757; --panel:#FFFFFF; --rule:#C8D3E1;
+  --hi:#FFD93D; --hi-line:#E3AE00; --miss:#D6344D; --good:#1E8757; --panel:#FFFFFF; --rule:#C8D3E1;
   --serif:"Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   box-sizing:border-box;
@@ -19,12 +19,12 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
-    --hi:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+    --hi:#FFD43B; --hi-line:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
   }
 }
 :root[data-theme="dark"]{
   --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
-  --hi:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+  --hi:#FFD43B; --hi-line:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
 }
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -47,13 +47,11 @@ h3{font-size:1.15em; margin:1.6em 0 .4em; font-weight:700}
 em{font-style:italic}
 code,.eq{font-family:var(--mono); font-size:.84em}
 .eq{display:block; margin:.6em 0 1.1em; padding:.7em 1em; background:var(--panel); border:1px solid var(--rule); border-left:4px solid var(--ink); border-radius:2px; overflow-x:auto; white-space:pre; line-height:1.7}
-.p{background:linear-gradient(transparent 38%,var(--hi) 38%,var(--hi) 88%,transparent 88%); color:var(--ink); padding:0 .1em}
-:root[data-theme="dark"] .p{color:#14223D}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .p{color:#14223D}}
-mark{background:linear-gradient(transparent 45%,var(--hi) 45%,var(--hi) 90%,transparent 90%); color:inherit}
-:root[data-theme="dark"] mark,.dark-mark{color:#14223D}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) mark{color:#14223D}}
-
+.p,mark{
+  background:none; color:inherit; font-weight:500;
+  text-decoration:underline; text-decoration-color:var(--hi-line);
+  text-decoration-thickness:.2em; text-underline-offset:.2em; text-decoration-skip-ink:none;
+}
 /* hero */
 header{padding:9vh 0 2vh}
 .dek{font-size:clamp(21px,1.6vw + 12px,28px); line-height:1.4; max-width:30ch; margin:.5em 0 0; color:var(--graphite)}
@@ -128,7 +126,7 @@ input[type=text],input[type=number]{
 .call{font-family:var(--mono); font-size:.85em; margin-top:10px; overflow-x:auto; white-space:nowrap}
 
 .gen-steps{font-family:var(--mono); font-size:.8em; line-height:1.9; min-height:11em; margin-top:10px; overflow-x:auto; white-space:pre}
-.gen-steps .new{background:var(--hi); color:#14223D; padding:0 .2em}
+.gen-steps .new{font-weight:500; color:var(--ink); text-decoration:underline; text-decoration-color:var(--hi-line); text-decoration-thickness:.2em; text-underline-offset:.2em}
 .gen-word{font-size:2.2em; font-weight:500; letter-spacing:.02em; min-height:1.3em; margin:.2em 0 0}
 .history{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
 .history span{font-family:var(--mono); font-size:.78em; border:1px solid var(--rule); border-radius:2px; padding:.1em .45em}
