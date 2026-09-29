@@ -1780,14 +1780,14 @@
       return;
     }
 
-    // Anywhere else on a smaller tile brings it up to 4×4; a 4×4 one keeps
-    // its clicks for what is in it. Links still go where they go,
+    // Anywhere else on a smaller tile grows it one size — 1×1 to 2×2, 2×2
+    // to 4×4; a 4×4 one keeps its clicks for what is in it. Links still go where they go,
     // the click that ends a drag or a text selection isn't asking for anything
     // (the email address is one, a click selecting all of it), and stacked
     // there are no sizes at all.
     if (sz[id] >= BIG || isStatic || dragged || e.target.closest('a, button, .email')) return;
     if (!window.getSelection().isCollapsed) return;
-    if (setSize(id, BIG)) resized();
+    if (setSize(id, sz[id] + 1)) resized();
   });
 
   /* ---------- keyboard ---------- */
