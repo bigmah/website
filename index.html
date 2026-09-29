@@ -1378,6 +1378,13 @@
         var n = s.sz && s.sz[TILES[i]];
         z[TILES[i]] = typeof n === 'number' && SIZES[n] ? n : HOME_SIZE[TILES[i]];
       }
+      // a layout saved with two at 4×4 keeps the first of them
+      var big = false;
+      TILES.forEach(function (id) {
+        if (z[id] !== BIG) return;
+        if (big) z[id] = BIG - 1;
+        big = true;
+      });
       return { pos: p, sz: z };
     } catch (e) { return null; }
   }
@@ -1721,10 +1728,13 @@
   /* ---------- sizes ---------- */
 
   // Put `id` at size `n`: where it stands if it fits there, shoving the others
-  // aside as a drag would, or else at the nearest spot that takes it.
+  // aside as a drag would, or else at the nearest spot that takes it. Only
+  // one tile is ever 4×4, so growing one first takes whichever was down to
+  // 2×2 — in place, where it always fits, since it only gets smaller.
   function setSize(id, n) {
     if (!SIZES[n] || n === sz[id]) return false;
-    var was = sz[id];
+    var was = copySize(sz);
+    if (n === BIG) TILES.forEach(function (k) { if (sz[k] === BIG) sz[k] = BIG - 1; });
     sz[id] = n;
 
     var next = tryPlace(id, pos[id].x, pos[id].y, pos);
@@ -1739,7 +1749,7 @@
         }
       }
     }
-    if (!next) { sz[id] = was; return false; }
+    if (!next) { sz = was; return false; }
     pos = next;
     return true;
   }
