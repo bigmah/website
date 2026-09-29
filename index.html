@@ -635,7 +635,7 @@
 
   .post {
     display: block;
-    padding: 0.3rem 0.6rem;
+    padding: 0.45rem 0.6rem;
     text-decoration: none;
     background: var(--card-tint);
     border: 1px solid var(--line);
@@ -650,8 +650,19 @@
     color: var(--fg);
   }
 
-  .post time,
-  .post .what { display: none; }
+  .post time { display: none; }
+
+  /* Small, the line about it is a two-line teaser under the name. */
+  .post .what {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    margin-top: 0.15rem;
+    font-size: 0.62rem;
+    line-height: 1.5;
+    color: var(--muted);
+  }
 
   /* Small, a row is only a name, and the click goes through it to grow the tile
      the way it would anywhere else on one. Bigger, each row is the link it looks like. */
