@@ -152,17 +152,6 @@ input[type=text],input[type=number]{
 .gen-word{font-size:2.2em; font-weight:500; letter-spacing:.02em; min-height:1.3em; margin:.2em 0 0}
 .history{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
 .history span{font-family:var(--mono); font-size:.78em; border:1px solid var(--rule); border-radius:2px; padding:.1em .45em}
-/* neuron diagrams */
-.nsvg{display:block; width:100%; height:auto}
-#trainNet{max-width:600px; margin:0 auto}
-.nsvg text{font-family:var(--mono); font-size:13px; fill:var(--ink)}
-.nsvg .lbl{fill:var(--graphite); font-size:12px}
-.nsvg .pp{font-weight:700}
-.nsvg .wire{stroke:var(--graphite); stroke-width:1.5; fill:none; opacity:.7}
-.nsvg .io{fill:var(--panel); stroke:var(--graphite); stroke-width:1.5}
-.nsvg .out{fill:var(--panel); stroke:var(--ink); stroke-width:1.5}
-.nsvg .neu{fill:var(--hi); stroke:var(--ink); stroke-width:1.5}
-.nsvg .sq{stroke:#14223D; stroke-width:2; fill:none; stroke-linecap:round}
 .note{font-size:.8em; color:var(--graphite); margin-top:8px}
 .warn{color:var(--miss)}
 
@@ -177,14 +166,14 @@ details p{font-family:var(--mono); font-size:.9em; line-height:1.6; margin-top:.
 .stack li{counter-increment:s; display:grid; grid-template-columns:2.4em 1fr; gap:.6em; padding:.55em 0; border-bottom:1px solid var(--rule)}
 .stack li>div{min-width:0}
 .stack li::before{content:counter(s); font-family:var(--mono); font-size:.8em; background:var(--ink); color:var(--paper); border-radius:3px; text-align:center; height:1.7em; line-height:1.7em; margin-top:.25em}
-/* shape + parameters */
-.pgrid{display:grid; grid-template-columns:auto repeat(5,minmax(0,1fr)); gap:3px; font-family:var(--mono); font-size:.68em; align-items:center}
+/* parameter grids */
+.pgrid{display:grid; grid-template-columns:auto repeat(10,minmax(0,1fr)); gap:3px; font-family:var(--mono); font-size:.68em; align-items:center}
 .pgrid .rl{color:var(--graphite); text-align:right; padding-right:.6em; white-space:nowrap}
-.pgrid .pc{border:1px solid var(--rule); border-radius:2px; text-align:center; padding:.4em 0; cursor:pointer; min-width:0; overflow:hidden}
-.pgrid .pc.b{background:var(--grid)}
+.pgrid .hd{color:var(--graphite); text-align:center}
+.pgrid .pc{border:1px solid var(--rule); border-radius:2px; text-align:center; padding:.4em 0; min-width:0; overflow:hidden; white-space:nowrap}
+.pgrid .pc[data-k]{cursor:pointer}
 .pgrid .pc.on{background:var(--hi); color:#14223D; box-shadow:inset 0 0 0 1.5px #14223D; font-weight:500}
-.pgrid .gap{grid-column:1/-1; height:5px}
-@media (max-width:520px){.pgrid{font-size:.6em; gap:2px}.pgrid .rl{white-space:normal; width:4.6em; line-height:1.2; padding-right:.4em}}
+@media (max-width:520px){.pgrid{font-size:.55em; gap:2px}.pgrid .rl{padding-right:.3em}}
 .file{font-family:var(--mono); font-size:.72em; line-height:1.6; background:var(--paper); border:1px solid var(--rule); border-radius:2px; padding:.7em 1em; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--graphite)}
 footer{padding:6vh 0 10vh; font-size:.8em; color:var(--graphite)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
@@ -320,97 +309,52 @@ footer{padding:6vh 0 10vh; font-size:.8em; color:var(--graphite)}
   </div>
 </section>
 
-<section id="nn">
+<section id="curves">
   <div class="wrap">
-    <h2><span class="n">5</span>Neural networks: a function that can bend</h2>
+    <h2><span class="n">5</span>Curves: more terms, more parameters</h2>
     <p>If parameter count is what matters, what equation do those billions of parameters live in? It isn't a line. A line can only ever be straight, and most things in the world aren't. Try fitting a line to a wave: no setting of <span class="p">m</span> and <span class="p">b</span> will ever do it.</p>
-    <p>The trick is small. Take a line, <code><span class="p">w</span>x + <span class="p">c</span></code>, and squash it through an S-shaped curve so it flattens out at both ends. That gives you a smooth <em>step</em> instead of a straight line. Scale it by another parameter <span class="p">v</span>. That squashed, scaled line is one <mark>neuron</mark>.</p>
-    <span class="eq">neuron(x) = <span class="p">v</span> · squash(<span class="p">w</span>·x + <span class="p">c</span>)</span>
-    <p>Now add a bunch of neurons together. Each one contributes a step somewhere, going up or down, sharp or gentle. Stack enough steps and you can trace out almost any shape. This is a <mark>neural network</mark>, and the fact that enough neurons can approximate <em>any</em> reasonable function is a real theorem, called the <em>universal approximation theorem</em>.</p>
-    <p>Neural networks are usually drawn as circles joined by lines. Each yellow circle is one neuron: one copy of <code>neuron(x)</code> above, with its own <span class="p">w</span>, <span class="p">c</span> and <span class="p">v</span>. The line coming in carries <code>x</code>. The line going out carries that neuron's step.</p>
-    <p>Here's the smallest interesting network: one input, three neurons, one output. The same <code>x</code> goes into all three. Each makes its own step, and the output just adds them up, plus one last parameter <span class="p">d</span> to shift the whole thing up or down:</p>
-    <span class="eq">y = neuron₁(x) + neuron₂(x) + neuron₃(x) + <span class="p">d</span></span>
+    <p>The fix is to give the equation more terms. Keep the line, then add an <code>x²</code> term, an <code>x³</code> term, and so on, each with its own parameter. This is a <mark>polynomial</mark>, the same kind you graphed in algebra class:</p>
+    <span class="eq">y = <span class="p">a₀</span> + <span class="p">a₁</span>·x + <span class="p">a₂</span>·x² + <span class="p">a₃</span>·x³ + … + <span class="p">aₙ</span>·xⁿ</span>
+    <p>Each term is a simple shape on its own: <code>x²</code> is a bowl, <code>x³</code> is an S, and higher powers get flatter in the middle and steeper at the edges. Scale each one by the right parameter, add them up, and they can bend into almost any smooth curve. The highest power, <code>n</code>, decides how much bending is available, and every extra power is one more parameter.</p>
+    <p>Pick a shape, press Train, and watch the curve bend itself to the data. Each press runs a fixed 3,000 training steps of the same loop as before: nudge every parameter downhill on the loss, 3,000 times over. Not happy with the fit? Press it again for 3,000 more. Click the plot to add your own dots.</p>
   </div>
   <div class="wide">
     <figure class="fig">
-      <div class="pair">
-        <div><p class="ptitle">One neuron</p>
-          <svg class="nsvg" viewBox="0 0 390 170" role="img" aria-label="One neuron: x comes in, is multiplied by w and has c added, is squashed, then scaled by v to give neuron(x)">
-            <line class="wire" x1="54" y1="90" x2="156" y2="90"/><line class="wire" x1="224" y1="90" x2="300" y2="90"/>
-            <circle class="io" cx="40" cy="90" r="14"/><text x="40" y="94.5" text-anchor="middle">x</text>
-            <text x="105" y="78" text-anchor="middle"><tspan class="pp">w</tspan>·x + <tspan class="pp">c</tspan></text>
-            <circle class="neu" cx="190" cy="90" r="34"/><path class="sq" d="M169.6 101.9C190 101.9 190 78.1 210.4 78.1"/>
-            <text class="lbl" x="190" y="146" text-anchor="middle">squash</text>
-            <text x="262" y="78" text-anchor="middle">× <tspan class="pp">v</tspan></text>
-            <text x="306" y="94.5">neuron(x)</text>
-          </svg></div>
-        <div><p class="ptitle">1 input → 3 neurons → 1 output</p><svg class="nsvg" id="babyNet" role="img" aria-label="A network with one input wired to three neurons, all wired to one output"></svg></div>
-      </div>
-      <figcaption>Left: what happens inside every yellow circle. Right: three of them side by side. Each has its own <span class="p">w</span>, <span class="p">c</span> and <span class="p">v</span>, so this network has 3 × 3 + 1 = 10 parameters.</figcaption>
-    </figure>
-  </div>
-  <div class="wrap">
-    <p>The network you're about to train has exactly this shape, just wider in the middle. It starts with 6 neurons, and this diagram follows the neurons slider below:</p>
-  </div>
-  <div class="wide">
-    <figure class="fig">
-      <svg class="nsvg" id="trainNet" role="img" aria-label="The network being trained: one input, a layer of neurons, one output"></svg>
-      <figcaption id="trainNetCap"></figcaption>
-    </figure>
-  </div>
-  <div class="wrap">
-    <p>Pick a shape, press Train, and watch the network bend itself to the data. Each press runs a fixed 3,000 training steps of the same loop as before: nudge every parameter downhill on the loss, 3,000 times over. Not happy with the fit? Press it again for 3,000 more. Click the plot to add your own dots.</p>
-  </div>
-  <div class="wide">
-    <figure class="fig">
-      <canvas id="nnCanvas" aria-label="Neural network fitting data points; click to add points"></canvas>
+      <canvas id="polyCanvas" aria-label="A polynomial curve fitting data points; click to add points"></canvas>
+      <div class="call" id="polyEq"></div>
       <div class="controls">
-        <button class="go" id="nnPlay">Train 3,000 steps</button>
-        <button id="nnShuffle">Scramble the parameters</button>
+        <button class="go" id="polyPlay">Train 3,000 steps</button>
+        <button id="polyShuffle">Scramble the parameters</button>
         <span style="display:flex;gap:6px;flex-wrap:wrap" role="group" aria-label="Data shape">
           <button data-shape="wave">Wave</button><button data-shape="steps">Steps</button><button data-shape="bump">Bump</button><button data-shape="clear">Clear dots</button>
         </span>
       </div>
       <div class="controls">
-        <div class="ctl"><label for="nnH">neurons</label><input id="nnH" type="range" min="1" max="24" value="6"><output id="nnHO"></output></div>
-        <label class="check"><input type="checkbox" id="nnParts"> Show each neuron</label>
+        <div class="ctl"><label for="polyD">highest power</label><input id="polyD" type="range" min="1" max="12" value="3"><output id="polyDO"></output></div>
+        <label class="check"><input type="checkbox" id="polyParts"> Show each term</label>
       </div>
       <div class="readout">
-        <div>parameters<b id="nnP">—</b></div>
-        <div>average miss<b id="nnL">—</b></div>
-        <div>training steps<b id="nnS">0</b></div>
+        <div>parameters<b id="polyP">—</b></div>
+        <div>average miss<b id="polyL">—</b></div>
+        <div>training steps<b id="polyS">0</b></div>
       </div>
-      <figcaption>Try 1 neuron on the wave: it can only make one step, so it can't bend enough. Then try 12. Tick “Show each neuron” to see the individual steps being added up.</figcaption>
+      <figcaption>Try highest power 1 on the wave: that's just our line again, and it can't bend at all. Then try 3, then 7. Tick “Show each term” to see the individual shapes being added up. The steps are hard for any polynomial, since it can only make smooth curves, but more terms get it closer.</figcaption>
     </figure>
   </div>
   <div class="wrap">
-    <p>Real models use many inputs instead of one, and stack neurons in layers, feeding outputs of one layer into the next. But every piece is this: lines, squashed, scaled, added, with every <span class="p">highlighted</span> number learned by nudging downhill on a loss.</p>
-    <p>Here's the shape of it. Every circle is a neuron. Every line is a <span class="p">weight</span>: one neuron's output, multiplied on its way into the next. Each neuron also has one <span class="p">bias</span> of its own. The network you just trained is the preset on the left: one input, one layer of 6 neurons, one output. Add layers, widen them, and watch the count.</p>
+    <h3>Two inputs: a grid of parameters</h3>
+    <p>With one input, the terms line up in a row: one parameter per power of <code>x</code>. Add a second input, <code>z</code>, and they form a <em>grid</em>. Every power of <code>x</code> gets multiplied by every power of <code>z</code>, and each combination gets its own parameter. Go up to the 9th power of each and that's a 10 × 10 grid, 100 parameters:</p>
+    <span class="eq">y = <span class="p">a₀₀</span> + <span class="p">a₀₁</span>·z + <span class="p">a₁₀</span>·x + <span class="p">a₁₁</span>·x·z + <span class="p">a₂₁</span>·x²·z + … + <span class="p">a₉₉</span>·x⁹·z⁹</span>
   </div>
-  <div class="wide">
+  <div class="wrap">
     <figure class="fig">
-      <canvas id="shapeCanvas" aria-label="Diagram of a neural network: columns of neurons in layers, every neuron connected to every neuron in the next layer"></canvas>
-      <p class="note" id="shapeInfo" aria-live="polite"></p>
-      <div class="controls">
-        <span style="display:flex;gap:6px;flex-wrap:wrap" role="group" aria-label="Network presets">
-          <button data-net="wave">Our wave network</button><button data-net="auto">Our autocomplete</button><button data-net="big">Much, much bigger</button>
-        </span>
-      </div>
-      <div class="controls">
-        <div class="ctl"><label for="shL">layers</label><input id="shL" type="range" min="1" max="6" value="1"><output id="shLO"></output></div>
-        <div class="ctl"><label for="shW">neurons per layer</label><input id="shW" type="range" min="1" max="12" value="6"><output id="shWO"></output></div>
-      </div>
-      <div class="readout">
-        <div>neurons<b id="shN">—</b></div>
-        <div>weights (lines)<b id="shE">—</b></div>
-        <div>parameters<b id="shP">—</b></div>
-      </div>
-      <div class="call" id="shMath" style="color:var(--graphite)"></div>
-      <figcaption>Past a dozen neurons, a column shows a few and a ⋮ for the rest, and long stacks of layers are shortened with ⋯. The count below always uses the real sizes.</figcaption>
+      <div class="pgrid" id="termGrid"></div>
+      <figcaption>Row <code>i</code>, column <code>j</code> is the term <code>xⁱ·zʲ</code>, and each cell gets one parameter, <span class="p">aᵢⱼ</span>. The whole equation is just: multiply every cell's parameter by its term, then add up all 100.</figcaption>
     </figure>
   </div>
   <div class="wrap">
-    <p>The count grows fast because every neuron connects to <em>every</em> neuron in the next layer. Double a layer's width and you roughly quadruple its weights. Two layers of 10,000 neurons, fully connected, are already 100 million weights. Stack 100 of those and you're past 10 billion, all from the same squashed, scaled, added lines.</p>
+    <p>This is the picture to keep in your head: <strong>a model is an equation with a big grid of parameters.</strong> Real AI models don't use polynomials, which get unruly when they're huge. They use a different family of equations, designed to train well at enormous scale. But the parameters are still laid out in grids, and training is still the same loop: nudge every cell downhill on the loss.</p>
+    <p>Grids are also why the counts explode. A grid's size is its width times its height, so double both and you quadruple the parameters. One grid of 10,000 × 10,000 is already 100 million parameters. Stack a hundred of those and you're past 10 billion.</p>
   </div>
 </section>
 
@@ -482,7 +426,7 @@ z = 0 0 0 0 … 0 1</span>
     <h2><span class="n">7</span>Autocomplete: predicting letters</h2>
     <p class="lede">This is the single biggest jump we're going to make, so let's line up the two pieces we already have.</p>
     <ol class="stack">
-      <li><div><strong>We can predict numbers by fitting data.</strong> Show training some house sizes and prices, and it finds a line (or, with neurons, a curve) that predicts the price of a house it has never seen.</div></li>
+      <li><div><strong>We can predict numbers by fitting data.</strong> Show training some house sizes and prices, and it finds a line (or, with more terms, a curve) that predicts the price of a house it has never seen.</div></li>
       <li><div><strong>We can write text as numbers.</strong> A letter becomes a one-hot row of switches, and a function can take those switches as its inputs.</div></li>
     </ol>
     <p>Put them together: <strong>can we fit a function to data so that it predicts <em>letters</em>?</strong></p>
@@ -513,22 +457,22 @@ z = 0 0 0 0 … 0 1</span>
     <p>That picture also tells us how to train it. Our <mark>training data</mark> is just a list of words, and every word is a question with a known answer: the first four letters are the input, and the fifth is the right answer. The perfect output would be the one-hot of that right letter, 100% on it and 0% everywhere else. The <mark>loss</mark> is how far off we were from that.</p>
     <p>For letters we measure “how far off” as <code>loss = −log(chance on the right letter)</code>. It's 0 when the model puts 100% on the right letter and climbs quickly as that chance shrinks, so confident wrong guesses get punished hardest. Average it over every word and we have one number to push downhill, just like the average miss for house prices.</p>
     <h3>What's inside the box</h3>
-    <p><code>autocomplete</code> is a small neural network, the same kind as in section 5, only wider. Here's the whole journey from four letters to 27 probabilities, left to right in the diagram below:</p>
+    <p>Inside, <code>autocomplete</code> is an equation built from two grids of parameters, like the 10 × 10 grid in section 5, only bigger. Here's the whole journey from four letters to 27 probabilities, left to right in the diagram below:</p>
     <ol class="stack">
       <li><div><strong>Letters become switches.</strong> Each letter is one-hot, exactly like section 6, plus the extra blank switch: 27 switches per letter. Four letters make 4 × 27 = 108 switches, and only 4 of them are ever on at once.</div></li>
-      <li><div><strong>64 neurons each look at all 108 switches.</strong> Each one is the neuron from section 5, just with more inputs: multiply every switch (<em>s</em>) by its own <span class="p">weight</span>, add them up with a <span class="p">bias</span>, and squash. Since only 4 switches are on, that sum is really just four weights picked out by the four letters.
-        <span class="eq">neuron = squash(<span class="p">w₁</span>·s₁ + <span class="p">w₂</span>·s₂ + … + <span class="p">w₁₀₈</span>·s₁₀₈ + <span class="p">c</span>)</span></div></li>
-      <li><div><strong>Every possible answer gets a score.</strong> For each of the 27 answers there's one more weighted sum, this time over the 64 neuron outputs. It's our old friend <code>mx + b</code>, with 64 <span class="p">m</span>'s. A high score means “the neurons that lit up point at this letter.” Below, <em>r</em> stands for any one of the 27 answers.
-        <span class="eq">score(r) = <span class="p">v₁</span>·neuron₁ + … + <span class="p">v₆₄</span>·neuron₆₄ + <span class="p">d</span></span></div></li>
+      <li><div><strong>A 108 × 64 grid mixes the switches into 64 middle numbers.</strong> Each middle number is a weighted sum over all 108 switches: multiply every switch (<em>s</em>) by its own <span class="p">weight</span> from the grid and add them up, plus a <span class="p">bias</span>. Since only 4 switches are on, that sum is really just four weights picked out by the four letters. Then the sum is <em>squashed</em> through an S-shaped curve that flattens out at both ends, so every middle number lands between −1 and 1. The squash plays the role the higher powers did in section 5: it's what lets the equation bend instead of being one giant straight-line sum.
+        <span class="eq">middle = squash(<span class="p">w₁</span>·s₁ + <span class="p">w₂</span>·s₂ + … + <span class="p">w₁₀₈</span>·s₁₀₈ + <span class="p">c</span>)</span></div></li>
+      <li><div><strong>A 64 × 27 grid gives every possible answer a score.</strong> For each of the 27 answers there's one more weighted sum, this time over the 64 middle numbers. It's our old friend <code>mx + b</code>, with 64 <span class="p">m</span>'s. A high score means “the middle numbers that lit up point at this letter.” Below, <em>r</em> stands for any one of the 27 answers.
+        <span class="eq">score(r) = <span class="p">v₁</span>·middle₁ + … + <span class="p">v₆₄</span>·middle₆₄ + <span class="p">d</span></span></div></li>
       <li><div><strong>Scores become probabilities.</strong> Scores can be any number, even negative. To turn them into odds that are all positive and add up to 100%, raise <em>e</em> (≈ 2.718) to each score and divide by the total. This step is called <mark>softmax</mark>. The biggest score gets the biggest share, and a score just a little higher than the rest gets a <em>lot</em> more of the share.
         <span class="eq">P(r) = e^score(r) ÷ (sum of e^score over all 27)</span></div></li>
     </ol>
-    <p>Count the knobs: 108 × 64 weights and 64 biases for the neurons, 64 × 27 weights and 27 biases for the scores. That's {{PARAMS}} <span class="p">parameters</span>, and every one of them starts random.</p>
+    <p>Count the knobs: a 108 × 64 grid of weights plus 64 biases for the middle numbers, then a 64 × 27 grid plus 27 biases for the scores. That's {{PARAMS}} <span class="p">parameters</span>, and every one of them starts random.</p>
   </div>
   <div class="wide">
     <figure class="fig">
-      <canvas id="archCanvas" aria-label="Diagram of the autocomplete network: four letters become 108 switches, feeding 64 neurons, feeding 27 scores, which softmax turns into 27 probabilities"></canvas>
-      <figcaption>The real network, live. It shows whatever you type in the “Ask it to finish a word” box below. Lit switches are yellow, and only their connections are drawn because the other 104 switches are off and contribute nothing. Neuron shading shows how strongly each one fires (yellow positive, gray negative). Train the model below and watch the probabilities on the right go from flat to confident.</figcaption>
+      <canvas id="archCanvas" aria-label="Diagram of the autocomplete model: four letters become 108 switches, feeding 64 middle numbers, feeding 27 scores, which softmax turns into 27 probabilities"></canvas>
+      <figcaption>The real model, live. It shows whatever you type in the “Ask it to finish a word” box below. Lit switches are yellow, and only their connections are drawn because the other 104 switches are off and contribute nothing. Middle numbers are shaded by their value (yellow positive, gray negative). Train the model below and watch the probabilities on the right go from flat to confident.</figcaption>
     </figure>
   </div>
   <div class="wrap">
@@ -620,58 +564,51 @@ autocomplete('e', 'l', 'l', 'o')       → end</span>
 <section id="open">
   <div class="wrap">
     <h2><span class="n">10</span>There is no magic</h2>
-    <p>The AI models in the news are neural networks under the hood, just like the ones we trained here. They're just much, much bigger.</p>
-    <p>It takes two things to describe a neural network: its <mark>shape</mark> and its <span class="p">parameters</span>.</p>
-    <p>The shape says how the neurons are organized: how many layers, and how many neurons in each layer. Here's a small one: one input, two layers of 5 neurons, and one output. Written down, the whole shape is just four numbers.</p>
-    <span class="eq">shape = [1, 5, 5, 1]</span>
+    <p>The AI models in the news are the same kind of thing we built here: an equation with grids of parameters, trained by nudging downhill on a loss. They're just much, much bigger.</p>
+    <p>It takes two things to describe a model: its <mark>equation</mark> and its <span class="p">parameters</span>.</p>
+    <p>The equation is the recipe: which terms exist and how they're combined. Take the two-input polynomial from section 5. Its whole recipe fits on one line:</p>
+    <span class="eq">y = add up <span class="p">a[i][j]</span>·xⁱ·zʲ over all 100 cells</span>
+    <p>Then there are the actual values of the parameters: one number in every cell of the 10 × 10 grid. Hover or tap a number to see which term it belongs to.</p>
   </div>
-  <div class="wide">
+  <div class="wrap">
     <figure class="fig">
-      <canvas id="tinyShape" aria-label="A network with one input, two layers of five neurons, and one output"></canvas>
-      <figcaption>The shape: which circles exist and how they're wired. It says nothing yet about how strong any of the lines are.</figcaption>
+      <p class="ptitle">Its 100 parameters</p>
+      <div class="pgrid" id="valGrid"></div>
+      <p class="note" id="valInfo" aria-live="polite"></p>
+      <figcaption>The equation plus these 100 numbers is the <em>entire</em> model: nothing else is needed to run it.</figcaption>
     </figure>
   </div>
   <div class="wrap">
-    <p>Then there are the actual values of the parameters: one <span class="p">weight</span> for every line and one <span class="p">bias</span> for every neuron. For this network that's 5 + 25 + 5 = 35 weights and 5 + 5 + 1 = 11 biases, so 46 numbers. Each one has its own cell in the grid below. Hover or tap a number to see which line or neuron it belongs to, or hover a neuron to see its numbers.</p>
-  </div>
-  <div class="wide">
-    <figure class="fig">
-      <div class="pair">
-        <div><p class="ptitle">The network</p><canvas id="tinyNet" aria-label="The same network, with each line drawn thicker the bigger its weight"></canvas></div>
-        <div><p class="ptitle">Its 46 parameters</p><div class="pgrid" id="tinyGrid"></div></div>
-      </div>
-      <p class="note" id="tinyInfo" aria-live="polite"></p>
-      <figcaption>Thicker lines have bigger weights. Shaded cells are biases. The shape plus these 46 numbers is the <em>entire</em> network: nothing else is needed to run it.</figcaption>
-    </figure>
-  </div>
-  <div class="wrap">
-    <p>Arriving at a shape and a set of parameter values is what training a neural network means. People pick the shape, and the loss-nudging loop from section 3 finds the values.</p>
-    <p>Once we have a shape and a set of parameters, we can use the network. That's called <mark>inference</mark>: feed in an input, get an output. Predicting a home's price with a line of best fit is inference. So is autocomplete guessing the next letter, and a chatbot generating text.</p>
-    <p>And the shape and the parameter values are shareable. <strong>If you know the shape and have the values, you can use a network without training it.</strong> That's great news, because training is the hard part, and using it is the useful part.</p>
-    <p>The 46 numbers above aren't random. They were trained ahead of time, before this page was ever loaded, to fit the wave from section 5. Here they are saved in a file, just like one you'd download. Load it and the network works immediately, with zero training.</p>
+    <p>Arriving at an equation and a set of parameter values is what training a model means. People pick the equation, and the loss-nudging loop from section 3 finds the values.</p>
+    <p>Once we have an equation and a set of parameters, we can use the model. That's called <mark>inference</mark>: feed in an input, get an output. Predicting a home's price with a line of best fit is inference. So is autocomplete guessing the next letter, and a chatbot generating text.</p>
+    <p>And the equation and the parameter values are shareable. <strong>If you know the equation and have the values, you can use a model without training it.</strong> That's great news, because training is the hard part, and using it is the useful part.</p>
+    <p>The 100 numbers above aren't random. They were trained ahead of time, before this page was ever loaded, to fit a landscape with one hill and one valley. Here they are saved in a file, just like one you'd download. Load it and the model works immediately, with zero training.</p>
   </div>
   <div class="wrap">
     <figure class="fig">
-      <p class="ptitle">wave-model.json</p>
-      <div class="file" id="modelFile"></div>
+      <p class="ptitle">hill-model.json</p>
+      <div class="file" id="modelFile" style="white-space:pre;overflow-x:auto"></div>
       <div class="controls">
         <button class="go" id="loadBtn">Load the model</button>
-        <div class="ctl"><label for="infX">input x</label><input id="infX" type="range" min="-1" max="1" step="0.01" value="0.4" disabled><output id="infXO"></output></div>
       </div>
-      <canvas id="infCanvas" style="margin-top:14px" aria-label="The loaded network's output for every input x, with the current input marked"></canvas>
+      <canvas id="infCanvas" style="margin-top:14px" aria-label="A map of the loaded model's output for every input x and z, with the current input marked; click to move it"></canvas>
+      <div class="controls">
+        <div class="ctl"><label for="infX">input x</label><input id="infX" type="range" min="-1" max="1" step="0.01" value="0.4" disabled><output id="infXO"></output></div>
+        <div class="ctl"><label for="infZ">input z</label><input id="infZ" type="range" min="-1" max="1" step="0.01" value="0.35" disabled><output id="infZO"></output></div>
+      </div>
       <div class="call" id="infCall"></div>
       <div class="readout">
-        <div>parameters<b>46</b></div>
+        <div>parameters<b>100</b></div>
         <div>training steps<b>0</b></div>
         <div>output y<b id="infY">—</b></div>
       </div>
-      <figcaption>Loading is just reading the numbers into the right slots. Running it is the same squash-and-add arithmetic from section 5, done once per input: no loss, no nudging.</figcaption>
+      <figcaption>Each spot on the map is one input (x, z), shaded by the model's output: yellow is high, gray is low. Click the map to move the input. Loading is just reading the numbers into the right cells. Running it is the same multiply-and-add from section 5, done once per input: no loss, no nudging.</figcaption>
     </figure>
   </div>
   <div class="wrap">
-    <p>Some AI labs are secretive about their neural networks. They don't share the shape or the parameter values. But lots of labs do. These are called <mark>open-weight</mark> models, and there are tons of them you can use. Here are <a href="https://huggingface.co/models?pipeline_tag=text-generation&amp;sort=downloads">the most-downloaded text generators on Hugging Face</a>.</p>
+    <p>Some AI labs are secretive about their models. They don't share the equation or the parameter values. But lots of labs do. These are called <mark>open-weight</mark> models, and there are tons of them you can use. Here are <a href="https://huggingface.co/models?pipeline_tag=text-generation&amp;sort=downloads">the most-downloaded text generators on Hugging Face</a>.</p>
     <p>Their parameters can be downloaded and used just like our little example. In reality, the files are much bigger: roughly 1 GB per billion parameters. And the computer running them has to be powerful. Think MacBook Pro or stronger.</p>
-    <p>But the pattern is the same. These labs did the hard part: they came up with a network shape, gathered the training data, and trained the network until the loss was low. Then they uploaded the shape and the parameter values to the internet, so anyone can download them and do the useful part.</p>
+    <p>But the pattern is the same. These labs did the hard part: they came up with an equation, gathered the training data, and trained the parameters until the loss was low. Then they uploaded the equation and the parameter values to the internet, so anyone can download them and do the useful part.</p>
   </div>
 </section>
 
@@ -683,12 +620,12 @@ autocomplete('e', 'l', 'l', 'o')       → end</span>
       <li><span><strong>Loss</strong> is one number that says how wrong a prediction is.</span></li>
       <li><span><strong>Training</strong> adjusts the line to make the loss as low as possible.</span></li>
       <li><span>The adjustable numbers are <strong>parameters</strong>. Model size is counted in them.</span></li>
-      <li><span>A <strong>neural network</strong> is lines, squashed and added, so it can bend to fit anything.</span></li>
+      <li><span>Add more terms and the equation can <strong>bend</strong>. With more inputs, the parameters form a <strong>grid</strong>.</span></li>
       <li><span>Encode <strong>text as numbers</strong> and the same machinery works on language.</span></li>
-      <li><span><strong>Autocomplete</strong> is a network trained to predict the next letter.</span></li>
+      <li><span><strong>Autocomplete</strong> is an equation trained to predict the next letter.</span></li>
       <li><span>Feed predictions back in and you get <strong>generation</strong>: the core of a chatbot.</span></li>
       <li><span><strong>Scale</strong> brings new abilities, but a model can't outgrow its training data.</span></li>
-      <li><span>There's <strong>no magic</strong>: a network is a shape plus parameters. Open-weight labs publish both, so anyone can run them.</span></li>
+      <li><span>There's <strong>no magic</strong>: a model is an equation plus parameters. Open-weight labs publish both, so anyone can run them.</span></li>
     </ol>
     <p>That's an approximate but valid picture. The real systems add important machinery we skipped: tokens instead of letters, <em>embeddings</em> that give each token a rich numeric fingerprint, an architecture called the <em>transformer</em> that lets the model weigh every earlier word when predicting the next one, and extra training rounds with human feedback to make it helpful and careful. But every one of those pieces is built on the bricks above. Parameters, a loss, and a loop that nudges downhill.</p>
   </div>
@@ -731,7 +668,7 @@ function sizeCanvas(o){
 }
 let rsT; window.addEventListener('resize',()=>{clearTimeout(rsT);rsT=setTimeout(()=>canvases.forEach(sizeCanvas),80);});
 const redrawAll=()=>canvases.forEach(o=>o.draw(o));
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{landCache=null;redrawAll();});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{landCache=null;mapImg=null;redrawAll();});
 
 function frame(o,xr,yr,pad){
   pad=Object.assign({l:58,r:14,t:12,b:40},pad||{});
@@ -909,23 +846,20 @@ $('#nudgeBtn').onclick=()=>{
 $('#resetTrain').onclick=()=>{tries=[];best=null;path=[];logLines=[];trainLog([]);updTrain();};
 updTrain();
 
-/* ---------- 5: neural network 1D ---------- */
-class Net1D{
-  constructor(H,seed){this.H=H;const r=mulberry32(seed);
-    this.w=Float64Array.from({length:H},()=>(r()*2-1)*5);
-    this.c=Float64Array.from({length:H},()=>(r()*2-1)*3);
-    this.v=Float64Array.from({length:H},()=>(r()*2-1)*.6);
-    this.d=0; const P=3*H+1; this.m1=new Float64Array(P); this.m2=new Float64Array(P); this.t=0; this.g=new Float64Array(P); this.tt=new Float64Array(H);}
-  f(x){let y=this.d;for(let j=0;j<this.H;j++)y+=this.v[j]*Math.tanh(this.w[j]*x+this.c[j]);return y;}
-  part(j,x){return this.v[j]*Math.tanh(this.w[j]*x+this.c[j]);}
-  step(pts,lr){const H=this.H,N=pts.length,g=this.g,t=this.tt;if(!N)return 0;g.fill(0);let L=0;
-    for(const [x,y] of pts){let yp=this.d;for(let j=0;j<H;j++){t[j]=Math.tanh(this.w[j]*x+this.c[j]);yp+=this.v[j]*t[j];}
-      const e=yp-y;L+=e*e;const ge=2*e/N;
-      for(let j=0;j<H;j++){g[j]+=ge*t[j];const a=ge*this.v[j]*(1-t[j]*t[j]);g[H+j]+=a*x;g[2*H+j]+=a;}g[3*H]+=ge;}
+/* ---------- 5: polynomial curves ---------- */
+const sup=n=>String(n).replace(/\d/g,d=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);
+const pw=(v,k)=>k===0?'':k===1?v:v+sup(k);
+class Poly1D{
+  constructor(D,seed){this.D=D;const P=D+1,r=mulberry32(seed);
+    this.a=Float64Array.from({length:P},()=>(r()*2-1)*.5);
+    this.m1=new Float64Array(P);this.m2=new Float64Array(P);this.g=new Float64Array(P);this.t=0;}
+  f(x){let y=0,p=1;for(let k=0;k<=this.D;k++){y+=this.a[k]*p;p*=x;}return y;}
+  part(k,x){return this.a[k]*Math.pow(x,k);}
+  step(pts,lr){const P=this.D+1,N=pts.length,g=this.g;if(!N)return 0;g.fill(0);let L=0;
+    for(const [x,y] of pts){const e=this.f(x)-y;L+=e*e;let p=2*e/N;for(let k=0;k<P;k++){g[k]+=p;p*=x;}}
     this.t++;const b1=.9,b2=.999,c1=1-Math.pow(b1,this.t),c2=1-Math.pow(b2,this.t);
-    for(let i=0;i<3*H+1;i++){this.m1[i]=b1*this.m1[i]+(1-b1)*g[i];this.m2[i]=b2*this.m2[i]+(1-b2)*g[i]*g[i];
-      const u=lr*(this.m1[i]/c1)/(Math.sqrt(this.m2[i]/c2)+1e-8);
-      if(i<H)this.v[i]-=u;else if(i<2*H)this.w[i-H]-=u;else if(i<3*H)this.c[i-2*H]-=u;else this.d-=u;}
+    for(let k=0;k<P;k++){this.m1[k]=b1*this.m1[k]+(1-b1)*g[k];this.m2[k]=b2*this.m2[k]+(1-b2)*g[k]*g[k];
+      this.a[k]-=lr*(this.m1[k]/c1)/(Math.sqrt(this.m2[k]/c2)+1e-8);}
     return L/N;}
   mae(pts){return pts.length?pts.reduce((s,[x,y])=>s+Math.abs(this.f(x)-y),0)/pts.length:0;}
 }
@@ -935,135 +869,53 @@ const SHAPES={
   bump:x=>1.5*Math.exp(-14*x*x)-0.55,
 };
 function makePts(fn,n,seed){const r=mulberry32(seed),p=[];for(let i=0;i<n;i++){const x=-1+2*(i+r()*.8)/n;p.push([x,fn(x)+gauss(r)*0.05]);}return p;}
-let nnPts=makePts(SHAPES.wave,34,5), nnSeed=11, nn=new Net1D(6,nnSeed), nnRun=false, nnSteps=0;
-const nnH=$('#nnH'), NX=[-1.15,1.15], NY=[-1.7,1.7];
-const nnC=makeCanvas($('#nnCanvas'),w=>w<520?0.8:0.45,o=>{
+let polyPts=makePts(SHAPES.wave,34,5), polySeed=11, poly=new Poly1D(3,polySeed), polyRun=false, polySteps=0;
+const polyD=$('#polyD'), NX=[-1.15,1.15], NY=[-1.7,1.7];
+const polyC=makeCanvas($('#polyCanvas'),w=>w<520?0.8:0.45,o=>{
   const f=frame(o,NX,NY,{l:40}),c=o.ctx;
   axes(o,f,{xt:[-1,-.5,0,.5,1],yt:[-1,0,1],xl:'input x',yl:'output y'});
   clip(o,f);
   const N=Math.max(80,Math.round(o.w/3));
-  if($('#nnParts').checked){c.strokeStyle=C('--graphite');c.globalAlpha=.55;c.lineWidth=1;
-    for(let j=0;j<nn.H;j++){c.beginPath();for(let i=0;i<=N;i++){const x=NX[0]+(NX[1]-NX[0])*i/N,y=f.Y(nn.part(j,x));i?c.lineTo(f.X(x),y):c.moveTo(f.X(x),y);}c.stroke();}
+  if($('#polyParts').checked){c.strokeStyle=C('--graphite');c.globalAlpha=.55;c.lineWidth=1;
+    for(let k=0;k<=poly.D;k++){c.beginPath();for(let i=0;i<=N;i++){const x=NX[0]+(NX[1]-NX[0])*i/N,y=f.Y(clamp(poly.part(k,x),-50,50));i?c.lineTo(f.X(x),y):c.moveTo(f.X(x),y);}c.stroke();}
     c.globalAlpha=1;}
-  const pts=[];for(let i=0;i<=N;i++){const x=NX[0]+(NX[1]-NX[0])*i/N;pts.push([f.X(x),f.Y(nn.f(x))]);}
+  const pts=[];for(let i=0;i<=N;i++){const x=NX[0]+(NX[1]-NX[0])*i/N;pts.push([f.X(x),f.Y(clamp(poly.f(x),-50,50))]);}
   highlighterLine(c,pts);
   c.restore();
-  dots(c,f,nnPts,4);
+  dots(c,f,polyPts,4);
 });
-function updNN(){$('#nnHO').textContent=nnH.value;$('#nnP').textContent=(3*nn.H+1).toLocaleString('en-US');$('#nnL').textContent=nnPts.length?nn.mae(nnPts).toFixed(3):'—';$('#nnS').textContent=nnSteps.toLocaleString('en-US');nnC.draw(nnC);}
-const NN_STEPS=3000; let nnGoal=0, nnJob=0;
-function setNNBtn(){const b=$('#nnPlay');b.disabled=nnRun;b.textContent=nnRun?'Training…':(nnSteps?'Train 3,000 more steps':'Train 3,000 steps');}
-function stopNN(){nnJob++;nnRun=false;setNNBtn();}
-$('#nnPlay').onclick=()=>{
-  if(nnRun)return; nnRun=true; nnGoal=nnSteps+NN_STEPS; setNNBtn();
-  const id=++nnJob;
-  const loop=()=>{if(id!==nnJob)return;
-    const n=reduceMotion?nnGoal-nnSteps:Math.min(25,nnGoal-nnSteps);
-    for(let i=0;i<n;i++)nn.step(nnPts,0.03);nnSteps+=n;updNN();
-    if(nnSteps<nnGoal)requestAnimationFrame(loop);else stopNN();};
+function updPoly(){
+  $('#polyDO').textContent=polyD.value;$('#polyP').textContent=poly.D+1;
+  $('#polyL').textContent=polyPts.length?poly.mae(polyPts).toFixed(3):'—';$('#polyS').textContent=polySteps.toLocaleString('en-US');
+  $('#polyEq').innerHTML='y = '+Array.from(poly.a,(v,k)=>(k?(v<0?' − ':' + '):(v<0?'−':''))+`<span class="p">${Math.abs(v).toFixed(2)}</span>`+(k?'·'+pw('x',k):'')).join('');
+  polyC.draw(polyC);
+}
+const POLY_STEPS=3000; let polyGoal=0, polyJob=0;
+function setPolyBtn(){const b=$('#polyPlay');b.disabled=polyRun;b.textContent=polyRun?'Training…':(polySteps?'Train 3,000 more steps':'Train 3,000 steps');}
+function stopPoly(){polyJob++;polyRun=false;setPolyBtn();}
+$('#polyPlay').onclick=()=>{
+  if(polyRun)return; polyRun=true; polyGoal=polySteps+POLY_STEPS; setPolyBtn();
+  const id=++polyJob;
+  const loop=()=>{if(id!==polyJob)return;
+    const n=reduceMotion?polyGoal-polySteps:Math.min(25,polyGoal-polySteps);
+    for(let i=0;i<n;i++)poly.step(polyPts,0.03);polySteps+=n;updPoly();
+    if(polySteps<polyGoal)requestAnimationFrame(loop);else stopPoly();};
   requestAnimationFrame(loop);
 };
-const resetNN=()=>{stopNN();nn=new Net1D(+nnH.value,++nnSeed);nnSteps=0;updNN();setNNBtn();};
-$('#nnShuffle').onclick=resetNN;
-nnH.addEventListener('input',resetNN);
-$('#nnParts').addEventListener('input',updNN);
-document.querySelectorAll('[data-shape]').forEach(bt=>bt.onclick=()=>{const s=bt.dataset.shape;stopNN();nnPts=s==='clear'?[]:makePts(SHAPES[s],34,nnSeed);nnSteps=0;updNN();setNNBtn();});
-$('#nnCanvas').addEventListener('click',e=>{const r=e.currentTarget.getBoundingClientRect();const f=frame(nnC,NX,NY,{l:40});const x=f.iX(e.clientX-r.left),y=f.iY(e.clientY-r.top);if(x<NX[0]||x>NX[1]||y<NY[0]||y>NY[1])return;nnPts.push([x,y]);updNN();});
-updNN();
+const resetPoly=()=>{stopPoly();poly=new Poly1D(+polyD.value,++polySeed);polySteps=0;updPoly();setPolyBtn();};
+$('#polyShuffle').onclick=resetPoly;
+polyD.addEventListener('input',resetPoly);
+$('#polyParts').addEventListener('input',updPoly);
+document.querySelectorAll('[data-shape]').forEach(bt=>bt.onclick=()=>{const s=bt.dataset.shape;stopPoly();polyPts=s==='clear'?[]:makePts(SHAPES[s],34,polySeed);polySteps=0;updPoly();setPolyBtn();});
+$('#polyCanvas').addEventListener('click',e=>{const r=e.currentTarget.getBoundingClientRect();const f=frame(polyC,NX,NY,{l:40});const x=f.iX(e.clientX-r.left),y=f.iY(e.clientY-r.top);if(x<NX[0]||x>NX[1]||y<NY[0]||y>NY[1])return;polyPts.push([x,y]);updPoly();});
+updPoly();
 
-/* ---------- 5a: 1 -> n -> 1 diagrams ---------- */
-function netSVG(svg,n,H){
-  const W=390,top=34,bot=H-14,slot=Math.min(52,(bot-top)/n),r=Math.min(18,slot*.36),xi=40,xh=195,xo=330,ym=(top+bot)/2;
-  const ys=Array.from({length:n},(_,j)=>ym+(j-(n-1)/2)*slot);
-  let h=ys.map(y=>`<line class="wire" x1="${xi}" y1="${ym}" x2="${xh}" y2="${y}"/><line class="wire" x1="${xh}" y1="${y}" x2="${xo}" y2="${ym}"/>`).join('');
-  h+=`<circle class="io" cx="${xi}" cy="${ym}" r="14"/><text x="${xi}" y="${ym+4.5}" text-anchor="middle">x</text>`;
-  h+=ys.map(y=>`<circle class="neu" cx="${xh}" cy="${y}" r="${r}"/>`+(r>=10?`<path class="sq" d="M${xh-.6*r} ${y+.35*r}C${xh} ${y+.35*r} ${xh} ${y-.35*r} ${xh+.6*r} ${y-.35*r}"/>`:'')).join('');
-  h+=`<circle class="out" cx="${xo}" cy="${ym}" r="16"/><text x="${xo}" y="${ym+4.5}" text-anchor="middle">+</text><text x="${xo+24}" y="${ym+4.5}">y</text>`;
-  h+=`<text class="lbl" x="${xi}" y="16" text-anchor="middle">input</text><text class="lbl" x="${xh}" y="16" text-anchor="middle">${n} neuron${n>1?'s':''}</text><text class="lbl" x="${xo}" y="16" text-anchor="middle">output</text>`;
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.innerHTML=h;
-}
-netSVG($('#babyNet'),3,190);
-function updTrainNet(){const n=+nnH.value;netSVG($('#trainNet'),n,n>8?300:240);
-  $('#trainNetCap').innerHTML=`One input, one layer of ${n} neuron${n>1?'s':''}, one output. ${n} × 3 parameters (<span class="p">w</span>, <span class="p">c</span>, <span class="p">v</span>) + <span class="p">d</span> = <strong>${3*n+1}</strong> parameters, the same count shown under the plot.`;}
-nnH.addEventListener('input',updTrainNet);updTrainNet();
-
-/* ---------- 5b: network shape ---------- */
-const NETS={wave:{inp:1,hid:[6],out:1},auto:{inp:108,hid:[64],out:27},big:{inp:10000,hid:Array(100).fill(10000),out:10000}};
-let net={...NETS.wave}, shHover=null;
-const shL=$('#shL'), shW=$('#shW');
-const sub=n=>String(n).replace(/\d/g,d=>'₀₁₂₃₄₅₆₇₈₉'[d]);
-const fmtBig=n=>n>=1e9?(n/1e9).toLocaleString('en-US',{maximumFractionDigits:1})+' billion':n.toLocaleString('en-US');
-const netCols=()=>[net.inp,...net.hid,net.out];
-function colName(i,cols){return i===0?'input':i===cols.length-1?'output':'layer '+i;}
-const shapeC=makeCanvas($('#shapeCanvas'),w=>w<520?0.95:0.46,o=>{
-  const c=o.ctx,W=o.w,H=o.h,small=W<520,cols=netCols();c.clearRect(0,0,W,H);
-  // which columns to draw; long stacks get a gap
-  let items=cols.map((n,i)=>({n,i}));
-  const maxCols=small?7:9;
-  if(items.length>maxCols){const k=Math.floor((maxCols-1)/2);items=[...items.slice(0,k),{gap:items.length-2*k},...items.slice(-k)];}
-  const top=30,bot=H-26,cap=small?9:12,padX=small?22:40;
-  const dx=(W-2*padX)/Math.max(1,items.length-1);
-  const slotH=(bot-top)/cap, r=Math.max(3,Math.min(11,slotH*.34,dx*.16));
-  // node positions per drawn column
-  items.forEach((it,ci)=>{it.x=items.length>1?padX+ci*dx:W/2;if(it.gap)return;
-    const k=Math.min(it.n,cap),h=k*slotH,y0=(top+bot)/2-h/2;it.nodes=[];it.dots=null;
-    for(let s2=0;s2<k;s2++){const y=y0+(s2+.5)*slotH;
-      if(it.n>cap&&s2===Math.floor(k/2)){it.dots=y;continue;}
-      const idx=it.n>cap&&s2>k/2?it.n-(k-s2):s2;it.nodes.push({x:it.x,y,col:it.i,idx});}});
-  o.nodes=items.filter(it=>!it.gap).flatMap(it=>it.nodes);
-  const hv=shHover;
-  // wires
-  c.lineWidth=1;
-  for(let ci=0;ci+1<items.length;ci++){const A=items[ci],B=items[ci+1];if(A.gap||B.gap)continue;
-    const a=Math.max(.06,Math.min(.45,6/Math.sqrt(A.nodes.length*B.nodes.length)));
-    for(const u of A.nodes)for(const v of B.nodes){
-      const on=hv&&v.col===hv.col&&v.idx===hv.idx;
-      if(on)continue;c.strokeStyle=rgba('--graphite',hv?a*.35:a);c.beginPath();c.moveTo(u.x,u.y);c.lineTo(v.x,v.y);c.stroke();}}
-  if(hv){const ci=items.findIndex(it=>it.i===hv.col),A=items[ci-1];
-    if(A&&!A.gap){c.strokeStyle=C('--hi-line');c.lineWidth=2;for(const u of A.nodes){c.beginPath();c.moveTo(u.x,u.y);c.lineTo(hv.x,hv.y);c.stroke();}}}
-  // nodes
-  c.font=(small?'10px ':'11px ')+C('--mono');c.textAlign='center';
-  items.forEach(it=>{
-    if(it.gap){c.fillStyle=C('--graphite');c.textBaseline='middle';c.fillText('⋯',it.x,(top+bot)/2-8);c.fillText(it.gap+' more',it.x,(top+bot)/2+8);c.fillText('layers',it.x,(top+bot)/2+22);return;}
-    const first=it.i===0,last=it.i===cols.length-1;
-    for(const nd of it.nodes){const isHv=hv&&nd.col===hv.col&&nd.idx===hv.idx;
-      c.beginPath();c.arc(nd.x,nd.y,isHv?r+2:r,0,7);c.fillStyle=first?C('--panel'):(last?C('--panel'):C('--hi'));
-      if(isHv)c.fillStyle=C('--hi');c.fill();c.strokeStyle=first?C('--graphite'):C('--ink');c.lineWidth=isHv?2.5:1.5;c.stroke();}
-    c.fillStyle=C('--ink');c.textBaseline='middle';if(it.dots!=null)c.fillText('⋮',it.x,it.dots);
-    c.fillStyle=C('--graphite');c.textBaseline='alphabetic';c.fillText(colName(it.i,cols),it.x,top-12);
-    c.textBaseline='top';c.fillText(it.n.toLocaleString('en-US'),it.x,bot+8);
-  });
-});
-function shInfo(){
-  const el=$('#shapeInfo'),cols=netCols(),hv=shHover;
-  if(!hv){el.innerHTML='Hover or tap any circle to see what that neuron computes.';return;}
-  const i=hv.col,name=colName(i,cols);
-  if(i===0){el.innerHTML=`<strong>Input ${(hv.idx+1).toLocaleString('en-US')}</strong>: just a number fed in (an x, or a letter switch). No parameters of its own.`;return;}
-  const N=cols[i-1],last=i===cols.length-1,sum=`<span class="p">w${sub(1)}</span>·x${sub(1)} + … + <span class="p">w${sub(N)}</span>·x${sub(N)} + <span class="p">b</span>`;
-  el.innerHTML=`<strong>${name[0].toUpperCase()+name.slice(1)}, neuron ${(hv.idx+1).toLocaleString('en-US')}</strong>: <code>${last?sum:'squash('+sum+')'}</code>. That's ${N.toLocaleString('en-US')} weight${N>1?'s':''} (the yellow lines) + 1 bias = <strong>${(N+1).toLocaleString('en-US')}</strong> parameters, just for this one neuron.`;
-}
-function updShape(){
-  const cols=netCols();let P=0,E=0,parts=[];
-  for(let i=0;i+1<cols.length;i++){E+=cols[i]*cols[i+1];P+=cols[i]*cols[i+1]+cols[i+1];parts.push(`${cols[i].toLocaleString('en-US')}×${cols[i+1].toLocaleString('en-US')} + ${cols[i+1].toLocaleString('en-US')}`);}
-  const neurons=cols.slice(1).reduce((a,b)=>a+b,0);
-  $('#shN').textContent=fmtBig(neurons);$('#shE').textContent=fmtBig(E);$('#shP').textContent=fmtBig(P);
-  const runs=[];parts.forEach(t=>{const l=runs[runs.length-1];if(l&&l.t===t)l.n++;else runs.push({t,n:1});});
-  $('#shMath').textContent='parameters = '+runs.map(({t,n})=>n>1?`${n} × (${t})`:t).join('  +  ')+'  =  '+P.toLocaleString('en-US');
-  $('#shLO').textContent=net.hid.length.toLocaleString('en-US');$('#shWO').textContent=Math.max(...net.hid).toLocaleString('en-US');
-  shInfo();shapeC.draw(shapeC);
-}
-const shSlide=()=>{net={inp:net.inp,hid:Array(+shL.value).fill(+shW.value),out:net.out};shHover=null;updShape();};
-shL.addEventListener('input',shSlide);shW.addEventListener('input',shSlide);
-document.querySelectorAll('[data-net]').forEach(bt=>bt.onclick=()=>{const n=NETS[bt.dataset.net];net={inp:n.inp,hid:[...n.hid],out:n.out};
-  shL.value=Math.min(+shL.max,n.hid.length);shW.value=Math.min(+shW.max,n.hid[0]);shHover=null;updShape();});
-function shPick(e){const r=e.currentTarget.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bd=24*24;
-  for(const nd of shapeC.nodes||[]){const d=(nd.x-x)**2+(nd.y-y)**2;if(d<bd){bd=d;best=nd;}}
-  const same=best&&shHover&&best.col===shHover.col&&best.idx===shHover.idx;
-  if(best&&!same||!best&&shHover){shHover=best;shInfo();shapeC.draw(shapeC);}}
-$('#shapeCanvas').addEventListener('pointermove',shPick);
-$('#shapeCanvas').addEventListener('pointerdown',shPick);
-$('#shapeCanvas').addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'&&shHover){shHover=null;shInfo();shapeC.draw(shapeC);}});
-updShape();
+/* ---------- 5a: the 10 x 10 grid of terms ---------- */
+const G=10;
+const term=(i,j)=>i||j?pw('x',i)+pw('z',j):'1';
+const gridHead='<div></div>'+Array.from({length:G},(_,j)=>`<div class="hd">z${sup(j)}</div>`).join('');
+const gridRows=cell=>Array.from({length:G},(_,i)=>`<div class="rl">x${sup(i)}</div>`+Array.from({length:G},(_,j)=>cell(i,j)).join('')).join('');
+$('#termGrid').innerHTML=gridHead+gridRows((i,j)=>`<div class="pc">${term(i,j)}</div>`);
 
 /* ---------- 6: encoding ---------- */
 const ABC='abcdefghijklmnopqrstuvwxyz';
@@ -1210,16 +1062,16 @@ const archC=makeCanvas($('#archCanvas'),w=>w<520?1.25:0.56,o=>{
   const mono=px=>px+'px '+C('--mono');
   // headings
   c.fillStyle=C('--graphite');c.font=mono(small?10:11);c.textAlign='center';c.textBaseline='alphabetic';
-  [[xL,['4','letters']],[xI+sw/2,['108','switches']],[xH+sw/2,['64','neurons']],[xZ+sw/2,['27','scores']],[(xP+W)/2,['softmax →','probabilities']]]
+  [[xL,['4','letters']],[xI+sw/2,['108','switches']],[xH+sw/2,['64','middle']],[xZ+sw/2,['27','scores']],[(xP+W)/2,['softmax →','probabilities']]]
     .forEach(([x,ls])=>ls.forEach((l,i)=>c.fillText(l,x,14+i*13)));
   // one-hot switches: 4 groups of 27
   const gap=small?6:10,ch=(avail-3*gap)/(4*V),grpH=ch*V;
   const lit=ctx.map((t,k)=>top+k*(grpH+gap)+(t+.5)*ch);
   const hy=j=>top+(j+.5)*avail/HID, zy=o2=>top+(o2+.5)*avail/V;
-  // wires: lit switches -> every neuron, colored by weight sign
+  // wires: lit switches -> every middle number, colored by weight sign
   c.lineWidth=.6;
   ctx.forEach((t,k)=>{const base=(k*V+t)*HID;for(let j=0;j<HID;j++){const w=cm.W1[base+j];c.strokeStyle=rgba(w>0?'--hi-line':'--graphite',Math.min(.5,.08+Math.abs(w)*.25));c.beginPath();c.moveTo(xI+sw,lit[k]);c.lineTo(xH,hy(j));c.stroke();}});
-  // wires: neurons -> scores (all of them, faint)
+  // wires: middle numbers -> scores (all of them, faint)
   c.strokeStyle=rgba('--faint',small?.05:.07);c.beginPath();
   for(let j=0;j<HID;j++)for(let o2=0;o2<V;o2++){c.moveTo(xH+sw,hy(j));c.lineTo(xZ,zy(o2));}
   c.stroke();
@@ -1235,7 +1087,7 @@ const archC=makeCanvas($('#archCanvas'),w=>w<520?1.25:0.56,o=>{
       if(on){c.strokeStyle='#14223D';c.lineWidth=1.2;c.strokeRect(xI,y0+t*ch,sw,ch);}}
     if(!small){c.fillStyle=C('--graphite');c.font=mono(10);c.textAlign='right';c.fillText(ch2==='.'?'blank':ch2,xI-4,lit[k]);}
   }
-  // neurons, shaded by activation
+  // middle numbers, shaded by value
   const nh=avail/HID;
   for(let j=0;j<HID;j++){c.fillStyle=C('--grid');c.fillRect(xH,top+j*nh+.3,sw,nh-.6);c.fillStyle=rgba(h[j]>0?'--hi':'--graphite',Math.abs(h[j]));c.fillRect(xH,top+j*nh+.3,sw,nh-.6);}
   c.strokeStyle=C('--ink');c.lineWidth=1;c.strokeRect(xH,top,sw,avail);
@@ -1280,101 +1132,68 @@ $('#genBtn').onclick=async()=>{
   genBusy=false;$('#genBtn').disabled=false;
 };
 
-/* ---------- 10: shape + parameters, pre-trained ---------- */
-// trained offline on SHAPES.wave; per layer: weights [into j][from i], then biases
-const TS=[1,5,5,1];
-const TP=[1.24,-1.96,-0.69,-1.17,0.74,-0.98,0.02,-0.38,-0.66,0.08,-0.78,-1.52,0,-0.59,1.3,2.04,-0.64,0.34,-0.91,1.1,0.04,1.15,-0.37,-1.45,1.06,-0.73,1.3,1.28,0.1,0.05,-1.35,-0.35,1.05,-1.47,-1.66,0.17,0.08,0.23,-0.09,0.41,0.41,0.38,-1.3,-0.51,1,0.1];
-const TL=[];{let k=0;for(let l=0;l+1<TS.length;l++){const a=TS[l],b=TS[l+1];TL.push({a,b,w:k,bi:k+a*b});k+=a*b+b;}}
-function runNet(P,x){let h=[x];TL.forEach((L,l)=>{const o=[];for(let j=0;j<L.b;j++){let s=P[L.bi+j];for(let i=0;i<L.a;i++)s+=P[L.w+j*L.a+i]*h[i];o.push(l<TL.length-1?Math.tanh(s):s);}h=o;});return h[0];}
-function pInfo(k){for(let l=0;l<TL.length;l++){const L=TL[l];if(k<L.bi)return{w:true,l,j:Math.floor((k-L.w)/L.a),i:(k-L.w)%L.a};if(k<L.bi+L.b)return{w:false,l,j:k-L.bi};}}
+/* ---------- 10: a pre-trained grid ---------- */
+// fit offline to a hill at (0.4, 0.35) and a valley at (−0.45, −0.3); HP[i*G+j] multiplies x^i · z^j
+const HP=[0.03,1.07,0.18,-2.54,-0.31,0.87,-0.09,0.92,0.17,-0.3,1.22,0.18,-0.79,0.12,-1.06,-0.2,0.04,-0.13,0.54,0.04,-0.24,0.49,0.16,0.03,0.13,0.14,0.03,-0.09,-0.04,-0.37,-1.84,-0.41,0.93,0.05,0.51,0.05,0.3,0.08,0.01,0.11,0.19,-1.5,-0.17,0.51,-0.02,0.39,-0.02,0.14,-0.06,-0.03,-0.18,0.04,0.52,0.05,0.28,0.03,0.05,0.03,-0.2,0.03,0.11,-0.47,-0.12,0.59,0.02,0.2,0.02,-0.05,-0.02,-0.15,0.51,0.12,0,-0.01,0.02,-0.01,-0.08,-0.01,-0.22,-0.01,-0.1,0.47,-0.03,0.45,0.08,-0.09,0.06,-0.32,0.01,-0.36,0.3,0.05,-0.44,-0.07,-0.17,-0.05,-0.13,-0.04,-0.17,-0.04];
+function runGrid(P,x,z){let y=0,xp=1;for(let i=0;i<G;i++){let zp=1;for(let j=0;j<G;j++){y+=P[i*G+j]*xp*zp;zp*=z;}xp*=x;}return y;}
 const f2=v=>(v<0?'−':'')+Math.abs(v).toFixed(2);
-const tColName=ci=>ci===0?'input':ci===TS.length-1?'output':'layer '+ci;
-const tNode=(ci,j)=>ci===0?'the input':ci===TS.length-1?'the output':`layer ${ci}, neuron ${j+1}`;
-let tnHv=null;
-// which params / nodes the hover lights up
-function tnHot(){const k=new Set();let n=null;if(!tnHv)return{k,n};
-  if(tnHv.k!=null){const p=pInfo(tnHv.k);k.add(tnHv.k);if(!p.w)n={ci:p.l+1,j:p.j};}
-  else if(tnHv.ci>0){const L=TL[tnHv.ci-1];for(let i=0;i<L.a;i++)k.add(L.w+tnHv.j*L.a+i);k.add(L.bi+tnHv.j);n=tnHv;}
-  else n=tnHv;
-  return{k,n};}
-function drawTiny(o,vals){
-  const c=o.ctx,W=o.w,H=o.h,small=W<420;c.clearRect(0,0,W,H);
-  const top=34,bot=H-26,padX=small?24:48,slot=(bot-top)/5,r=clamp(slot*.28,6,14);
-  const pos=(ci,j)=>[padX+ci*(W-2*padX)/(TS.length-1),(top+bot)/2+(j-(TS[ci]-1)/2)*slot];
-  const hot=vals?tnHot():{k:new Set(),n:null},dim=vals&&tnHv;
-  const wires=[];
-  TL.forEach((L,l)=>{for(let j=0;j<L.b;j++)for(let i=0;i<L.a;i++){const k=L.w+j*L.a+i;wires.push({k,a:pos(l,i),b:pos(l+1,j),on:hot.k.has(k)});}});
-  wires.sort((p,q)=>p.on-q.on).forEach(({k,a,b,on})=>{
-    c.lineWidth=(vals?.5+Math.abs(TP[k])*1.6:1.2)+(on?1.5:0);
-    c.strokeStyle=on?C('--hi-line'):rgba('--graphite',dim?.2:.55);
-    c.beginPath();c.moveTo(a[0],a[1]);c.lineTo(b[0],b[1]);c.stroke();});
-  o.nodes=[];
-  c.font=(small?'10px ':'11px ')+C('--mono');c.textAlign='center';
-  TS.forEach((n,ci)=>{const io=ci===0||ci===TS.length-1;
-    for(let j=0;j<n;j++){const[x,y]=pos(ci,j),on=hot.n&&hot.n.ci===ci&&hot.n.j===j;o.nodes.push({x,y,ci,j});
-      c.beginPath();c.arc(x,y,on?r+2:r,0,7);c.fillStyle=io&&!on?C('--panel'):C('--hi');c.fill();
-      c.strokeStyle=ci===0?C('--graphite'):C('--ink');c.lineWidth=on?2.5:1.5;c.stroke();}
-    const x=pos(ci,0)[0];c.fillStyle=C('--graphite');
-    c.textBaseline='alphabetic';c.fillText(tColName(ci),x,top-14);
-    c.textBaseline='top';c.fillText(n,x,bot+8);});
+const fc=v=>(v<0?'−':'')+Math.abs(v).toFixed(2).replace(/^0(?=\.)/,'');
+const termDot=(i,j)=>i||j?[pw('x',i),pw('z',j)].filter(Boolean).join('·'):'1';
+const valGrid=$('#valGrid'), infX=$('#infX'), infZ=$('#infZ');
+let vgHv=null, tLoaded=null, mapImg=null;
+valGrid.innerHTML=gridHead+gridRows((i,j)=>`<div class="pc" data-k="${i*G+j}">${fc(HP[i*G+j])}</div>`);
+function updVal(){
+  valGrid.querySelectorAll('.pc').forEach(el=>el.classList.toggle('on',+el.dataset.k===vgHv));
+  const el=$('#valInfo');
+  if(vgHv==null){el.innerHTML='Hover or tap a number.';return;}
+  const i=Math.floor(vgHv/G),j=vgHv%G,v=HP[vgHv],x=+infX.value,z=+infZ.value;
+  el.innerHTML=`<strong>a[${i}][${j}] = ${f2(v)}</strong>, the parameter for the term <code>${termDot(i,j)}</code>.`+
+    (tLoaded?` At x = ${f2(x)}, z = ${f2(z)}, this one cell adds <strong>${f2(v*Math.pow(x,i)*Math.pow(z,j))}</strong> to the output.`:'');
 }
-makeCanvas($('#tinyShape'),w=>w<520?0.7:0.36,o=>drawTiny(o,false));
-const tinyC=makeCanvas($('#tinyNet'),w=>w<420?0.75:0.8,o=>drawTiny(o,true));
-const tinyGrid=$('#tinyGrid');
-{const cell=k=>`<div class="pc${pInfo(k).w?'':' b'}" data-k="${k}">${f2(TP[k])}</div>`,row=(lbl,ks)=>`<div class="rl">${lbl}</div>`+ks.map(cell).join('')+'<div></div>'.repeat(5-ks.length);
-  const rng=(s,n)=>Array.from({length:n},(_,i)=>s+i);let h='';
-  TL.forEach((L,l)=>{const nm=l===TL.length-1?'output':'layer '+(l+1);
-    for(let j=0;j<L.b;j+=L.a>1?1:5)h+=row(j?'':nm+' weights',L.a>1?rng(L.w+j*L.a,L.a):rng(L.w,L.b));
-    h+=row(nm+(L.b>1?' biases':' bias'),rng(L.bi,L.b))+(l<TL.length-1?'<div class="gap"></div>':'');});
-  tinyGrid.innerHTML=h;}
-function updTiny(){
-  const hot=tnHot();tinyGrid.querySelectorAll('.pc').forEach(el=>el.classList.toggle('on',hot.k.has(+el.dataset.k)));
-  const el=$('#tinyInfo'),hv=tnHv;
-  if(!hv)el.innerHTML='Hover or tap a number or a neuron.';
-  else if(hv.k!=null){const p=pInfo(hv.k);
-    el.innerHTML=p.w?`<strong>Weight</strong> on the line from ${tNode(p.l,p.i)} into ${tNode(p.l+1,p.j)}: <strong>${f2(TP[hv.k])}</strong>`:`<strong>Bias</strong> of ${tNode(p.l+1,p.j)}: <strong>${f2(TP[hv.k])}</strong>`;}
-  else if(hv.ci===0)el.innerHTML='<strong>The input</strong>: just the number x being fed in. No parameters of its own.';
-  else{const a=TS[hv.ci-1];el.innerHTML=`<strong>${tNode(hv.ci,hv.j).replace(/^./,s=>s.toUpperCase())}</strong> uses ${a} weight${a>1?'s':''} + 1 bias = ${a+1} of the 46 numbers.`;}
-  tinyC.draw(tinyC);
-}
-const setTiny=v=>{if(JSON.stringify(v)!==JSON.stringify(tnHv)){tnHv=v;updTiny();}};
-tinyGrid.addEventListener('pointerover',e=>{const k=e.target.closest('.pc')?.dataset.k;if(k!=null)setTiny({k:+k});});
-tinyGrid.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')setTiny(null);});
-function tinyPick(e){const r=e.currentTarget.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bd=22*22;
-  for(const nd of tinyC.nodes||[]){const d=(nd.x-x)**2+(nd.y-y)**2;if(d<bd){bd=d;best=nd;}}
-  if(best)setTiny({ci:best.ci,j:best.j});else if(e.pointerType==='mouse')setTiny(null);}
-$('#tinyNet').addEventListener('pointermove',tinyPick);
-$('#tinyNet').addEventListener('pointerdown',tinyPick);
-$('#tinyNet').addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')setTiny(null);});
-updTiny();
+const setVal=k=>{if(k!==vgHv){vgHv=k;updVal();}};
+valGrid.addEventListener('pointerover',e=>{const k=e.target.closest('.pc')?.dataset.k;if(k!=null)setVal(+k);});
+valGrid.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')setVal(null);});
 
 // inference with the downloaded numbers
-$('#modelFile').textContent=`{\n  "shape": [${TS.join(', ')}],\n  "params": [${TP.map(v=>v.toFixed(2)).join(', ')}]\n}`;
-let tLoaded=null;const infX=$('#infX');
-const infC=makeCanvas($('#infCanvas'),w=>w<520?0.8:0.45,o=>{
-  const f=frame(o,NX,NY,{l:40}),c=o.ctx;
-  axes(o,f,{xt:[-1,-.5,0,.5,1],yt:[-1,0,1],xl:'input x',yl:'output y'});
+$('#modelFile').textContent='{\n  "equation": "add up a[i][j] · x^i · z^j",\n  "params": [\n'+
+  Array.from({length:G},(_,i)=>'    ['+HP.slice(i*G,i*G+G).map(v=>v.toFixed(2)).join(', ')+']').join(',\n')+'\n  ]\n}';
+function mapImage(){
+  if(mapImg)return mapImg;
+  const S=64,cv=document.createElement('canvas');cv.width=S;cv.height=S;
+  const cx=cv.getContext('2d'),img=cx.createImageData(S,S);
+  const A=hexRgb(C('--hi')),B=hexRgb(C('--panel')),D=hexRgb(C('--graphite'));
+  for(let r=0;r<S;r++)for(let q=0;q<S;q++){const v=clamp(runGrid(tLoaded,-1+2*(q+.5)/S,1-2*(r+.5)/S),-1,1);
+    const col=v>0?B.map((b,i)=>b+(A[i]-b)*v):B.map((b,i)=>b+(D[i]-b)*-v*.85);
+    img.data.set([col[0],col[1],col[2],255],(r*S+q)*4);}
+  cx.putImageData(img,0,0);return mapImg=cv;
+}
+const MAP=[-1,1];
+const infC=makeCanvas($('#infCanvas'),w=>w<520?0.85:0.62,o=>{
+  const f=frame(o,MAP,MAP,{l:40}),c=o.ctx;
+  c.clearRect(0,0,o.w,o.h);
+  if(tLoaded){c.imageSmoothingEnabled=true;c.drawImage(mapImage(),f.pad.l,f.pad.t,o.w-f.pad.l-f.pad.r,o.h-f.pad.t-f.pad.b);}
+  axes(o,f,{keep:true,xt:[-1,-.5,0,.5,1],yt:[-1,-.5,0,.5,1],xl:'input x',yl:'input z'});
   if(!tLoaded){c.fillStyle=C('--graphite');c.font='13px '+C('--serif');c.textAlign='center';c.textBaseline='middle';c.fillText('No model loaded yet',(f.pad.l+o.w-f.pad.r)/2,(f.pad.t+o.h-f.pad.b)/2);return;}
-  clip(o,f);
-  const N=Math.max(80,Math.round(o.w/3)),pts=[];
-  for(let i=0;i<=N;i++){const x=-1+2*i/N;pts.push([f.X(x),f.Y(runNet(tLoaded,x))]);}
-  highlighterLine(c,pts);c.restore();
-  const x=+infX.value,y=runNet(tLoaded,x);
-  c.save();c.strokeStyle=C('--graphite');c.setLineDash([4,4]);c.lineWidth=1;
-  c.beginPath();c.moveTo(f.X(x),o.h-f.pad.b);c.lineTo(f.X(x),f.Y(y));c.lineTo(f.pad.l,f.Y(y));c.stroke();c.restore();
-  c.fillStyle=C('--miss');c.beginPath();c.arc(f.X(x),f.Y(y),6,0,7);c.fill();
+  const x=+infX.value,z=+infZ.value;
+  c.save();c.strokeStyle=C('--ink');c.setLineDash([4,4]);c.lineWidth=1;
+  c.beginPath();c.moveTo(f.X(x),o.h-f.pad.b);c.lineTo(f.X(x),f.Y(z));c.lineTo(f.pad.l,f.Y(z));c.stroke();c.restore();
+  c.fillStyle=C('--miss');c.strokeStyle=C('--panel');c.lineWidth=2;c.beginPath();c.arc(f.X(x),f.Y(z),6,0,7);c.fill();c.stroke();
 });
 function updInf(){
-  const x=+infX.value;$('#infXO').textContent=f2(x);
-  $('#infCall').innerHTML=tLoaded?`run(shape, params, ${f2(x)}) → <strong>${f2(runNet(tLoaded,x))}</strong>`:`run(shape, params, ${f2(x)}) → ? (load the file first)`;
-  $('#infY').textContent=tLoaded?f2(runNet(tLoaded,x)):'—';
-  infC.draw(infC);
+  const x=+infX.value,z=+infZ.value,args=`params, ${f2(x)}, ${f2(z)}`;
+  $('#infXO').textContent=f2(x);$('#infZO').textContent=f2(z);
+  $('#infCall').innerHTML=tLoaded?`run(${args}) → <strong>${f2(runGrid(tLoaded,x,z))}</strong>`:`run(${args}) → ? (load the file first)`;
+  $('#infY').textContent=tLoaded?f2(runGrid(tLoaded,x,z)):'—';
+  infC.draw(infC);updVal();
 }
-$('#loadBtn').onclick=()=>{tLoaded=JSON.parse($('#modelFile').textContent).params;infX.disabled=false;$('#loadBtn').disabled=true;$('#loadBtn').textContent='Loaded';updInf();};
-infX.addEventListener('input',updInf);updInf();
+$('#loadBtn').onclick=()=>{tLoaded=JSON.parse($('#modelFile').textContent).params.flat();mapImg=null;infX.disabled=infZ.disabled=false;$('#loadBtn').disabled=true;$('#loadBtn').textContent='Loaded';updInf();};
+[infX,infZ].forEach(e=>e.addEventListener('input',updInf));
+$('#infCanvas').addEventListener('pointerdown',e=>{if(!tLoaded)return;const r=e.currentTarget.getBoundingClientRect(),f=frame(infC,MAP,MAP,{l:40});
+  const x=f.iX(e.clientX-r.left),z=f.iY(e.clientY-r.top);if(x<-1||x>1||z<-1||z>1)return;infX.value=x.toFixed(2);infZ.value=z.toFixed(2);updInf();});
+updInf();
 
 /* ---------- 4: parameter bars ---------- */
-const BARS=[['Our house line',2],['Size + lot size',3],['Wave network (6 neurons)',19],['Our letter model',cm.nParams],['GPT-2 (2019)',1.5e9],['GPT-3 (2020)',1.75e11]];
+const BARS=[['Our house line',2],['Size + lot size',3],['Wave curve (power 7)',8],['Our letter model',cm.nParams],['GPT-2 (2019)',1.5e9],['GPT-3 (2020)',1.75e11]];
 const fmtN=n=>n>=1e9?(n/1e9).toLocaleString('en-US',{maximumFractionDigits:1})+' billion':n.toLocaleString('en-US');
 const barsEl=$('#bars');const maxLog=Math.log10(2e11);
 barsEl.innerHTML=BARS.map(([l,n])=>`<span>${l}</span><div><div class="bar" data-w="${(Math.max(.02,Math.log10(n)/maxLog)*100).toFixed(1)}" style="width:0"></div></div><span class="num">${fmtN(n)}</span>`).join('');
