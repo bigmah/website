@@ -38,6 +38,7 @@
     --dot: rgba(255, 255, 255, 0.055);
     --cube: #6b62a8;
     --cube-hover: #8f83d6;
+    --danger: #e5484d;
     color-scheme: dark;
   }
 
@@ -59,6 +60,7 @@
     --dot: rgba(0, 0, 0, 0.07);
     --cube: #5f56a3;
     --cube-hover: #443c84;
+    --danger: #ce2c31;
     color-scheme: light;
   }
 
@@ -384,6 +386,30 @@
     cursor: pointer;
   }
 
+  /* the red × on a tile that was put on the board from a square, and can go */
+  .tile__close {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-right: -0.25rem;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    color: var(--danger);
+    opacity: 0.7;
+    cursor: pointer;
+    transition: opacity 160ms ease, background-color 160ms ease;
+  }
+  .tile__close svg { width: 0.75rem; height: 0.75rem; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+  .tile__close:hover,
+  .tile__close:focus-visible { opacity: 1; background: color-mix(in srgb, var(--danger) 14%, transparent); outline: none; }
+
+  /* off the board until its square is clicked */
+  .tile[hidden] { display: none !important; }
+
   .tile__body {
     flex: 1;
     min-height: 0;
@@ -703,6 +729,10 @@
   .board--static .repos:not(.is-open) { display: none; }
 
   .repo {
+    width: 100%;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
     aspect-ratio: 1;
     display: flex;
     flex-direction: column;
@@ -732,6 +762,8 @@
   .repo:focus-visible { border-color: var(--line-strong); transform: translateY(-1px); }
   .repo:hover .repo__name,
   .repo:focus-visible .repo__name { color: var(--accent); }
+  /* its tile is already out on the board */
+  .repo[aria-pressed="true"] { border-color: var(--accent-soft); }
 
   /* emulator */
 
@@ -904,7 +936,8 @@
   .ph { display: none; }
   /* nothing ever resizes a tile, so it shows all it has from the start */
   .post time, .post .what { display: block; }
-  .repos { display: grid; grid-template-columns: repeat(auto-fill, minmax(4.6rem, 5.2rem)); gap: 0.45rem; margin: 1.15rem 0 0; padding: 0; list-style: none; }
+  /* the squares and the × only move tiles on and off a board there is no script to run */
+  .repos, .tile__close { display: none; }
   /* no script to swap the iframe in, so the button is just the link it already is */
   .start .go { text-decoration: underline; }
   /* ...and its rows are links from the start */
@@ -972,26 +1005,12 @@
           <span class="email__said" role="status"></span>
         </span>
       </nav>
-      <p class="now">working on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> — trying to make code review in browser better with Rust + WASM</p>
-      <button class="repos-toggle" type="button" aria-expanded="false" aria-controls="repos">repos ↓</button>
-      <ul class="repos" id="repos" aria-label="Repositories on GitHub">
-        <li><a class="repo" href="https://github.com/bigmah/pullspace" target="_blank" rel="noopener noreferrer" title="An IDE-style GitHub pull request reviewer that runs in browser with WASM"><span class="repo__name">pullspace</span><span class="repo__lang">Rust</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/dolbundler" target="_blank" rel="noopener noreferrer" title="Statically recompile GameCube ROMs into local macOS/iOS applications"><span class="repo__name">dolbundler</span><span class="repo__lang">Obj-C++</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/n64bundler" target="_blank" rel="noopener noreferrer"><span class="repo__name">n64bundler</span><span class="repo__lang">C++</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/llmoxide" target="_blank" rel="noopener noreferrer" title="Privacy first local LLM inference"><span class="repo__name">llmoxide</span><span class="repo__lang">Rust</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/kb-agent" target="_blank" rel="noopener noreferrer" title="Ask a folder of books a question; every one gets read in full before it answers"><span class="repo__name">kb-<wbr>agent</span><span class="repo__lang">Rust</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/arxiv-reader" target="_blank" rel="noopener noreferrer" title="Self-hosted arXiv reader with AI summaries and chat-with-the-paper"><span class="repo__name">arxiv-<wbr>reader</span><span class="repo__lang">Rust</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/serato-cli" target="_blank" rel="noopener noreferrer" title="Drive Serato Lite from the CLI"><span class="repo__name">serato-<wbr>cli</span><span class="repo__lang">Rust</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/nso_gc_macos" target="_blank" rel="noopener noreferrer" title="Low-latency macOS driver for the NSO GameCube controller"><span class="repo__name">nso_<wbr>gc_<wbr>macos</span><span class="repo__lang">Rust</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/local_mb64" target="_blank" rel="noopener noreferrer" title="Local macOS app for Mario Builder 64"><span class="repo__name">local_<wbr>mb64</span><span class="repo__lang">C++</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/renut_macos" target="_blank" rel="noopener noreferrer"><span class="repo__name">renut_<wbr>macos</span><span class="repo__lang">Shell</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/connect4" target="_blank" rel="noopener noreferrer" title="Homebrew connect 4 game for GBA"><span class="repo__name">connect4</span><span class="repo__lang">C</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/gba_wasm" target="_blank" rel="noopener noreferrer" title="WASM build for the mGBA emulator"><span class="repo__name">gba_<wbr>wasm</span><span class="repo__lang">JS</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/bike_or_die" target="_blank" rel="noopener noreferrer"><span class="repo__name">bike_<wbr>or_<wbr>die</span><span class="repo__lang">Python</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/fluids" target="_blank" rel="noopener noreferrer"><span class="repo__name">fluids</span><span class="repo__lang">Rust</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/rl" target="_blank" rel="noopener noreferrer"><span class="repo__name">rl</span><span class="repo__lang">C</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/website" target="_blank" rel="noopener noreferrer" title="bigmah.com source"><span class="repo__name">website</span><span class="repo__lang">HTML</span></a></li>
-        <li><a class="repo" href="https://github.com/bigmah/bigmah" target="_blank" rel="noopener noreferrer" title="GitHub profile"><span class="repo__name">bigmah</span><span class="repo__lang">Python</span></a></li>
+      <p class="now">rustpilled dev interested in too many things</p>
+      <button class="repos-toggle" type="button" aria-expanded="false" aria-controls="repos">projects ↓</button>
+      <!-- each square puts its tile on the board; the tile's × takes it off again -->
+      <ul class="repos" id="repos" aria-label="Projects">
+        <li><button class="repo" type="button" data-open="gba" aria-pressed="false" title="Put connect 4 on the board"><span class="repo__name">connect 4</span><span class="repo__lang">GBA</span></button></li>
+        <li><button class="repo" type="button" data-open="bike" aria-pressed="false" title="Put bike or die 2 on the board"><span class="repo__name">bike or die 2</span><span class="repo__lang">Palm OS</span></button></li>
       </ul>
     </div>
   </article>
@@ -1035,6 +1054,7 @@
       <span class="tile__title">connect 4</span>
       <span class="spacer"></span>
       <a class="ln" href="gba/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+      <button class="tile__close" type="button" aria-label="Take connect 4 off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
     <div class="tile__body">
       <div class="mini" aria-hidden="true">
@@ -1126,6 +1146,7 @@
       <span class="tile__title">bike or die 2</span>
       <span class="spacer"></span>
       <a class="ln" href="bike/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+      <button class="tile__close" type="button" aria-label="Take bike or die 2 off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
     <div class="tile__body">
       <div class="mini" aria-hidden="true">
@@ -1186,20 +1207,23 @@
 
   // The model is parked in the template above; this list is the other half of
   // that, and the board is built from it alone. It is not missed by the code —
-  // what is not named here is simply not on the board.
-  var TILES = ['id', 'ex', 'gba', 'bike'];
+  // what is not named here is simply not on the board. The two that are always
+  // there come first; the games join it from their squares in the bigmah tile
+  // and leave it again by their ×.
+  var BASE  = ['id', 'ex'];
+  var EXTRA = ['gba', 'bike'];
+  var TILES = BASE.slice();
 
   // where everything starts, and what the reset button goes back to: one
   // column down the middle of the board — bigmah at 2×2, the writing at 2×2
-  // under it, and the two games 1×1 and side by side at the bottom.
+  // under it.
   var HOME = {
     id:   { x: 3, y: 0 },
-    ex:   { x: 3, y: 2 },
-    gba:  { x: 3, y: 4 },
-    bike: { x: 4, y: 4 }
+    ex:   { x: 3, y: 2 }
   };
-  var HOME_SIZE = { id: 1, ex: 1, gba: 0, bike: 0 };
-  var HOME_ROWS = 5 + SPARE;   // the depth that layout takes
+  var HOME_SIZE = { id: 1, ex: 1 };
+  var OPEN_SIZE = 1;           // a game comes onto the board at 2×2
+  var HOME_ROWS = 4 + SPARE;   // the depth that layout takes
 
   var board = document.getElementById('board');
   var ph    = document.getElementById('ph');
@@ -1209,10 +1233,17 @@
     els[el.dataset.id] = el;
   });
 
+  // what each game's tile holds before it is started, so taking it off the
+  // board can stop the game and put the card back
+  var cards = {};
+  EXTRA.forEach(function (id) { cards[id] = els[id].querySelector('.tile__body').innerHTML; });
+
   var saved = readSaved();
+  if (saved) TILES = BASE.concat(saved.on);
   var pos   = saved ? saved.pos : copy(HOME);
   var sz    = saved ? saved.sz : copySize(HOME_SIZE);   // each tile's index into SIZES
-  if (!valid(pos)) { pos = copy(HOME); sz = copySize(HOME_SIZE); }
+  if (!valid(pos)) { TILES = BASE.slice(); pos = copy(HOME); sz = copySize(HOME_SIZE); }
+  EXTRA.forEach(function (id) { els[id].hidden = TILES.indexOf(id) === -1; });
 
   var isStatic = false;
 
@@ -1437,27 +1468,30 @@
     try {
       var s = JSON.parse(raw);
       if (!s || !s.pos) return null;
+      var on = EXTRA.filter(function (id) { return s.on && s.on.indexOf(id) !== -1; });
+      var ids = BASE.concat(on);
       var p = {}, z = {};
-      for (var i = 0; i < TILES.length; i++) {
-        var v = s.pos[TILES[i]];
+      for (var i = 0; i < ids.length; i++) {
+        var v = s.pos[ids[i]];
         if (!v || typeof v.x !== 'number' || typeof v.y !== 'number') return null;
-        p[TILES[i]] = { x: v.x | 0, y: v.y | 0 };
-        var n = s.sz && s.sz[TILES[i]];
-        z[TILES[i]] = typeof n === 'number' && SIZES[n] ? n : HOME_SIZE[TILES[i]];
+        p[ids[i]] = { x: v.x | 0, y: v.y | 0 };
+        var n = s.sz && s.sz[ids[i]];
+        z[ids[i]] = typeof n === 'number' && SIZES[n] ? n : (HOME_SIZE[ids[i]] || OPEN_SIZE);
       }
       // a layout saved with two at 4×4 keeps the first of them
       var big = false;
-      TILES.forEach(function (id) {
+      ids.forEach(function (id) {
         if (z[id] !== BIG) return;
         if (big) z[id] = BIG - 1;
         big = true;
       });
-      return { pos: p, sz: z };
+      return { on: on, pos: p, sz: z };
     } catch (e) { return null; }
   }
 
   function save() {
-    try { localStorage.setItem(KEY, JSON.stringify({ pos: pos, sz: sz })); } catch (e) {}
+    var on = TILES.filter(function (id) { return EXTRA.indexOf(id) !== -1; });
+    try { localStorage.setItem(KEY, JSON.stringify({ on: on, pos: pos, sz: sz })); } catch (e) {}
   }
 
   /* ---------- drawing ---------- */
@@ -1831,6 +1865,12 @@
   board.addEventListener('click', function (e) {
     if (phys) return;
 
+    var open = e.target.closest('[data-open]');
+    if (open) { openTile(open.dataset.open); return; }
+
+    var close = e.target.closest('.tile__close');
+    if (close) { closeTile(close.closest('.tile').dataset.id); return; }
+
     // Without script these links open the standalone page, which is the
     // honest fallback; with it, the page comes to the tile instead.
     var go = e.target.closest('.go');
@@ -1888,6 +1928,77 @@
     render();
     save();
   });
+
+  /* ---------- the games, on and off the board ---------- */
+
+  // Each square in the bigmah tile is a game's tile, waiting off the board.
+  function syncSquares() {
+    Array.prototype.forEach.call(board.querySelectorAll('[data-open]'), function (b) {
+      b.setAttribute('aria-pressed', TILES.indexOf(b.dataset.open) !== -1 ? 'true' : 'false');
+    });
+  }
+
+  // Back into the grid or the stack after a tile has come or gone.
+  function relayout() {
+    syncSizes();
+    syncSquares();
+    resume();
+    showTug();
+    save();
+  }
+
+  // Onto the board at 2×2, in the first whole-cell spot nothing covers —
+  // reading order, so it turns up as near the top as there is room. Stacked,
+  // it goes under everything instead, rather than pushing the rest down.
+  function openTile(id) {
+    var el = els[id];
+    if (!el || EXTRA.indexOf(id) === -1) return;
+    if (TILES.indexOf(id) !== -1) { el.querySelector('.tile__bar').focus(); return; }
+    land();
+
+    var s = SIZES[OPEN_SIZE], spot = null;
+    var y0 = isStatic ? Math.ceil((rowsOf(pos) - SPARE) / SUB) * SUB : 0;
+    for (var y = y0; !spot; y += SUB) {
+      for (var x = 0; x + s <= GW && !spot; x += SUB) {
+        var free = TILES.every(function (k) { return !overlap({ x: x, y: y }, s, pos[k], sizeOf(k)); });
+        if (free) spot = { x: x, y: y };
+      }
+    }
+
+    TILES.push(id);
+    pos[id] = spot;
+    sz[id] = OPEN_SIZE;
+    el.hidden = false;
+
+    // straight to its spot rather than sliding in from the board's corner
+    if (!isStatic) {
+      el.style.transition = 'none';
+      place(el, geo(spot, s, cellPx()));
+      el.getBoundingClientRect();
+      el.style.transition = '';
+    }
+    relayout();
+  }
+
+  // Off the board, and whatever was running in it stops with it.
+  function park(id) {
+    var el = els[id];
+    el.hidden = true;
+    el.classList.remove('is-live', 'tile--drag-hint');
+    if (handEl && el.contains(handEl)) { handEl.remove(); handEl = null; }
+    el.querySelector('.tile__body').innerHTML = cards[id];
+    el.style.transform = el.style.width = el.style.height = '';
+  }
+
+  function closeTile(id) {
+    if (EXTRA.indexOf(id) === -1 || TILES.indexOf(id) === -1) return;
+    land();
+    park(id);
+    TILES = TILES.filter(function (k) { return k !== id; });
+    delete pos[id];
+    delete sz[id];
+    relayout();
+  }
 
   /* ---------- the three that wait to be asked ---------- */
 
@@ -2431,6 +2542,9 @@
   });
 
   document.querySelector('.js-reset').addEventListener('click', function () {
+    TILES.forEach(function (id) { if (EXTRA.indexOf(id) !== -1) park(id); });
+    TILES = BASE.slice();
+    syncSquares();
     pos = copy(HOME);
     sz = copySize(HOME_SIZE);
     try { localStorage.removeItem(KEY); } catch (e) {}
@@ -2476,7 +2590,7 @@
   reposBtn.addEventListener('click', function () {
     var open = repos.classList.toggle('is-open');
     reposBtn.setAttribute('aria-expanded', String(open));
-    reposBtn.textContent = open ? 'less ↑' : 'repos ↓';
+    reposBtn.textContent = open ? 'less ↑' : 'projects ↓';
   });
 
   mailBtn.addEventListener('click', function () {
@@ -2514,6 +2628,7 @@
 
   if (!hinted) board.classList.add('board--hint');
   syncSizes();
+  syncSquares();
   setMode();
   showTug();
   requestAnimationFrame(function () { board.classList.add('is-ready'); });
