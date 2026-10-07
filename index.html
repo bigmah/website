@@ -728,6 +728,15 @@
   .board--static .repos-toggle:focus-visible { color: var(--accent); border-bottom-color: var(--accent); }
   .board--static .repos:not(.is-open) { display: none; }
 
+  /* a heading for the squares, across the top of their grid */
+  .repos__label {
+    grid-column: 1 / -1;
+    font-size: 0.6rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
   .repo {
     width: 100%;
     font: inherit;
@@ -804,6 +813,13 @@
     height: 100%;
     border: 0;
   }
+
+  /* bloons td — the page in the frame letterboxes itself into any box, so
+     unlike the two above there is nothing to scale */
+  .tile--btd .tile__body { background: var(--panel); }
+  .tile--btd:not(.is-live) .tile__body { overflow: auto; }
+  .tile--btd.is-live .tile__body { background: #000; }
+  .tile--btd iframe { display: block; width: 100%; height: 100%; border: 0; }
 
   /* bike or die 2 */
 
@@ -921,6 +937,8 @@
   .board--static .tile--gba.is-live .tile__body { flex: none; height: 480px; }
   .board--static .tile--llm.is-live .tile__body { flex: none; height: 560px; }
   .board--static .tile--bike.is-live .tile__body { flex: none; height: 700px; }
+  .board--static .tile--btd.is-live .tile__body { flex: none; aspect-ratio: 4 / 3; }
+  .board--static .tile--btd[data-id="btd4"].is-live .tile__body { aspect-ratio: 1; }
 
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
@@ -1008,9 +1026,14 @@
       <p class="now">rustpilled dev interested in too many things</p>
       <button class="repos-toggle" type="button" aria-expanded="false" aria-controls="repos">projects ↓</button>
       <!-- each square puts its tile on the board; the tile's × takes it off again -->
-      <ul class="repos" id="repos" aria-label="Projects">
+      <ul class="repos" id="repos" aria-label="Games that run in the browser">
+        <li class="repos__label" aria-hidden="true">games in browser</li>
         <li><button class="repo" type="button" data-open="gba" aria-pressed="false" title="Put connect 4 on the board"><span class="repo__name">connect 4</span><span class="repo__lang">GBA</span></button></li>
         <li><button class="repo" type="button" data-open="bike" aria-pressed="false" title="Put bike or die 2 on the board"><span class="repo__name">bike or die 2</span><span class="repo__lang">Palm OS</span></button></li>
+        <li><button class="repo" type="button" data-open="btd1" aria-pressed="false" title="Put bloons td 1 on the board"><span class="repo__name">bloons td 1</span><span class="repo__lang">Flash</span></button></li>
+        <li><button class="repo" type="button" data-open="btd2" aria-pressed="false" title="Put bloons td 2 on the board"><span class="repo__name">bloons td 2</span><span class="repo__lang">Flash</span></button></li>
+        <li><button class="repo" type="button" data-open="btd3" aria-pressed="false" title="Put bloons td 3 on the board"><span class="repo__name">bloons td 3</span><span class="repo__lang">Flash</span></button></li>
+        <li><button class="repo" type="button" data-open="btd4" aria-pressed="false" title="Put bloons td 4 on the board"><span class="repo__name">bloons td 4</span><span class="repo__lang">Flash</span></button></li>
       </ul>
     </div>
   </article>
@@ -1176,6 +1199,146 @@
       </div>
     </div>
   </article>
+
+  <article class="tile tile--flush tile--btd" data-id="btd1">
+    <header class="tile__bar" tabindex="0" aria-label="bloons td 1 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
+      <span class="tile__title">bloons td 1</span>
+      <span class="spacer"></span>
+      <a class="ln" href="bloons/bloons-td-1.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+      <button class="tile__close" type="button" aria-label="Take bloons td 1 off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="tile__body">
+      <div class="mini" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2.2c-3.9 0-6.7 3-6.7 6.8 0 4.1 3.2 7.6 6 8.6.4.1.9.1 1.4 0 2.8-1 6-4.5 6-8.6 0-3.8-2.8-6.8-6.7-6.8Z" opacity=".95"/>
+          <path d="M10.9 17.6h2.2l.5 1.5h-3.2l.5-1.5Z" opacity=".95"/>
+          <path d="M12 19.1c-.9 1-.9 1.8 0 2.7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+          <ellipse cx="9.4" cy="7.6" rx="1.3" ry="2.1" transform="rotate(-24 9.4 7.6)" fill="var(--panel)" opacity=".45"/>
+        </svg>
+        <span>bloons td 1</span>
+      </div>
+      <div class="start">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2.2c-3.9 0-6.7 3-6.7 6.8 0 4.1 3.2 7.6 6 8.6.4.1.9.1 1.4 0 2.8-1 6-4.5 6-8.6 0-3.8-2.8-6.8-6.7-6.8Z" opacity=".95"/>
+          <path d="M10.9 17.6h2.2l.5 1.5h-3.2l.5-1.5Z" opacity=".95"/>
+          <path d="M12 19.1c-.9 1-.9 1.8 0 2.7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+          <ellipse cx="9.4" cy="7.6" rx="1.3" ry="2.1" transform="rotate(-24 9.4 7.6)" fill="var(--panel)" opacity=".45"/>
+        </svg>
+        <span>
+          <span class="name">bloons td 1</span>
+          <span class="what">ninja kiwi's flash tower defense, 2007 — the first one. place towers, pop every bloon before it reaches the end of the track. the original swf, played here on ruffle, a flash player written in rust and compiled to webassembly.</span>
+        </span>
+        <a class="go" href="bloons/bloons-td-1.html">load the game — 14 MB</a>
+        <span class="note">nothing is fetched until this is clicked. the 14 MB player is shared by all four and cached after the first.</span>
+      </div>
+    </div>
+  </article>
+
+  <article class="tile tile--flush tile--btd" data-id="btd2">
+    <header class="tile__bar" tabindex="0" aria-label="bloons td 2 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
+      <span class="tile__title">bloons td 2</span>
+      <span class="spacer"></span>
+      <a class="ln" href="bloons/bloons-td-2.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+      <button class="tile__close" type="button" aria-label="Take bloons td 2 off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="tile__body">
+      <div class="mini" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2.2c-3.9 0-6.7 3-6.7 6.8 0 4.1 3.2 7.6 6 8.6.4.1.9.1 1.4 0 2.8-1 6-4.5 6-8.6 0-3.8-2.8-6.8-6.7-6.8Z" opacity=".95"/>
+          <path d="M10.9 17.6h2.2l.5 1.5h-3.2l.5-1.5Z" opacity=".95"/>
+          <path d="M12 19.1c-.9 1-.9 1.8 0 2.7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+          <ellipse cx="9.4" cy="7.6" rx="1.3" ry="2.1" transform="rotate(-24 9.4 7.6)" fill="var(--panel)" opacity=".45"/>
+        </svg>
+        <span>bloons td 2</span>
+      </div>
+      <div class="start">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2.2c-3.9 0-6.7 3-6.7 6.8 0 4.1 3.2 7.6 6 8.6.4.1.9.1 1.4 0 2.8-1 6-4.5 6-8.6 0-3.8-2.8-6.8-6.7-6.8Z" opacity=".95"/>
+          <path d="M10.9 17.6h2.2l.5 1.5h-3.2l.5-1.5Z" opacity=".95"/>
+          <path d="M12 19.1c-.9 1-.9 1.8 0 2.7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+          <ellipse cx="9.4" cy="7.6" rx="1.3" ry="2.1" transform="rotate(-24 9.4 7.6)" fill="var(--panel)" opacity=".45"/>
+        </svg>
+        <span>
+          <span class="name">bloons td 2</span>
+          <span class="what">ninja kiwi's flash tower defense, 2007 — more towers, more tracks, and the first upgrades. the original swf, played here on ruffle, a flash player written in rust and compiled to webassembly.</span>
+        </span>
+        <a class="go" href="bloons/bloons-td-2.html">load the game — 15 MB</a>
+        <span class="note">nothing is fetched until this is clicked. the 14 MB player is shared by all four and cached after the first.</span>
+      </div>
+    </div>
+  </article>
+
+  <article class="tile tile--flush tile--btd" data-id="btd3">
+    <header class="tile__bar" tabindex="0" aria-label="bloons td 3 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
+      <span class="tile__title">bloons td 3</span>
+      <span class="spacer"></span>
+      <a class="ln" href="bloons/bloons-td-3.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+      <button class="tile__close" type="button" aria-label="Take bloons td 3 off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="tile__body">
+      <div class="mini" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2.2c-3.9 0-6.7 3-6.7 6.8 0 4.1 3.2 7.6 6 8.6.4.1.9.1 1.4 0 2.8-1 6-4.5 6-8.6 0-3.8-2.8-6.8-6.7-6.8Z" opacity=".95"/>
+          <path d="M10.9 17.6h2.2l.5 1.5h-3.2l.5-1.5Z" opacity=".95"/>
+          <path d="M12 19.1c-.9 1-.9 1.8 0 2.7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+          <ellipse cx="9.4" cy="7.6" rx="1.3" ry="2.1" transform="rotate(-24 9.4 7.6)" fill="var(--panel)" opacity=".45"/>
+        </svg>
+        <span>bloons td 3</span>
+      </div>
+      <div class="start">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2.2c-3.9 0-6.7 3-6.7 6.8 0 4.1 3.2 7.6 6 8.6.4.1.9.1 1.4 0 2.8-1 6-4.5 6-8.6 0-3.8-2.8-6.8-6.7-6.8Z" opacity=".95"/>
+          <path d="M10.9 17.6h2.2l.5 1.5h-3.2l.5-1.5Z" opacity=".95"/>
+          <path d="M12 19.1c-.9 1-.9 1.8 0 2.7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+          <ellipse cx="9.4" cy="7.6" rx="1.3" ry="2.1" transform="rotate(-24 9.4 7.6)" fill="var(--panel)" opacity=".45"/>
+        </svg>
+        <span>
+          <span class="name">bloons td 3</span>
+          <span class="what">ninja kiwi's flash tower defense, 2008 — two upgrade paths per tower, and the bloons get tougher. the original swf, played here on ruffle, a flash player written in rust and compiled to webassembly.</span>
+        </span>
+        <a class="go" href="bloons/bloons-td-3.html">load the game — 15 MB</a>
+        <span class="note">nothing is fetched until this is clicked. the 14 MB player is shared by all four and cached after the first.</span>
+      </div>
+    </div>
+  </article>
+
+  <article class="tile tile--flush tile--btd" data-id="btd4">
+    <header class="tile__bar" tabindex="0" aria-label="bloons td 4 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
+      <span class="tile__title">bloons td 4</span>
+      <span class="spacer"></span>
+      <a class="ln" href="bloons/bloons-td-4.html" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+      <button class="tile__close" type="button" aria-label="Take bloons td 4 off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="tile__body">
+      <div class="mini" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2.2c-3.9 0-6.7 3-6.7 6.8 0 4.1 3.2 7.6 6 8.6.4.1.9.1 1.4 0 2.8-1 6-4.5 6-8.6 0-3.8-2.8-6.8-6.7-6.8Z" opacity=".95"/>
+          <path d="M10.9 17.6h2.2l.5 1.5h-3.2l.5-1.5Z" opacity=".95"/>
+          <path d="M12 19.1c-.9 1-.9 1.8 0 2.7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+          <ellipse cx="9.4" cy="7.6" rx="1.3" ry="2.1" transform="rotate(-24 9.4 7.6)" fill="var(--panel)" opacity=".45"/>
+        </svg>
+        <span>bloons td 4</span>
+      </div>
+      <div class="start">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2.2c-3.9 0-6.7 3-6.7 6.8 0 4.1 3.2 7.6 6 8.6.4.1.9.1 1.4 0 2.8-1 6-4.5 6-8.6 0-3.8-2.8-6.8-6.7-6.8Z" opacity=".95"/>
+          <path d="M10.9 17.6h2.2l.5 1.5h-3.2l.5-1.5Z" opacity=".95"/>
+          <path d="M12 19.1c-.9 1-.9 1.8 0 2.7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+          <ellipse cx="9.4" cy="7.6" rx="1.3" ry="2.1" transform="rotate(-24 9.4 7.6)" fill="var(--panel)" opacity=".45"/>
+        </svg>
+        <span>
+          <span class="name">bloons td 4</span>
+          <span class="what">ninja kiwi's flash tower defense, 2009 — the big one — actionscript 3, so it leans hardest on ruffle and may glitch now and then. the original swf, played here on ruffle, a flash player written in rust and compiled to webassembly.</span>
+        </span>
+        <a class="go" href="bloons/bloons-td-4.html">load the game — 17 MB</a>
+        <span class="note">nothing is fetched until this is clicked. the 14 MB player is shared by all four and cached after the first.</span>
+      </div>
+    </div>
+  </article>
 </div>
 
 <script>
@@ -1211,7 +1374,7 @@
   // there come first; the games join it from their squares in the bigmah tile
   // and leave it again by their ×.
   var BASE  = ['id', 'ex'];
-  var EXTRA = ['gba', 'bike'];
+  var EXTRA = ['gba', 'bike', 'btd1', 'btd2', 'btd3', 'btd4'];
   var TILES = BASE.slice();
 
   // where everything starts, and what the reset button goes back to: one
@@ -2021,7 +2184,15 @@
             allow: 'fullscreen; gamepad; autoplay' },
     llm:  { src: 'llm.html?go=1', title: 'llmoxide — an LLM in the browser' },
     bike: { src: 'bike/', title: 'Bike or Die 2 — recompiled to WebAssembly',
-            allow: 'fullscreen; gamepad; autoplay' }
+            allow: 'fullscreen; gamepad; autoplay' },
+    btd1: { src: 'bloons/bloons-td-1.html', title: 'Bloons TD 1, running in Ruffle',
+            allow: 'fullscreen; autoplay' },
+    btd2: { src: 'bloons/bloons-td-2.html', title: 'Bloons TD 2, running in Ruffle',
+            allow: 'fullscreen; autoplay' },
+    btd3: { src: 'bloons/bloons-td-3.html', title: 'Bloons TD 3, running in Ruffle',
+            allow: 'fullscreen; autoplay' },
+    btd4: { src: 'bloons/bloons-td-4.html', title: 'Bloons TD 4, running in Ruffle',
+            allow: 'fullscreen; autoplay' }
   };
 
   function startTile(id) {

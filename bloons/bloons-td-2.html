@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bloons TD 2</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    #game, #game ruffle-player { display: block; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <script>
+    window.RufflePlayer = window.RufflePlayer || {};
+    window.RufflePlayer.config = {
+      publicPath: "ruffle/",
+      autoplay: "on",
+      unmuteOverlay: "hidden",
+      splashScreen: false,
+      letterbox: "on",
+      backgroundColor: "#000000",
+      allowScriptAccess: false,
+      warnOnUnsupportedContent: false,
+    };
+  </script>
+  <script src="ruffle/ruffle.js"></script>
+  <script>
+    const player = window.RufflePlayer.newest().createPlayer();
+    document.getElementById("game").appendChild(player);
+    player.ruffle().load("games/bloons-td-2.swf");
+  </script>
+</body>
+</html>
