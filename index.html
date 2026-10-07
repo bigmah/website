@@ -682,6 +682,26 @@
     animation: reveal 320ms 130ms both cubic-bezier(.2,.7,.3,1);
   }
 
+  /* stacked, every tile is open, so the repos wait behind a toggle */
+  .repos-toggle { display: none; }
+  .board--static .repos-toggle {
+    display: inline-block;
+    align-self: flex-start;
+    margin-top: 0.9rem;
+    font: inherit;
+    font-size: 0.85em;
+    color: var(--dim);
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--accent-soft);
+    padding: 0 0 1px;
+    cursor: pointer;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+  .board--static .repos-toggle:hover,
+  .board--static .repos-toggle:focus-visible { color: var(--accent); border-bottom-color: var(--accent); }
+  .board--static .repos:not(.is-open) { display: none; }
+
   .repo {
     aspect-ratio: 1;
     display: flex;
@@ -953,7 +973,8 @@
         </span>
       </nav>
       <p class="now">working on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> — trying to make code review in browser better with Rust + WASM</p>
-      <ul class="repos" aria-label="Repositories on GitHub">
+      <button class="repos-toggle" type="button" aria-expanded="false" aria-controls="repos">repos ↓</button>
+      <ul class="repos" id="repos" aria-label="Repositories on GitHub">
         <li><a class="repo" href="https://github.com/bigmah/pullspace" target="_blank" rel="noopener noreferrer" title="An IDE-style GitHub pull request reviewer that runs in browser with WASM"><span class="repo__name">pullspace</span><span class="repo__lang">Rust</span></a></li>
         <li><a class="repo" href="https://github.com/bigmah/dolbundler" target="_blank" rel="noopener noreferrer" title="Statically recompile GameCube ROMs into local macOS/iOS applications"><span class="repo__name">dolbundler</span><span class="repo__lang">Obj-C++</span></a></li>
         <li><a class="repo" href="https://github.com/bigmah/n64bundler" target="_blank" rel="noopener noreferrer"><span class="repo__name">n64bundler</span><span class="repo__lang">C++</span></a></li>
@@ -2449,6 +2470,14 @@
       if (ok) resolve(); else reject();
     });
   }
+
+  var reposBtn = document.querySelector('.repos-toggle');
+  var repos = document.getElementById('repos');
+  reposBtn.addEventListener('click', function () {
+    var open = repos.classList.toggle('is-open');
+    reposBtn.setAttribute('aria-expanded', String(open));
+    reposBtn.textContent = open ? 'less ↑' : 'repos ↓';
+  });
 
   mailBtn.addEventListener('click', function () {
     var open = email.hidden;
