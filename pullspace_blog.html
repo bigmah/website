@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>pullspace and the future of programming</title>
+<meta name="description" content="Code review is the bottleneck now. pullspace is a fast browser-based code reviewer in Rust + WASM, plus agent-written summaries tracked in git next to the code.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,700;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F5F8FC; --grid:#E0E8F2; --ink:#14223D; --graphite:#556176; --faint:#98A4B6;
+  --hi:#FFD93D; --hi-line:#E3AE00; --miss:#D6344D; --good:#1E8757; --panel:#FFFFFF; --rule:#C8D3E1;
+  --add-bg:#DDF4E6; --del-bg:#FBE1E5;
+  --serif:"Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
+    --hi:#FFD43B; --hi-line:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+    --add-bg:#123D30; --del-bg:#43202B;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
+  --hi:#FFD43B; --hi-line:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+  --add-bg:#123D30; --del-bg:#43202B;
+}
+*,*::before,*::after{box-sizing:inherit}
+body{
+  margin:0; color:var(--ink); background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px; background-position:-1px -1px;
+  font-family:var(--serif); font-size:clamp(18px,1.1vw + 12px,21px); line-height:1.62;
+  font-optical-sizing:auto; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px; margin:0 auto; padding:0 22px}
+.wide{max-width:1000px; margin-left:auto; margin-right:auto; padding:0 22px}
+p{margin:0 0 1em}
+a{color:inherit; text-decoration-color:var(--hi-line); text-decoration-thickness:.12em; text-underline-offset:.18em}
+h1,h2,h3{font-weight:500; line-height:1.1; letter-spacing:-0.01em}
+h1{font-size:clamp(46px,8vw,96px); margin:0; letter-spacing:-0.035em}
+h2{font-size:clamp(32px,4.4vw,46px); margin:0 0 .55em; display:flex; gap:.45em; align-items:baseline}
+h2 .n{font-family:var(--mono); font-size:.42em; font-weight:500; color:var(--paper); background:var(--ink); border-radius:3px; padding:.12em .45em; transform:translateY(-.35em)}
+h3{font-size:1.15em; margin:1.6em 0 .4em; font-weight:700}
+code{font-family:var(--mono); font-size:.8em; background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:.05em .3em; overflow-wrap:anywhere}
+pre{font-family:var(--mono); font-size:.72em; line-height:1.65; margin:.6em 0 1.3em; padding:.9em 1.1em; background:var(--panel); border:1px solid var(--rule); border-left:4px solid var(--ink); border-radius:2px; overflow-x:auto}
+pre code{background:none; border:0; padding:0; font-size:1em; overflow-wrap:normal}
+pre .c{color:var(--faint)}
+pre .k{color:var(--good)}
+mark{background:none; color:inherit; font-weight:500; text-decoration:underline; text-decoration-color:var(--hi-line); text-decoration-thickness:.2em; text-underline-offset:.2em; text-decoration-skip-ink:none}
+
+nav.top{padding-top:28px; font-family:var(--mono); font-size:.72em}
+nav.top a{text-decoration:none; color:var(--graphite)}
+nav.top a:hover{color:var(--ink)}
+header{padding:7vh 0 2vh}
+.dek{font-size:clamp(21px,1.6vw + 12px,28px); line-height:1.4; max-width:32ch; margin:.5em 0 0; color:var(--graphite)}
+.meta{font-family:var(--mono); font-size:.68em; color:var(--graphite); margin-top:1.6em; display:flex; gap:.4em 1.4em; flex-wrap:wrap}
+.meta a{color:var(--ink)}
+
+section{padding:8vh 0 1vh}
+.lede{font-size:1.12em}
+.aside{font-size:.86em; color:var(--graphite); border-left:2px solid var(--rule); padding-left:1em; margin:1.4em 0}
+.pull{font-size:1.35em; line-height:1.3; font-style:italic; margin:1.2em 0; padding-left:.8em; border-left:4px solid var(--hi)}
+
+figure{margin:1.8em 0 2.2em}
+.fig{background:var(--panel); border:1px solid var(--rule); border-radius:4px; padding:18px; box-shadow:0 1px 0 var(--rule)}
+.fig svg{display:block; width:100%; height:auto}
+.shot{margin:0; border:1px solid var(--rule); border-radius:6px; overflow:hidden; box-shadow:0 10px 40px -18px rgba(20,34,61,.45)}
+.shot img{display:block; width:100%; height:auto}
+figcaption{font-size:.8em; color:var(--graphite); margin-top:.7em; line-height:1.5}
+
+/* svg vocabulary */
+svg text{font-family:var(--mono); fill:var(--ink); font-size:13px}
+svg .sm{font-size:11px; fill:var(--graphite)}
+svg .lbl{font-family:var(--serif); font-size:15px}
+svg .box{fill:var(--panel); stroke:var(--ink); stroke-width:1.5}
+svg .soft{fill:var(--grid); stroke:var(--rule); stroke-width:1}
+svg .hi{fill:var(--hi); stroke:#14223D; stroke-width:1.5}
+svg .hi + text, svg text.on-hi{fill:#14223D}
+svg .edge{stroke:var(--ink); stroke-width:1.5; fill:none}
+svg .dash{stroke:var(--graphite); stroke-width:1.5; fill:none; stroke-dasharray:4 4}
+svg .arrow{fill:var(--ink)}
+svg .dot{fill:var(--ink)}
+svg .dot-new{fill:var(--hi); stroke:#14223D; stroke-width:1.5}
+svg .bar-w{fill:var(--graphite)}
+svg .bar-r{fill:var(--miss)}
+svg .add{fill:var(--good)}
+
+/* feature list */
+.feats{list-style:none; padding:0; margin:1em 0 1.4em; display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.feats li{background:var(--panel); border:1px solid var(--rule); border-radius:4px; padding:12px 14px; font-size:.86em; line-height:1.45}
+.feats b{display:block; font-weight:700; margin-bottom:.15em}
+@media (max-width:620px){.feats{grid-template-columns:1fr}}
+
+table{border-collapse:collapse; width:100%; font-size:.82em; margin:.6em 0 1.4em}
+th,td{text-align:left; padding:.45em .6em; border-bottom:1px solid var(--rule); vertical-align:top}
+th{font-weight:700; border-bottom:1.5px solid var(--ink)}
+td:first-child{white-space:nowrap}
+.tbl{overflow-x:auto}
+
+/* before/after mock */
+.ba{background:var(--panel); border:1px solid var(--rule); border-radius:4px; overflow:hidden}
+.ba-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border-bottom:1px solid var(--rule); font-family:var(--mono); font-size:.66em; color:var(--graphite)}
+.ba-bar .path{color:var(--ink); font-weight:500; margin-right:auto}
+.seg{display:inline-flex; border:1.5px solid var(--ink); border-radius:3px; overflow:hidden}
+.seg button{font:inherit; color:var(--ink); background:transparent; border:0; padding:.3em .8em; cursor:pointer}
+.seg button + button{border-left:1.5px solid var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--hi); color:#14223D}
+.seg button:focus-visible{outline:3px solid var(--hi); outline-offset:2px}
+.pill{border-radius:99px; padding:.15em .7em; font-size:.95em; border:1px solid currentColor}
+.pill.cur{color:var(--good)} .pill.old{color:var(--miss)}
+.ba-body{padding:16px 18px 6px; font-size:.86em}
+.ba-body h4{margin:0 0 .5em; font-size:1.05em}
+.ba-body p{padding:.35em .6em; margin:0 0 .6em; border-radius:3px; border-left:3px solid transparent}
+.ba-body p.new{background:var(--add-bg); border-left-color:var(--good)}
+.ba-body p.gone{background:var(--del-bg); border-left-color:var(--miss)}
+.ba[data-view="before"] .new{display:none}
+.ba[data-view="after"] .gone{display:none}
+.ba[data-view="before"] p.gone,.ba[data-view="after"] p.new{background:none; border-left-color:transparent}
+
+footer{padding:10vh 0 8vh; font-size:.85em; color:var(--graphite)}
+footer .wrap{border-top:1.5px solid var(--ink); padding-top:1em; display:flex; justify-content:space-between; gap:1em; flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<nav class="top"><div class="wrap"><a href="index.html">← bigmah</a></div></nav>
+
+<header>
+  <div class="wrap">
+    <h1>pullspace and the future of programming</h1>
+    <p class="dek">Writing code got cheap. Understanding it didn't. A faster way to read pull requests, and summaries that live in the repo next to the code.</p>
+    <div class="meta"><span>oct 6, 2026</span><span><a href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a></span><span><a href="https://github.com/bigmah/pullspace" target="_blank" rel="noopener noreferrer">github.com/bigmah/pullspace</a></span></div>
+  </div>
+  <div class="wrap">
+    <figure class="fig" style="margin-top:5vh">
+      <svg viewBox="0 0 640 210" role="img" aria-label="Before coding agents, writing a change took most of the time and review was short. Now writing is short and review takes most of the time.">
+        <text class="lbl" x="0" y="22">before agents</text>
+        <rect class="bar-w" x="140" y="34" width="380" height="22" rx="2"/>
+        <text class="sm" x="530" y="50">write</text>
+        <rect class="bar-r" x="140" y="62" width="70" height="22" rx="2"/>
+        <text class="sm" x="220" y="78">review</text>
+
+        <text class="lbl" x="0" y="130">today</text>
+        <rect class="bar-w" x="140" y="142" width="44" height="22" rx="2"/>
+        <text class="sm" x="194" y="158">write</text>
+        <rect class="bar-r" x="140" y="170" width="380" height="22" rx="2"/>
+        <text class="sm" x="530" y="186">review</text>
+        <line class="dash" x1="130" y1="10" x2="130" y2="200"/>
+      </svg>
+    </figure>
+    <figcaption style="margin-top:-1.4em">Where the hours go on a change that matters. Not measured, but you've probably felt it.</figcaption>
+  </div>
+</header>
+
+<main>
+<section id="why">
+  <div class="wrap">
+    <p class="lede">AI agents have made it much easier to write complicated code. Not long ago the ceiling was roughly what you could pull off with a clever macro. Now a sweeping refactor or rewrite is close to trivial.</p>
+    <p>That's great. We can take on more ambitious work and reach for the fruit at the top of the tree.</p>
+    <p>Some software has no real consequences when it breaks. For that, fire the slop cannon and move on. If it breaks, another prompt will fix it, and that's fine.</p>
+    <p>Some software does matter. Money is on the line, sometimes lives. Whoever ships it is responsible for what it does, and <mark>serious code still has to be understood by the person responsible for it.</mark></p>
+    <p>That creates a new bottleneck on dev teams. Writing code used to be the slow part, so the PR queue never backed up. "You can read code much faster than you can write it" sounds almost silly now; it has flipped completely. Understanding what's about to ship, which is code review, is <em>the</em> bottleneck. Everything else is a rounding error.</p>
+    <p class="pull">Code review isn't going anywhere. So it should be good.</p>
+    <p>That bottleneck is what <a href="https://github.com/bigmah/pullspace" target="_blank" rel="noopener noreferrer">pullspace</a> is about. It does two things:</p>
+    <ol>
+      <li><b>Better ergonomics</b> for reading GitHub changes in the browser.</li>
+      <li><b>AI summaries that don't miss the forest for the trees</b>, tracked in git next to the code they describe.</li>
+    </ol>
+  </div>
+</section>
+
+<section id="ux">
+  <div class="wrap">
+    <h2><span class="n">1</span>A buttery browser UX for review</h2>
+    <p>Most of us end up with the same workflow: a million GitHub tabs. To review a change you click <em>Files changed</em>, wait for a slow API call, then scroll down one long list of diffs. It's clunky. The VS Code-in-the-browser integration is clunkier still.</p>
+    <p>You can check the branch out locally, but then you have to deal with your own uncommitted changes, stashes and worktrees, and repeat it for every PR you want to look at.</p>
+    <p>pullspace is an IDE-style code reviewer written entirely in Rust (<a href="https://dioxuslabs.com" target="_blank" rel="noopener noreferrer">Dioxus</a>) and compiled to WASM. It's a static page with no server. Your browser talks to <code>api.github.com</code> directly, and the source code never leaves the tab.</p>
+  </div>
+  <div class="wide">
+    <figure class="shot"><img src="img/pullspace-diff.jpg" width="2000" height="1129" loading="lazy" alt="pullspace showing a pull request: a file explorer on the left with modified files marked M, a split diff of src/ui/viewer.rs in the middle, and the PR conversation on the right."></figure>
+    <figcaption style="max-width:720px; margin-left:auto; margin-right:auto">A PR in pullspace: the explorer marks changed files, the diff is side by side, and the conversation sits in its own pane.</figcaption>
+  </div>
+  <div class="wrap">
+    <h3>Cloning, in a browser tab</h3>
+    <p>Opening a PR starts with a <strong>snapshot</strong>: one request reads the commit's whole git tree, which is every file path with its blob SHA. Then pullspace fetches the blobs it doesn't have, starting with the PR's changed files and pulling twelve at a time. It tries <code>raw.githubusercontent.com</code> first, which is unmetered and needs no token, and falls back to the API for private repos.</p>
+    <p>The bytes are stored in the browser's Origin Private File System, <mark>keyed by git blob SHA</mark>, just like git's own object store. So the second PR you open on a repo only downloads the files that actually differ, and it opens almost instantly. Search, the symbol index and goto definition all read from that same local store.</p>
+    <p class="aside">Why not a real <code>git clone</code>? GitHub's smart-HTTP and codeload endpoints refuse cross-origin requests, so a browser can't speak the git protocol to them. A content-addressed store fed from the tree API gets you most of the benefit anyway.</p>
+
+    <h3>What you get</h3>
+    <ul class="feats">
+      <li><b>Many reviews, one tab</b>Open several PRs, branches or compares as <em>spaces</em> in one browser tab and switch between them without losing your place.</li>
+      <li><b>IDE navigation</b>File tree, go to file <code>⌘P</code>, symbol in repo <code>⌘T</code>, goto definition, references, back/forward <code>⌘[</code> <code>⌘]</code>.</li>
+      <li><b>Search</b>Find in file <code>⌘F</code> and search the whole repo <code>⌘⇧F</code>, all running locally.</li>
+      <li><b>Real diffs</b>Inline or side by side, viewed-file checkmarks, and collapsed unchanged lines you can open back up.</li>
+      <li><b>Review from the diff</b>Comment on lines, reply to threads, hold comments, and submit an approve or request-changes, the same as github.com.</li>
+      <li><b>No sign-in</b>Public repos just work. For private ones, paste a fine-grained PAT. It stays in your browser.</li>
+    </ul>
+
+    <h3>Links that mean something</h3>
+    <p>Every view has a URL you can send to someone. The routes mirror GitHub's own, behind the <code>#</code> so the static host never sees them:</p>
+<pre><code>pullspace.dev/#/owner/repo/pull/123
+pullspace.dev/#/owner/repo/pull/123/files/src/main.rs:L42
+pullspace.dev/#/owner/repo/tree/my-branch
+pullspace.dev/#/owner/repo/compare/main...my-branch
+pullspace.dev/#/owner/repo/commit/&lt;sha&gt;</code></pre>
+    <p>You can also paste any github.com URL into pullspace. The repo includes a small Chrome extension that does it in one keystroke: on any GitHub page, <code>Alt+Shift+P</code> opens the same thing in pullspace, in your existing pullspace tab if you have one open.</p>
+  </div>
+</section>
+
+<section id="summaries">
+  <div class="wrap">
+    <h2><span class="n">2</span>Summaries that live in the repo</h2>
+    <p>AI code review already exists, and it's useful for mechanical things like logic errors, off-by-ones and index ranges. But it tends to be noisy, and it's weak on what a reviewer most needs to know: <em>what is this change for, how does it fit the system, and what does it quietly make untrue?</em></p>
+    <p>The better approach, which a lot of us already use, is to check the PR's branch out locally and ask your own agent to review it. That agent has far more context. It can read the repo's markdown, it remembers earlier sessions, and it treats the repo as a whole system, a tree of files with a structure, rather than a pile of hunks to analyze one at a time.</p>
+    <p>This is clearly where things are headed. We still have to understand the code, but we hand the mechanical part of getting there to an agent, the same way we used one to write the code.</p>
+    <p>It isn't quite there yet, though. Those reviews are one-off queries. The explanation the agent produced vanishes when the terminal closes, and the next reviewer starts from scratch.</p>
+    <p class="pull">pullspace makes the agent's explanation a file. It's committed and versioned, and it gets diffed like code.</p>
+
+    <h3>The <code>.pullspace/</code> directory</h3>
+    <p>Everything lives in a directory committed alongside the code:</p>
+  </div>
+  <div class="wrap">
+    <figure class="fig">
+      <svg viewBox="0 0 640 250" role="img" aria-label="The .pullspace directory: seed.md steers the agent, map holds one HTML page per important directory, changes holds one guide per branch.">
+        <text x="10" y="26" style="font-weight:500">.pullspace/</text>
+        <path class="edge" d="M22 34 V214"/>
+        <path class="edge" d="M22 58 H44"/><text x="52" y="62">seed.md</text>
+        <path class="edge" d="M22 108 H44"/><text x="52" y="112">map/</text>
+        <path class="edge" d="M64 118 V168"/>
+        <path class="edge" d="M64 138 H84"/><text x="92" y="142">index.html</text><text class="sm" x="210" y="142">the repo root</text>
+        <path class="edge" d="M64 168 H84"/><text x="92" y="172">src/backend/index.html</text><text class="sm" x="290" y="172">…one per important dir</text>
+        <path class="edge" d="M22 214 H44"/><text x="52" y="218">changes/</text><text x="134" y="218">feat-writes.html</text><text class="sm" x="276" y="218">one per branch</text>
+
+        <rect class="soft" x="408" y="38" width="222" height="40" rx="4"/>
+        <text class="sm" x="418" y="55">steering prompt: who reads,</text>
+        <text class="sm" x="418" y="70">what matters, what to skip</text>
+        <rect class="soft" x="408" y="96" width="222" height="40" rx="4"/>
+        <text class="sm" x="418" y="113">the map: how the code works,</text>
+        <text class="sm" x="418" y="128">stamped with a git tree hash</text>
+        <rect class="soft" x="408" y="196" width="222" height="40" rx="4"/>
+        <text class="sm" x="418" y="213">the guide: why, reading order,</text>
+        <text class="sm" x="418" y="228">decisions, risks, what was tested</text>
+      </svg>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p><strong><code>seed.md</code></strong> is a short steering prompt you edit freely. It says who reads these pages, what matters most in this codebase, the vocabulary, and what to skip. The agent reads it before every run. Here's part of pullspace's own:</p>
+<pre><code><span class="c">## What matters most here</span>
+- pullspace is a **static page**: Rust compiled to wasm, calling api.github.com
+  straight from the browser. There is no server.
+- **The security boundary**: a GitHub token sits in localStorage, and every
+  file shown is untrusted. Say where each of those lines is drawn.
+- **Panics are fatal** in wasm (the tab stops). The recurring traps: ...
+
+<span class="c">## Skip</span>
+`extension/icons`, `demo`, `deploy`, `.github`, `dist`, `target`.</code></pre>
+    <p><strong>The map</strong> has one static HTML page per important directory, mirroring the source tree. Each page explains its directory's purpose, how it works, its invariants and its gotchas, with links into the code at specific lines. Pages link to each other, so you can walk down the tree.</p>
+    <p><strong>The guide</strong> is one page per PR, written by the agent that made the change: why it exists, the order to read the diff in, the decisions made, the risks, and what was and wasn't checked. It's the PR description you always wanted and rarely got.</p>
+
+    <h3>Freshness costs nothing to track</h3>
+    <p>The obvious problem with docs is that they go stale. The trick is that git already knows exactly when a directory changed. Every map page carries a stamp:</p>
+<pre><code>&lt;meta name="pullspace:tree" content="8364bad9f7cd6074f02aceb897c3cb655207b307"&gt;
+
+<span class="c">$</span> git rev-parse HEAD:src/backend
+<span class="k">8364bad9f7cd6074f02aceb897c3cb655207b307</span>   <span class="c"># same hash → page is current</span></code></pre>
+    <p>That's the git <em>tree</em> hash of the directory when the page was written. It changes exactly when anything underneath it changes, so comparing the stamp with the current hash tells you whether the page is current. No database, cache or service is involved. If they differ, <code>git diff &lt;stamp&gt; HEAD:src/backend</code> shows exactly what moved since the page was written, and the agent uses that same diff to update the page.</p>
+    <p>In pullspace, each page shows a <span style="color:var(--good)">current</span> or <span style="color:var(--miss)">out of date</span> pill, with a list of the files that changed since. If a PR changes code under a page without touching the page, pullspace flags it, and that's usually the first thing to ask the author about.</p>
+  </div>
+</section>
+
+<section id="lifecycle">
+  <div class="wrap">
+    <h2><span class="n">3</span>How it flows through a PR</h2>
+    <p>Here's the loop. On your feature branch you write code as usual, with or without an agent. Before opening the PR you run <code>/pullspace-change</code>. The agent reads the branch's diff, <mark>rewrites only the map pages whose explanation the change makes untrue</mark>, and writes <code>.pullspace/changes/&lt;branch&gt;.html</code>. Those are committed on the branch like any other file.</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <svg viewBox="0 0 900 290" role="img" aria-label="Git graph: a feature branch leaves main, adds code commits, then a pullspace-change commit that rewrites map/src/backend/index.html and adds changes/feat-writes.html, then merges. pullspace compares the map page on main with the one at the branch head.">
+        <defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path class="arrow" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+        <text class="lbl" x="10" y="55">main</text>
+        <path class="edge" d="M70 50 H870"/>
+        <circle class="dot" cx="95" cy="50" r="7"/>
+        <circle class="dot" cx="150" cy="50" r="7"/>
+        <circle class="dot-new" cx="770" cy="50" r="9"/>
+        <text class="sm" x="770" y="28" text-anchor="middle">merge</text>
+
+        <text class="lbl" x="10" y="145">feat/writes</text>
+        <path class="edge" d="M150 50 C 195 50, 195 140, 240 140 H 680 C 730 140, 730 50, 762 50"/>
+        <circle class="dot" cx="300" cy="140" r="7"/>
+        <circle class="dot" cx="380" cy="140" r="7"/>
+        <circle class="dot" cx="460" cy="140" r="7"/>
+        <text class="sm" x="380" y="168" text-anchor="middle">code commits</text>
+        <rect class="hi" x="525" y="126" width="140" height="28" rx="4"/>
+        <text class="on-hi" x="595" y="145" text-anchor="middle" style="font-size:12px">/pullspace-change</text>
+
+        <path class="dash" d="M150 58 V214"/>
+        <rect class="box" x="40" y="214" width="220" height="60" rx="4"/>
+        <text x="54" y="238" style="font-size:12px">map page @ base</text>
+        <text class="sm" x="54" y="258">the explanation on main</text>
+
+        <path class="dash" d="M595 154 V196"/>
+        <rect class="box" x="480" y="196" width="250" height="78" rx="4"/>
+        <text x="494" y="218" style="font-size:12px">map page @ head</text>
+        <text x="494" y="240" style="font-size:11px">~ map/src/backend/index.html</text>
+        <text x="494" y="260" style="font-size:11px;fill:var(--good)">+ changes/feat-writes.html</text>
+
+        <path class="edge" d="M260 248 H 476" marker-end="url(#ah)"/>
+        <text class="sm" x="368" y="238" text-anchor="middle">pullspace diffs the explanation</text>
+      </svg>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>When you open the PR in pullspace, it opens on the guide. Each map page the PR rewrote gets a <strong>Before / Both / After</strong> toggle: passages only in the new version are highlighted green, passages only in the old one red. You're no longer just reviewing which lines changed. You're reviewing <em>how the explanation of the system changed</em>. Try the toggle:</p>
+
+    <figure>
+      <div class="ba" id="ba" data-view="both">
+        <div class="ba-bar">
+          <span class="path">◈ src/backend</span>
+          <span class="pill cur">current</span>
+          <span class="seg" role="group" aria-label="Compare view">
+            <button type="button" data-v="before" aria-pressed="false">Before</button>
+            <button type="button" data-v="both" aria-pressed="true">Both</button>
+            <button type="button" data-v="after" aria-pressed="false">After</button>
+          </span>
+        </div>
+        <div class="ba-body">
+          <h4>How it works</h4>
+          <p>There is no server. The only way out of the tab is <code>http.rs</code>, a thin wrapper over the browser's <code>fetch</code>. <code>github.rs</code> sits on top: a REST client for pull requests, commits, compares, branches, comments and checks.</p>
+          <p class="gone">pullspace only ever reads from GitHub; nothing in this directory sends a write, so a read-only token is all it needs.</p>
+          <p class="new">The four writes (a discussion comment, a reply to a line thread, a single line comment, and a review with its line comments) are each one JSON POST through <code>post_json</code>, which refuses to go out without a token and turns a refusal into GitHub's own words with <code>write_error</code>.</p>
+          <p>Opening a workspace starts with a snapshot: <code>repo_tree</code> reads the commit's whole tree in one request…</p>
+        </div>
+      </div>
+      <figcaption>A mock of the comparison view, based on the map page pullspace's own <code>feat/writes</code> PR rewrote when it added commenting and reviews. A reviewer sees right away that the "read-only" assumption is gone.</figcaption>
+    </figure>
+
+    <h3>What happens to the guide after merge?</h3>
+    <p>It merges with the rest of the branch. Guides are named after their branch, so two PRs never touch the same file and never conflict. Over time <code>.pullspace/changes/</code> on main builds up a reviewer's guide for every PR, sitting next to the code it explains and searchable with <code>git log</code>. Six months later, "why is it like this?" has an answer in the repo.</p>
+    <p>Map pages merge like any other file. A PR only rewrites the pages it makes untrue, and it deliberately leaves the parent pages alone even though their stamps go stale. They show as <span style="color:var(--miss)">out of date</span> until someone runs <code>/pullspace-map</code> on main again, which is accurate. Run it weekly or after a big merge, and since current pages are skipped by hash, it only redoes what actually moved.</p>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <h2><span class="n">4</span>Using it on your repo</h2>
+    <p><strong>Just reviewing?</strong> Go to <a href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> and paste a PR URL. That's it for public repos. For private ones, paste a GitHub token that can read the repo (to comment and approve from pullspace, a fine-grained token also needs <em>Pull requests: Read and write</em>).</p>
+    <p><strong>Want summaries?</strong> The agent side is two skills: plain directories with a <code>SKILL.md</code>, the format Claude Code and other agent harnesses load. You don't need a service, an API key or a build step.</p>
+
+    <h3>1. Install the skills</h3>
+<pre><code>mkdir -p .claude/skills
+curl -sL https://github.com/bigmah/pullspace/archive/refs/heads/main.tar.gz \
+  | tar -xz --strip-components=2 -C .claude/skills pullspace-main/skills</code></pre>
+    <p>That gives you <code>pullspace-map</code> and <code>pullspace-change</code>. Commit them so the whole team, and their agents, use the same ones. If your harness doesn't load skills, tell the agent: <em>"Read <code>.claude/skills/pullspace-map/SKILL.md</code> and follow it."</em></p>
+
+    <h3>2. Build the map, once</h3>
+<pre><code><span class="c">&gt;</span> /pullspace-map</code></pre>
+    <p>On the first run the agent writes <code>seed.md</code> and asks you a few questions about your codebase. Then it writes one page per important directory, bottom-up, stamps each one, and checks every link. Review the pages the way you'd review docs, then commit <code>.pullspace/</code>.</p>
+
+    <h3>3. Before every PR</h3>
+<pre><code><span class="c">&gt;</span> /pullspace-change</code></pre>
+    <p>This writes the guide and updates the map pages the branch affects. Commit them with the branch.</p>
+
+    <h3>4. Review it in pullspace</h3>
+    <p>Open the PR. It opens on the guide. The <code>◈</code> in the explorer header goes to the map, and directories with a page show a <code>◈</code> on their row. Links in a page open the file at the linked line.</p>
+
+    <h3>The scripts</h3>
+    <p>The skills lean on a few small shell scripts that only need <code>git</code>, <code>sh</code> and <code>awk</code>, and you can run them yourself:</p>
+    <div class="tbl"><table>
+      <tr><th>script</th><th>tells you</th></tr>
+      <tr><td><code>plan.sh</code></td><td>Every page's status (<code>current</code>, <code>stale</code>, <code>unstamped</code>, <code>orphan</code>), then the directories with no page, biggest first.</td></tr>
+      <tr><td><code>stamp.sh &lt;dir&gt;</code></td><td>The stamp for a directory, from the working tree, the index or HEAD.</td></tr>
+      <tr><td><code>check.sh</code></td><td>Anything a page does that the format or sandbox forbids, broken links, and line anchors past the end of a file.</td></tr>
+      <tr><td><code>affected.sh [base]</code></td><td>Which pages a branch's changes fall under.</td></tr>
+    </table></div>
+
+    <h3>Pages can't do anything</h3>
+    <p>A summary is someone else's HTML, rendered next to your GitHub token, so it's treated as hostile. Pages bring no CSS or script of their own (pullspace styles them to match its theme). They render in a sandboxed frame with an opaque origin, under a CSP that blocks every script, event handler and network request. The only script in the frame is pullspace's: a link bridge and the before/after highlighter. Markdown elsewhere in the app is parsed into pullspace's own elements and never handed to the browser as markup.</p>
+  </div>
+</section>
+
+<section id="end">
+  <div class="wrap">
+    <h2>Where this goes</h2>
+    <p>Agents write the code, and humans are still responsible for it. The gap between those two is understanding, and right now we close it by hand in a hundred browser tabs, with explanations that disappear when the chat closes.</p>
+    <p>pullspace's bet is that the review tool should be as good as your editor, and that the agent's understanding of the code belongs in the repo: versioned, diffed and reviewed like everything else.</p>
+    <p>It's open source and dual licensed under MIT and Apache-2.0. Try it on a PR you have open right now at <a href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a>, or open <a href="https://pullspace.dev/#/bigmah/pullspace" target="_blank" rel="noopener noreferrer">pullspace's own repo</a> in it to browse its map. Issues and PRs are welcome on <a href="https://github.com/bigmah/pullspace" target="_blank" rel="noopener noreferrer">GitHub</a>.</p>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap"><a href="index.html">← back to bigmah</a><span>oct 6, 2026</span></div></footer>
+
+<script>
+(()=>{
+  const ba=document.getElementById('ba');
+  ba.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{
+    ba.dataset.view=b.dataset.v;
+    ba.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  }));
+})();
+</script>
+</body>
+</html>

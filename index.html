@@ -522,62 +522,13 @@
 
   p:last-child { margin-bottom: 0; }
 
-  .lead { color: var(--dim); }
-
-  .lead em,
-  .more em {
-    color: var(--fg);
-    font-style: normal;
-  }
-
-  /* ---------- the part you only get at 4×4 ---------- */
-
-  .more {
-    display: none;
-    margin-top: 1.15rem;
-    padding-top: 1.15rem;
-    border-top: 1px solid var(--line);
-  }
-
-  .tile--big .more {
-    display: block;
-    animation: reveal 320ms 130ms both cubic-bezier(.2,.7,.3,1);
-  }
-
-  /* stacked, every tile is open, so the long read waits behind a toggle */
-  .more-toggle { display: none; }
-  .board--static .more-toggle {
-    display: inline-block;
-    align-self: flex-start;
-    text-align: left;
-    margin-top: 0.9rem;
-    font: inherit;
-    font-size: 0.85em;
-    color: var(--dim);
-    background: none;
-    border: 0;
-    border-bottom: 1px solid var(--accent-soft);
-    padding: 0 0 1px;
-    cursor: pointer;
-    transition: color 160ms ease, border-color 160ms ease;
-  }
-  .board--static .more-toggle:hover,
-  .board--static .more-toggle:focus-visible { color: var(--accent); border-bottom-color: var(--accent); }
-  .board--static .more:not(.is-open) { display: none; }
-
-  /* a tile can get wide; keep the line length readable */
-  .more p { max-width: 64ch; }
-
-  /* on a narrower board an enlarged tile is a smaller square, so the revealed
+  /* on a narrower board an enlarged tile is a smaller square, so its
      copy tightens up rather than spilling past the bottom of it */
   @media (max-width: 1400px) {
-    .board:not(.board--static) .more p { font-size: 0.7rem; line-height: 1.8; }
     .board:not(.board--static) .now { font-size: 0.72rem; line-height: 1.8; }
   }
 
   @media (max-width: 1260px) {
-    .board:not(.board--static) .more p { font-size: 0.63rem; line-height: 1.75; }
-    .board:not(.board--static) .more { margin-top: 0.9rem; padding-top: 0.9rem; }
     .board:not(.board--static) .now { font-size: 0.68rem; line-height: 1.75; margin-top: 0.95rem; }
   }
 
@@ -886,7 +837,7 @@
   .sizes, .mini { display: none; }
   .ph { display: none; }
   /* nothing ever resizes a tile, so it shows all it has from the start */
-  .more, .post time, .post .what { display: block; }
+  .post time, .post .what { display: block; }
   /* no script to swap the iframe in, so the button is just the link it already is */
   .start .go { text-decoration: underline; }
   /* ...and its rows are links from the start */
@@ -955,17 +906,6 @@
         </span>
       </nav>
       <p class="now">working on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> — trying to make code review in browser better with Rust + WASM</p>
-      <button class="more-toggle" type="button" aria-expanded="false" aria-controls="more">why pullspace? ↓</button>
-      <div class="more" id="more">
-        <p class="lead">These days reading + approving pull requests is a big bottleneck. It used to be the case that it was slower to write code than read it, so the PR queue never piled up. Obviously this is no longer the case due to coding agents. In some cases this does not matter, if nothing is really on the line with a particular repo, reviews can be brief, shoot first ask questions later. But some repos carry real weight. Lots of money is on the line, this is real deal high stakes production software.</p>
-        <p>In these cases there is no way around a thorough review of the code being released. Of course testing should be as comprehensive as possible, but at the end of the day there are still humans in the loop that are responsible for what a particular program does once released. These humans ought to understand what the code does.</p>
-        <p><em>Code review isn't going anywhere.</em></p>
-        <p>And the default ways we review code leave a lot to be desired. The stock diff viewer github is slow and hard to look at. The integrated vscode thing is bloated and cumbersome.</p>
-        <p>Of course we can just checkout a particular PR and view in our local editor, but this can be tedious. what if we have local changes? or want to review multiple branches. inb4 worktree</p>
-        <p>The path of least resistance today ends up looking like a million browser tabs open, one for each specific thing we want to investigate. The browser makes sense as the place to review things in this way, but we pay the price with ergonomics and a cluttered browser tab list.</p>
-        <p>pullspace aims to be a solution to this. A better browser based code review UX.</p>
-        <p>All you need is a github token (or not for a public repo) and then you can open a PR/branch/repo on <a class="ln" href="https://pullspace.dev" target="_blank" rel="noopener noreferrer">pullspace.dev</a> where you get a buttery like IDE UX to view code.</p>
-      </div>
     </div>
   </article>
 
@@ -984,6 +924,13 @@
       </div>
       <!-- one <li> per post, newest first -->
       <ul class="posts">
+        <li>
+          <a class="post" href="pullspace_blog.html">
+            <span class="name">pullspace and the future of programming</span>
+            <time datetime="2026-10-06">oct 6, 2026</time>
+            <span class="what">code review is the bottleneck now. a fast browser reviewer in rust + wasm, and agent-written summaries tracked in git next to the code.</span>
+          </a>
+        </li>
         <li>
           <a class="post" href="how_ai_works.html">
             <span class="name">How does AI work?</span>
@@ -2436,14 +2383,6 @@
       if (ok) resolve(); else reject();
     });
   }
-
-  var moreBtn = document.querySelector('.more-toggle');
-  var more = document.getElementById('more');
-  moreBtn.addEventListener('click', function () {
-    var open = more.classList.toggle('is-open');
-    moreBtn.setAttribute('aria-expanded', String(open));
-    moreBtn.textContent = open ? 'less ↑' : 'why pullspace? ↓';
-  });
 
   mailBtn.addEventListener('click', function () {
     var open = email.hidden;
