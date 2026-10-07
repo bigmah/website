@@ -821,6 +821,9 @@
   .tile--btd.is-live .tile__body { background: #000; }
   .tile--btd iframe { display: block; width: 100%; height: 100%; border: 0; }
 
+  /* mario strikers — another site's game, so the card links out to it */
+  .tile--mss .tile__body { background: var(--panel); overflow: auto; }
+
   /* bike or die 2 */
 
   /* Gated the same way the model is: the card sits here saying what it is and
@@ -1034,6 +1037,7 @@
         <li><button class="repo" type="button" data-open="btd2" aria-pressed="false" title="Put bloons td 2 on the board"><span class="repo__name">bloons td 2</span><span class="repo__lang">Flash</span></button></li>
         <li><button class="repo" type="button" data-open="btd3" aria-pressed="false" title="Put bloons td 3 on the board"><span class="repo__name">bloons td 3</span><span class="repo__lang">Flash</span></button></li>
         <li><button class="repo" type="button" data-open="btd4" aria-pressed="false" title="Put bloons td 4 on the board"><span class="repo__name">bloons td 4</span><span class="repo__lang">Flash</span></button></li>
+        <li><button class="repo" type="button" data-open="mss" aria-pressed="false" title="Put super mario strikers on the board"><span class="repo__name">mario strikers</span><span class="repo__lang">GameCube</span></button></li>
       </ul>
     </div>
   </article>
@@ -1339,6 +1343,39 @@
       </div>
     </div>
   </article>
+
+  <article class="tile tile--flush tile--mss" data-id="mss">
+    <header class="tile__bar" tabindex="0" aria-label="super mario strikers tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
+      <span class="tile__title">mario strikers</span>
+      <span class="spacer"></span>
+      <a class="ln" href="https://strikers.palace-pitch.workers.dev/?password=password" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
+      <button class="tile__close" type="button" aria-label="Take super mario strikers off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="tile__body">
+      <div class="mini" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="12" cy="12" r="9.6" opacity=".3"/>
+          <path d="M12 7.6l4.2 3-1.6 4.9H9.4l-1.6-4.9Z" opacity=".95"/>
+          <path d="M12 7.6V3.2M16.2 10.6l4.1-1.4M14.6 15.5l2.6 3.6M9.4 15.5l-2.6 3.6M7.8 10.6 3.7 9.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>
+        </svg>
+        <span>mario strikers</span>
+      </div>
+      <div class="start">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="12" cy="12" r="9.6" opacity=".3"/>
+          <path d="M12 7.6l4.2 3-1.6 4.9H9.4l-1.6-4.9Z" opacity=".95"/>
+          <path d="M12 7.6V3.2M16.2 10.6l4.1-1.4M14.6 15.5l2.6 3.6M9.4 15.5l-2.6 3.6M7.8 10.6 3.7 9.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>
+        </svg>
+        <span>
+          <span class="name">super mario strikers</span>
+          <span class="what">the 2005 gamecube soccer game, running in the browser.</span>
+        </span>
+        <a class="go" href="https://strikers.palace-pitch.workers.dev/?password=password" target="_blank" rel="noopener noreferrer">play it ↗</a>
+        <span class="note">opens in its own tab — the game's site keeps its unlock to itself, so it cannot run framed in this page.</span>
+      </div>
+    </div>
+  </article>
 </div>
 
 <script>
@@ -1374,7 +1411,7 @@
   // there come first; the games join it from their squares in the bigmah tile
   // and leave it again by their ×.
   var BASE  = ['id', 'ex'];
-  var EXTRA = ['gba', 'bike', 'btd1', 'btd2', 'btd3', 'btd4'];
+  var EXTRA = ['gba', 'bike', 'btd1', 'btd2', 'btd3', 'btd4', 'mss'];
   var TILES = BASE.slice();
 
   // where everything starts, and what the reset button goes back to: one
@@ -2037,7 +2074,7 @@
     // Without script these links open the standalone page, which is the
     // honest fallback; with it, the page comes to the tile instead.
     var go = e.target.closest('.go');
-    if (go) { e.preventDefault(); startTile(go.closest('.tile').dataset.id); return; }
+    if (go && GATED[go.closest('.tile').dataset.id]) { e.preventDefault(); startTile(go.closest('.tile').dataset.id); return; }
 
     var tile = e.target.closest('.tile');
     if (!tile) return;
