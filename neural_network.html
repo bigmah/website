@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How do neural networks work? A guide for non-programmers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,700;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F5F8FC; --grid:#E0E8F2; --ink:#14223D; --graphite:#556176; --faint:#98A4B6;
+  --hi:#FFD93D; --hi-line:#E3AE00; --miss:#D6344D; --good:#1E8757; --panel:#FFFFFF; --rule:#C8D3E1;
+  --cL:#2F6FDE; --cC:#D99A00; --cR:#1E8757;
+  --grass:#E2F0E3; --dirt:#F1E3CC; --fgrid:#C3D8C6; --fence:#7C8A9E; --ball:#FFFFFF; --stitch:#D6344D;
+  --serif:"Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
+    --hi:#FFD43B; --hi-line:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+    --cL:#6EA8FF; --cC:#FFD43B; --cR:#4CD39A;
+    --grass:#123628; --dirt:#3A3024; --fgrid:#1F4A38; --fence:#8FA3BC; --ball:#F4F4F4; --stitch:#FF6B80;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
+  --hi:#FFD43B; --hi-line:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+  --cL:#6EA8FF; --cC:#FFD43B; --cR:#4CD39A;
+  --grass:#123628; --dirt:#3A3024; --fgrid:#1F4A38; --fence:#8FA3BC; --ball:#F4F4F4; --stitch:#FF6B80;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; color:var(--ink); background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px; background-position:-1px -1px;
+  font-family:var(--serif); font-size:clamp(18px,1.1vw + 12px,21px); line-height:1.62;
+  font-optical-sizing:auto; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px; margin:0 auto; padding:0 22px}
+.wide{max-width:1000px; margin-left:auto; margin-right:auto; padding:0 22px}
+p{margin:0 0 1em}
+a{color:inherit}
+h1,h2,h3{font-weight:500; line-height:1.1; letter-spacing:-0.01em}
+h1{font-size:clamp(48px,8.4vw,104px); margin:0; letter-spacing:-0.035em; font-weight:500}
+h2{font-size:clamp(32px,4.4vw,46px); margin:0 0 .55em; display:flex; gap:.45em; align-items:baseline}
+h2 .n{font-family:var(--mono); font-size:.42em; font-weight:500; color:var(--paper); background:var(--ink); border-radius:3px; padding:.12em .45em; transform:translateY(-.35em)}
+em{font-style:italic}
+code,.eq{font-family:var(--mono); font-size:.84em}
+.eq{display:block; margin:.6em 0 1.1em; padding:.7em 1em; background:var(--panel); border:1px solid var(--rule); border-left:4px solid var(--ink); border-radius:2px; overflow-x:auto; white-space:pre; line-height:1.7}
+.p,mark{
+  background:none; color:inherit; font-weight:500;
+  text-decoration:underline; text-decoration-color:var(--hi-line);
+  text-decoration-thickness:.2em; text-underline-offset:.2em; text-decoration-skip-ink:none;
+}
+.zl{color:var(--cL); font-weight:500} .zc{color:var(--cC); font-weight:500} .zr{color:var(--cR); font-weight:500}
+:root:not([data-theme="dark"]) .zc{color:#9A6B00}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .zc{color:var(--cC)}}
+
+header{padding:9vh 0 2vh}
+.dek{font-size:clamp(21px,1.6vw + 12px,28px); line-height:1.4; max-width:32ch; margin:.5em 0 0; color:var(--graphite)}
+.hero-fig{margin-top:5vh}
+.hero-fig canvas{display:block; width:100%}
+.hero-cap{display:flex; justify-content:space-between; flex-wrap:wrap; gap:.4em 1.5em; font-size:.8em; color:var(--graphite); border-top:1.5px solid var(--ink); padding-top:.5em; margin-top:.2em}
+.hero-cap b{font-family:var(--mono); font-weight:500; font-size:.95em}
+
+section{padding:9vh 0 2vh}
+.lede{font-size:1.12em}
+.aside{font-size:.86em; color:var(--graphite); border-left:2px solid var(--rule); padding-left:1em; margin:1.4em 0}
+
+figure{margin:1.8em 0 2.2em}
+.fig{background:var(--panel); border:1px solid var(--rule); border-radius:4px; padding:18px; box-shadow:0 1px 0 var(--rule)}
+.fig canvas{display:block; width:100%; touch-action:manipulation}
+figcaption{font-size:.8em; color:var(--graphite); margin-top:.7em; line-height:1.5}
+.pair{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+.pair > div{min-width:0}
+@media (max-width:720px){.pair{grid-template-columns:1fr}}
+.ptitle{font-size:.85em; font-weight:700; margin:0 0 .3em}
+.small{max-width:420px}
+
+.controls{display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; margin-top:14px; font-size:.82em}
+.ctl{display:flex; align-items:center; gap:10px; flex:1 1 230px; min-width:0}
+.ctl label{white-space:nowrap}
+.ctl input[type=range]{flex:1; min-width:80px; accent-color:var(--ink)}
+.ctl output{font-family:var(--mono); font-size:.9em; min-width:5ch; text-align:right}
+button{
+  font-family:var(--serif); font-size:.95em; cursor:pointer; color:var(--ink); background:transparent;
+  border:1.5px solid var(--ink); border-radius:3px; padding:.4em .9em; line-height:1.2;
+}
+button:hover{background:var(--grid)}
+button.go{background:var(--hi); color:#14223D; border-color:#14223D; font-weight:500}
+button.go:hover{filter:brightness(.95)}
+button:disabled{opacity:.45; cursor:default}
+button:focus-visible,input:focus-visible{outline:3px solid var(--hi); outline-offset:2px}
+input[type=text]{
+  font-family:var(--mono); font-size:.9em; color:var(--ink); background:var(--paper);
+  border:1.5px solid var(--ink); border-radius:3px; padding:.45em .6em; width:100%;
+}
+.check{display:flex; gap:.45em; align-items:center; cursor:pointer}
+.check input{accent-color:var(--ink); width:1.05em; height:1.05em}
+
+.readout{display:flex; flex-wrap:wrap; gap:10px 28px; margin-top:12px; font-size:.82em; color:var(--graphite)}
+.readout b{display:block; font-family:var(--mono); font-weight:500; font-size:1.35em; color:var(--ink)}
+.calc{font-family:var(--mono); font-size:.74em; line-height:1.8; margin-top:12px; padding:.55em .85em; background:var(--paper); border:1px solid var(--rule); border-radius:2px; overflow-x:auto; white-space:pre; color:var(--graphite)}
+.calc b{color:var(--ink); font-weight:500}
+.verdict{font-size:.85em; margin-top:10px}
+.bad{color:var(--miss)!important}
+.good{color:var(--good)!important}
+
+/* bars of three dot products */
+.dbars{display:grid; grid-template-columns:auto 1fr 4.5em; gap:7px 12px; align-items:center; font-family:var(--mono); font-size:.76em; margin-top:12px}
+.dbars .track{height:14px; background:var(--grid); border-radius:2px; overflow:hidden}
+.dbars .fill{display:block; height:100%; width:0; opacity:.45}
+.dbars .fill.z0{background:var(--cL)} .dbars .fill.z1{background:var(--cC)} .dbars .fill.z2{background:var(--cR)}
+.dbars .win .fill{opacity:1; box-shadow:inset 0 0 0 1.5px var(--ink)}
+.dbars .num{text-align:right}
+.dbars .win{font-weight:500; color:var(--ink)}
+.ptable{display:grid; grid-template-columns:auto auto auto; gap:2px 14px; font-family:var(--mono); font-size:.76em; margin-top:12px; justify-content:start}
+.ptable span{text-align:right}
+.ptable .h{color:var(--graphite); text-align:left}
+
+.sl3{display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; margin-top:14px; font-size:.8em}
+.sl3 .ctl{flex:none; margin:4px 0}
+.sl3 .ttl{font-weight:700}
+@media (max-width:520px){.sl3{grid-template-columns:1fr}}
+
+.wchips{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px}
+.wchips button{font-family:var(--mono); font-size:.72em; padding:.25em .6em}
+.wchips button[aria-pressed="true"]{background:var(--hi); color:#14223D; border-color:#14223D}
+.rank{display:grid; grid-template-columns:auto 1fr 3.4em; gap:6px 10px; align-items:center; font-family:var(--mono); font-size:.76em}
+.rank .track{height:12px; background:var(--grid); border-radius:2px; overflow:hidden}
+.rank .track span{display:block; height:100%; background:var(--hi); box-shadow:inset 0 0 0 1.5px #14223D}
+.rank .num{text-align:right}
+
+.ac-text{font-size:1.5em; line-height:1.35; min-height:2.8em; margin:.2em 0 .4em}
+.ac-text .new{text-decoration:underline; text-decoration-color:var(--hi-line); text-decoration-thickness:.18em; text-underline-offset:.18em}
+.probs{display:grid; grid-template-columns:6em 1fr 3.2em; gap:5px 10px; align-items:center; font-family:var(--mono); font-size:.78em; margin-top:10px}
+.probs .pb{height:14px; background:var(--grid); border-radius:2px; overflow:hidden}
+.probs .pb span{display:block; height:100%; background:var(--graphite); transition:width .25s}
+.probs .pb.top span{background:var(--hi); box-shadow:inset 0 0 0 1.5px #14223D}
+.probs .num{text-align:right}
+
+.det{display:grid; grid-template-columns:7.5em 1fr 3em; gap:4px 12px; align-items:center; font-size:.8em; margin-top:14px}
+.det .track{height:16px; background:var(--grid); border-radius:2px; overflow:hidden}
+.det .track span{display:block; height:100%; background:var(--graphite); transition:width .2s}
+.det .on .track span,.det .track.on span{background:var(--hi); box-shadow:inset 0 0 0 1.5px #14223D}
+.det .num{font-family:var(--mono); text-align:right}
+.det .why{grid-column:2/4; font-family:var(--mono); font-size:.85em; color:var(--graphite); margin:-2px 0 6px; overflow-wrap:anywhere}
+.examples{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
+.examples button{font-size:.78em; padding:.25em .6em}
+details{margin-top:12px; font-size:.8em}
+details summary{cursor:pointer; color:var(--graphite)}
+details p{font-family:var(--mono); font-size:.88em; line-height:1.6; margin-top:.5em; color:var(--graphite)}
+
+.ladder{list-style:none; padding:0; margin:1.2em 0 1.6em; border-top:1.5px solid var(--ink)}
+.ladder li{display:grid; grid-template-columns:1fr auto; gap:.8em; padding:.5em 0; border-bottom:1px solid var(--rule)}
+.ladder b{font-family:var(--mono); font-weight:500; font-size:.84em; padding-top:.2em; text-align:right}
+.uses{list-style:none; padding:0; margin:1.2em 0}
+.uses li{display:grid; grid-template-columns:9.5em 1fr; gap:.8em; padding:.45em 0; border-bottom:1px solid var(--rule)}
+.uses li span:last-child{font-family:var(--mono); font-size:.8em; padding-top:.2em}
+@media (max-width:520px){.uses li{grid-template-columns:1fr; gap:0}}
+.stack{list-style:none; padding:0; margin:1.2em 0; counter-reset:s}
+.stack li{counter-increment:s; display:grid; grid-template-columns:2.4em 1fr; gap:.6em; padding:.55em 0; border-bottom:1px solid var(--rule)}
+.stack li::before{content:counter(s); font-family:var(--mono); font-size:.8em; background:var(--ink); color:var(--paper); border-radius:3px; text-align:center; height:1.7em; line-height:1.7em; margin-top:.25em}
+footer{padding:6vh 0 10vh; font-size:.8em; color:var(--graphite)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>How do neural networks work?</h1>
+    <p class="dek">A guide for non-programmers. It sounds fancy, but it's a few simple operations done over and over, and the most important one is called the dot product.</p>
+  </div>
+  <div class="wide hero-fig">
+    <canvas id="hero" aria-label="Batted balls landing on a baseball field, each one sorted into left, center or right by three dot products"></canvas>
+    <div class="hero-cap"><span>Three dot products sorting batted balls, live</span><span><b class="zl" id="hL">0</b> left · <b class="zc" id="hC">0</b> center · <b class="zr" id="hR">0</b> right</span></div>
+  </div>
+</header>
+
+<main>
+<section id="why">
+  <div class="wrap">
+    <p class="lede">Modern AI runs on something called a <mark>neural network</mark>. ChatGPT is one. So is the thing that finds faces in your photos, the thing that turns your voice into text, and most of the AI from the ten years before chatbots showed up.</p>
+    <p>“Neural network” sounds fancy, and a little biological. But it's really a few simple operations done over and over again, millions or billions of times. And at the heart of it is one operation in particular, called the <mark>dot product</mark>.</p>
+    <p>We're going to learn what a dot product is, and then build a neural network out of them, one brick at a time. No programming needed. Everything on this page is live: drag the dots, press the buttons, break things.</p>
+    <p class="aside">If you read <a href="how_ai_works.html">How does AI work?</a>, this goes one layer deeper. That post treated the model as a mystery equation full of knobs. This one opens the equation up.</p>
+  </div>
+</section>
+
+<section id="distance">
+  <div class="wrap">
+    <h2><span class="n">1</span>Distance</h2>
+    <p>Before the dot product, let's start with something familiar: distance.</p>
+    <p>Here's a flat, 2D plane, like a sheet of graph paper. Every point on it has two coordinates: how far right it is (<code>x</code>) and how far up it is (<code>y</code>). Drag the points around.</p>
+    <figure class="fig">
+      <canvas id="distCanvas" aria-label="Two draggable points on a grid with the distance between them"></canvas>
+      <div class="calc" id="distCalc"></div>
+    </figure>
+    <p>We can measure the distance between any two points. You'd use a ruler; a computer uses a formula from Pythagoras. But you don't need the formula. What matters is the shape of the idea:</p>
+    <span class="eq">distance(A, B)  →  one number</span>
+    <p>Distance is a <mark>function</mark>: you hand it two points, and it hands you back a single number. A small number means the points are close. A big number means they're far apart. Hang on to that shape. Everything else on this page has it.</p>
+  </div>
+</section>
+
+<section id="alignment">
+  <div class="wrap">
+    <h2><span class="n">2</span>Alignment</h2>
+    <p>Distance isn't the only way to compare two points. Another is <mark>alignment</mark>: do two points lie in the same direction, as seen from some starting spot?</p>
+    <p>Let's make that concrete with baseball. Picture a field from above, with home plate at the bottom. When a batter hits the ball, it generally goes one of three ways: to the <span class="zl">left field</span> side, up the <span class="zc">middle</span>, or to the <span class="zr">right field</span> side.</p>
+    <p>We can put coordinates on the field just like on the graph paper. Home plate is <code>[0, 0]</code>. The right field foul line is the <code>x</code> direction and the left field foul line is the <code>y</code> direction. One unit is 100 feet, so a ball at <code>[3, 0]</code> landed right on the right field line, 300 feet out.</p>
+  </div>
+  <div class="wrap">
+    <figure class="fig">
+      <canvas id="fieldDist" aria-label="A baseball field with two draggable batted balls and the distance between them"></canvas>
+      <div class="calc" id="fdCalc"></div>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>We can measure the distance between two batted balls exactly as before. But say we want to know whether two balls were hit to the <em>same side</em> of the field. Distance is bad at this. Look:</p>
+    <figure class="fig">
+      <canvas id="fieldProblem" aria-label="Three batted balls: A and B close together but on opposite sides, C on the same side as A but deeper"></canvas>
+      <div class="calc" id="fpCalc"></div>
+      <p class="verdict" id="fpVerdict"></p>
+    </figure>
+    <p>A and B landed close together, but A went to left and B went to right. C went the same way as A, just much deeper, so distance calls C the odd one out. Distance mixes up two different things: <em>which way</em> the ball went, and <em>how far</em> it went.</p>
+    <p>What we really want is the angle from home plate. Every ball leaves home at some angle: 0° is straight down the right field line, 90° is straight down the left field line, and 45° is dead center.</p>
+    <figure class="fig">
+      <canvas id="fieldAngle" aria-label="The same three balls with lines from home plate and their angles"></canvas>
+      <div class="calc" id="faCalc"></div>
+      <p class="verdict" id="faVerdict"></p>
+    </figure>
+    <p>Now A and C, both hit to left, have nearly the same angle, and B is way off. We can wrap this up as a function, just like distance:</p>
+    <span class="eq">alignment(A, B) = the difference between their angles</span>
+    <p>Zero means the exact same direction. Bigger means less aligned. Drag the balls and compare the two functions: alignment ignores how far the ball went, which is exactly what we wanted.</p>
+  </div>
+</section>
+
+<section id="dot">
+  <div class="wrap">
+    <h2><span class="n">3</span>The dot product</h2>
+    <p>The dot product is a measure of alignment too. It just calculates it a different way. Instead of measuring angles, you multiply the matching coordinates together and add up the results:</p>
+    <span class="eq">A = [x1, y1]        B = [x2, y2]
+
+dot(A, B) = x1 × x2  +  y1 × y2</span>
+    <p>That's the whole thing. Multiply, multiply, add. Here it is next to our other two functions:</p>
+    <figure class="fig">
+      <canvas id="fieldDot" aria-label="Two draggable balls with distance, alignment and dot product"></canvas>
+      <div class="readout">
+        <div>distance(A, B)<b id="fxD">—</b></div>
+        <div>alignment(A, B)<b id="fxA">—</b></div>
+        <div>dot(A, B)<b id="fxP">—</b></div>
+      </div>
+      <div class="calc" id="fxCalc"></div>
+    </figure>
+    <p>Play with it and a few things jump out:</p>
+    <ul>
+      <li>Hit both balls in the same direction, and the dot product is big.</li>
+      <li>Put one on each foul line, 90° apart, and it's exactly zero. (One side of each multiplication is zero there.)</li>
+      <li>It runs the opposite way from alignment: for the dot product, <em>bigger</em> means more aligned.</li>
+    </ul>
+    <p class="aside">The dot product also grows when the balls go farther, so it measures alignment and length together. That's usually fine, and in a neural network it's often useful: a long arrow is a loud signal. If you ever want pure alignment, divide by both lengths. That's called <em>cosine similarity</em>.</p>
+    <p>So why bother, when angles work fine? Because the dot product is just multiplying and adding, it works the same way in any number of dimensions. On a baseball field each ball has one angle. In 3D, a direction needs two angles, like latitude and longitude, and comparing them gets fiddly. For the dot product, a third dimension is just one more multiply and one more add:</p>
+    <span class="eq">dot(A, B) = x1 × x2  +  y1 × y2  +  z1 × z2</span>
+  </div>
+  <div class="wrap">
+    <figure class="fig">
+      <canvas id="dot3d" aria-label="Two arrows in 3D space; drag to rotate"></canvas>
+      <div class="sl3" id="sl3"></div>
+      <div class="readout">
+        <div>angle between<b id="d3A">—</b></div>
+        <div>dot(A, B)<b id="d3P">—</b></div>
+      </div>
+      <div class="calc" id="d3Calc"></div>
+      <figcaption>Drag the picture to spin it. Arrows pointing the same way give a big positive dot product. At 90° it's exactly zero. Point them in opposite directions and it goes negative.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>Neural networks routinely take dot products in thousands of dimensions. That's thousands of multiplies and adds, but still one number at the end, and no angles anywhere.</p>
+  </div>
+</section>
+
+<section id="question">
+  <div class="wrap">
+    <h2><span class="n">4</span>Dot products answer questions</h2>
+    <p>Here's where it gets interesting. We can arrange a few dot products to answer a question:</p>
+    <p class="lede"><em>Was this ball hit to left, center, or right?</em></p>
+    <p>We start with the ball that was hit, as a single coordinate:</p>
+    <span class="eq">ball = [x, y]</span>
+    <p>Then we keep one arrow for each part of the field, pointing into the middle of that zone:</p>
+    <span class="eq"><span class="zl">left</span>   = [1, 4]
+<span class="zc">center</span> = [3, 3]
+<span class="zr">right</span>  = [4, 1]</span>
+    <p>We take the dot product of the ball with each arrow:</p>
+    <span class="eq">dot_left   = dot(ball, left)
+dot_center = dot(ball, center)
+dot_right  = dot(ball, right)</span>
+    <p>And then we pick the biggest one:</p>
+    <span class="eq">max(dot_left, dot_center, dot_right)</span>
+    <p>Whichever arrow the ball lines up with best tells us where it was hit. Drag the ball:</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <div class="pair">
+        <div><p class="ptitle">On the field</p><canvas id="clsField" aria-label="A draggable ball and three arrows for left, center and right"></canvas></div>
+        <div><p class="ptitle">The same thing, drawn as a neural network</p><canvas id="netCanvas" aria-label="Two inputs, x and y, connected to three nodes for left, center and right, then a max"></canvas></div>
+      </div>
+      <div class="dbars" id="clsBars"></div>
+      <div class="calc" id="clsCalc"></div>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>Three dot products and a max: we've built a classifier. The diagram on the right is the same calculation, drawn the way neural networks usually are. The inputs are on the left. Each line multiplies by the number written on it. Each circle adds up whatever flows into it. That circle-and-line picture <em>is</em> a neural network. A tiny one, but a real one.</p>
+    <p class="aside">Why <code>[1, 4]</code> for left and not something like <code>[0, 5]</code>? Because the dot product rewards length as well as direction. With left as <code>[0, 5]</code> and center as <code>[5, 5]</code>, center's arrow would be longer and win every single time. Keeping the three arrows about the same length makes it a fair fight about direction.</p>
+  </div>
+</section>
+
+<section id="learn">
+  <div class="wrap">
+    <h2><span class="n">5</span>Learning the numbers</h2>
+    <p>I picked those six numbers, 1, 4, 3, 3, 4 and 1, by hand. That works for baseball, where we understand the problem. For harder problems nobody can pick the numbers by hand. Instead, we <em>learn</em> them from examples.</p>
+    <p>Let's warm up with something familiar: the line of best fit. Here's how far some batted balls traveled, plotted against how many seconds they hung in the air. A line <code>y = <span class="p">m</span> × x + <span class="p">b</span></code> has two adjustable numbers, <span class="p">m</span> and <span class="p">b</span>, which we call <mark>parameters</mark>. And one number, the <mark>loss</mark>, measures how bad the line is: here, the average gap between a dot and the line.</p>
+    <figure class="fig">
+      <canvas id="lineCanvas" aria-label="Batted ball distance against hang time, with an adjustable line"></canvas>
+      <div class="controls">
+        <div class="ctl"><label for="mS">slope <span class="p">m</span></label><input id="mS" type="range" min="0" max="120" step="1" value="20"><output id="mO"></output></div>
+        <div class="ctl"><label for="bS">intercept <span class="p">b</span></label><input id="bS" type="range" min="-100" max="300" step="5" value="150"><output id="bO"></output></div>
+      </div>
+      <div class="controls"><button class="go" id="lineTrain">Train</button></div>
+      <div class="readout">
+        <div>the line<b id="lineEq">—</b></div>
+        <div>loss (average miss)<b id="lineLoss">—</b></div>
+      </div>
+    </figure>
+    <p>Drag the sliders to find a good fit, or press Train and let the computer do it. Training is a loop: check the loss, nudge every parameter in whichever direction makes the loss smaller, and repeat. (<a href="how_ai_works.html#train">How does AI work?</a> walks through this slowly, if you want more.)</p>
+    <p>The same trick works on dot products. Below are 72 batted balls, each labeled <span class="zl">left</span>, <span class="zc">center</span> or <span class="zr">right</span> by the official scorer, who splits the field into three equal slices. Our classifier starts out with three random arrows. Their six numbers are its parameters. The loss is a number that's big when the classifier picks the wrong zone, and small when it confidently picks the right one.</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <div class="pair">
+        <div><p class="ptitle">The classifier's calls (shading) vs. the scorer's (dots)</p><canvas id="trainField" aria-label="72 labeled batted balls and the classifier's three learned arrows"></canvas></div>
+        <div>
+          <p class="ptitle">Loss over training</p><canvas id="lossCanvas" aria-label="Loss falling over training steps"></canvas>
+          <div class="readout">
+            <div>training steps<b id="trSteps">0</b></div>
+            <div>loss<b id="trLoss">—</b></div>
+            <div>wrong<b id="trWrong">—</b></div>
+          </div>
+          <div class="ptable" id="trParams"></div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="go" id="trGo">Train</button>
+        <button id="trStep">One step</button>
+        <button id="trScramble">Scramble the arrows</button>
+      </div>
+      <figcaption>Dots with a red ring are ones the classifier currently gets wrong. The arrows show which way each learned arrow points; they're shrunk to fit, because training makes them long.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>Watch the arrows swing into place as the loss falls. Nobody told it where left field is. It worked that out from examples. It even beats my hand-picked arrows, which put the zone lines at about 27° and 63° instead of the scorer's 30° and 60°, and so get 7 of these 72 balls wrong.</p>
+    <p>How does it know which way to nudge? For each parameter, it asks: <em>if this number went up a tiny bit, would the loss go up or down?</em> Then it moves the number a small step the other way. It does that for every parameter at once, then repeats. Our classifier has six parameters. ChatGPT has hundreds of billions. It's the same question, asked of each one.</p>
+    <p class="aside">The method is called <em>gradient descent</em>. The clever trick that answers “which way?” for billions of parameters at once, without test-driving each one, is called <em>backpropagation</em>.</p>
+  </div>
+</section>
+
+<section id="squash">
+  <div class="wrap">
+    <h2><span class="n">6</span>The secret sauce: non-linearity</h2>
+    <p>So far a neural network is a bunch of dot products. Can we make it smarter by stacking them, feeding the outputs of some dot products into more dot products?</p>
+    <p>As it stands, no. Say one dot product doubles its input, and a second one triples whatever it gets:</p>
+    <span class="eq">first:          h   = 2 × x
+second:         out = 3 × h
+put together:   out = 6 × x</span>
+    <p>The two dot products collapse into one. That always happens, no matter how many you stack or how wide you make them. Stacked dot products only ever add up to a straight-line relationship, which a single layer could have done on its own. A thousand layers would just be a very expensive single layer.</p>
+    <p>The fix is almost embarrassingly simple. Between layers, we squash each number with a function that <em>isn't</em> a straight line. The most popular one is called <mark>ReLU</mark>, and all it does is replace negative numbers with zero:</p>
+    <span class="eq">relu(x) = max(0, x)</span>
+    <figure class="fig small">
+      <canvas id="reluCanvas" aria-label="Graph of ReLU: flat at zero for negative inputs, then a straight diagonal line"></canvas>
+      <figcaption>Negative in, zero out. Positive in, unchanged.</figcaption>
+    </figure>
+    <p>That one bend is enough. Each dot product can now switch off for part of the input, and the pieces can no longer collapse into a single line. Here's a small network with one input, 8 dot products in the middle, and one output, trying to fit a wavy curve. Train it with the squash, then without:</p>
+    <figure class="fig">
+      <canvas id="kinkCanvas" aria-label="A small network fitting a wavy curve"></canvas>
+      <div class="controls">
+        <button class="go" id="kGo">Train</button>
+        <button id="kReset">Start over</button>
+        <label class="check"><input type="checkbox" id="kRelu" checked> Squash with ReLU</label>
+      </div>
+      <div class="readout">
+        <div>training steps<b id="kSteps">0</b></div>
+        <div>loss (average miss)<b id="kLoss">—</b></div>
+      </div>
+      <figcaption>Dots are the training data. The dark line is the network's output. The faint lines are the 8 middle dot products, each after its squash and its multiply: the output is their sum.</figcaption>
+    </figure>
+    <p>Without the squash, the best it can do is a straight line, however long it trains. With it, the faint lines show each middle dot product's bent contribution, and together they add up to a curve. The squash is called a <mark>non-linearity</mark>, and it's the secret sauce. It's what makes stacking worth doing.</p>
+  </div>
+</section>
+
+<section id="deep">
+  <div class="wrap">
+    <h2><span class="n">7</span>Going deep</h2>
+    <p>With a squash between them, stacking pays off. The outputs of one layer of dot products become the inputs to the next layer. The number of layers is the network's <mark>depth</mark>, and that's the “deep” in <em>deep learning</em>.</p>
+    <p>Every line in the picture is one multiplication by a learned number: one parameter. Each circle also gets one more learned number added in, called a bias. Make the network wider or deeper and watch the count climb:</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <canvas id="deepCanvas" aria-label="A neural network diagram whose layers and width you can change"></canvas>
+      <div class="controls">
+        <div class="ctl"><label for="dpL">layers in the middle</label><input id="dpL" type="range" min="1" max="8" step="1" value="2"><output id="dpLO"></output></div>
+        <div class="ctl"><label for="dpW">width of each layer</label><input id="dpW" type="range" min="2" max="16" step="1" value="5"><output id="dpWO"></output></div>
+      </div>
+      <div class="readout">
+        <div>dot products<b id="dpDots">—</b></div>
+        <div>parameters<b id="dpParams">—</b></div>
+      </div>
+      <figcaption>Two inputs on the left (a ball's x and y), three outputs on the right (left, center, right), just like our classifier, with layers of dot products in between.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>Parameters pile up fast, because every circle connects to every circle in the next layer. One layer 10,000 wide feeding another 10,000 wide is 100 million parameters on its own. Stack a thousand of those and you're at 100 billion.</p>
+    <p>That's what people mean when they talk about a “100B model”: a neural network with 100 billion learned numbers inside its dot products. Some real sizes:</p>
+    <ul class="ladder">
+      <li><span>Our line of best fit</span><b>2</b></li>
+      <li><span>Our baseball classifier</span><b>6</b></li>
+      <li><span>GPT-2 (2019)</span><b>1.5 billion</b></li>
+      <li><span>GPT-3 (2020)</span><b>175 billion</b></li>
+      <li><span>Llama 3.1, largest (2024)</span><b>405 billion</b></li>
+    </ul>
+  </div>
+</section>
+
+<section id="any">
+  <div class="wrap">
+    <h2><span class="n">8</span>Any function at all</h2>
+    <p>There's a famous result called the <mark>universal approximation theorem</mark>. In plain English: a neural network that's big enough, with enough training data, can learn to imitate <em>any</em> function.</p>
+    <p>Remember, a function is anything that takes something in and gives a result back. Draw any curve you like below, and watch a network learn it. The slider sets how many dot products sit in the middle. A few give a rough sketch; more give a closer fit.</p>
+  </div>
+  <div class="wrap">
+    <figure class="fig">
+      <canvas id="drawCanvas" aria-label="Draw a curve here and a neural network learns to imitate it" style="cursor:crosshair"></canvas>
+      <div class="controls">
+        <div class="ctl"><label for="uaU">dot products in the middle</label><input id="uaU" type="range" min="0" max="10" step="1" value="5"><output id="uaUO"></output></div>
+        <button id="uaClear">Clear and draw your own</button>
+      </div>
+      <div class="readout">
+        <div>parameters<b id="uaP">—</b></div>
+        <div>training steps<b id="uaS">0</b></div>
+        <div>loss (average miss)<b id="uaL">—</b></div>
+      </div>
+      <figcaption>Draw with your mouse or finger, left to right. The yellow line is your function; the dark line is the network's imitation, trained from scratch every time you change something.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>The theorem doesn't promise that training is easy, or say how big “big enough” is. But it does say there's no shape a network can't learn, in principle. And an enormous number of useful things can be framed as a function:</p>
+    <ul class="uses">
+      <li><span>Photo labeling</span><span>pixel colors in → “cat” or “dog” out</span></li>
+      <li><span>Playing a game</span><span>what's on screen in → which button to press out</span></li>
+      <li><span>Speech to text</span><span>sound in → words out</span></li>
+      <li><span>Chat</span><span>the conversation so far in → the next word out</span></li>
+    </ul>
+    <p>That's why neural networks are everywhere in modern AI. Instead of writing rules for each problem, you collect examples of inputs and outputs, and let training find the function.</p>
+  </div>
+</section>
+
+<section id="words">
+  <div class="wrap">
+    <h2><span class="n">9</span>Words as coordinates</h2>
+    <p>So how does a pile of dot products become ChatGPT? The first step is to turn words into coordinates, just like batted balls.</p>
+    <p>Imagine a simple 3D space where each direction measures how much a word is some quality. Say <code>x</code> measures <em>female</em>, <code>y</code> measures <em>male</em>, and <code>z</code> measures <em>old</em>. Grandma is very female and very old, so she sits around <code>[1, 0, 0.95]</code>. A boy is around <code>[0, 1, 0.1]</code>. Every word becomes a point, and words with similar meanings land near each other. Pick a word to see its dot product with all the others:</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <div class="wchips" id="wChips"></div>
+      <div class="pair">
+        <div><canvas id="wordsCanvas" aria-label="Words placed in a 3D space with axes female, male and old; drag to spin"></canvas></div>
+        <div><p class="ptitle" id="wTitle">dot products</p><div class="rank" id="wRank"></div></div>
+      </div>
+      <figcaption>Drag the picture to spin it. Brighter dots line up better with the word you picked.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>The dot product finds related words for the same reason it found balls hit to the same side. It also shows the limits of three directions: <em>queen</em> and <em>woman</em> barely differ, and <em>fossil</em> scores well against <em>grandpa</em> because “old” is all they share. Real models use thousands of directions, and nobody picks them by hand. Training discovers them, the same way it discovered left field.</p>
+  </div>
+</section>
+
+<section id="chat">
+  <div class="wrap">
+    <h2><span class="n">10</span>How a chatbot uses all this</h2>
+    <p>A chatbot is, at its core, autocomplete. It's trained on an enormous amount of text to do one thing: given some text, predict the next word. To write a whole reply, it predicts a word, sticks it on the end, and feeds the longer text back in to predict the word after that:</p>
+    <figure class="fig">
+      <div class="ac-text" id="acText"></div>
+      <div class="probs" id="acProbs"></div>
+      <div class="controls">
+        <button class="go" id="acGo">Predict the next word</button>
+        <button id="acReset">Start over</button>
+      </div>
+      <figcaption>A pretend autocomplete with made-up odds, to show the loop. The real thing works the same way, one word at a time.</figcaption>
+    </figure>
+    <p>The model doing the predicting is a huge neural network: layer after layer of dot products and squashes, with the words going in as coordinates. And through training, many of those dot products come to <em>mean</em> something. One might light up when the input is a question. Another when it's about math. Another when it's about animals.</p>
+    <p>Here's a toy version. Each detector below is a single dot product. The text becomes a list of how many times each word appears, the detector has a number for each word, and we multiply and add. Type anything:</p>
+    <figure class="fig">
+      <input type="text" id="detIn" value="how many legs does a spider have?" aria-label="Text to run through the detectors" autocomplete="off" spellcheck="false">
+      <div class="examples" id="detEx"></div>
+      <div class="det" id="detOut"></div>
+      <details><summary>See each detector's numbers</summary><div id="detW"></div></details>
+    </figure>
+    <p>In a real model nobody writes those lists of numbers. Training finds them, and the detectors it finds are rarely this tidy. But the principle holds. Grammar, facts, a sense of what's being asked, all of it ends up baked into the numbers inside billions of little dot products. Multiply, multiply, add, squash, over and over again.</p>
+  </div>
+</section>
+
+<section id="recap">
+  <div class="wrap">
+    <h2>What we built</h2>
+    <ol class="stack">
+      <li><span>A <strong>function</strong> takes things in and gives one result back, like <strong>distance</strong>.</span></li>
+      <li><span><strong>Alignment</strong> asks whether two points face the same way, ignoring how far.</span></li>
+      <li><span>The <strong>dot product</strong> measures alignment with nothing but multiplying and adding, in any number of dimensions.</span></li>
+      <li><span>A few dot products and a max can <strong>answer a question</strong>. Drawn as circles and lines, that's a neural network.</span></li>
+      <li><span>The numbers inside are <strong>parameters</strong>, and <strong>training</strong> nudges them to lower the loss.</span></li>
+      <li><span>A <strong>squash</strong> like ReLU between layers stops the dot products collapsing into one.</span></li>
+      <li><span>Stack layers and you get <strong>depth</strong>, and lots of parameters. A “100B model” has 100 billion.</span></li>
+      <li><span>Big enough networks can learn <strong>any function</strong>, which is why they're everywhere.</span></li>
+      <li><span><strong>Words become coordinates</strong>, and a chatbot is a giant network of dot products doing autocomplete.</span></li>
+    </ol>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">Everything on this page runs in your browser. The networks are real, just tiny: they train from scratch on your device, in a second or two.</div></footer>
+
+<script>
+(() => {
+"use strict";
+/* ---------- utilities ---------- */
+const $ = s => document.querySelector(s);
+const root = document.documentElement;
+const C = n => getComputedStyle(root).getPropertyValue(n).trim();
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r());}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const r1=v=>Math.round(v*10)/10;
+const f1=v=>v.toFixed(1), f2=v=>v.toFixed(2);
+// short number: 2, 1.5, −0.5
+const nf=v=>(v<0?'−':'')+(Number.isInteger(v)?String(Math.abs(v)):Math.abs(v).toFixed(1));
+const sg=v=>(v<0?'−':'')+Math.abs(v).toFixed(2);
+const range=(a,b,s=1)=>{const o=[];for(let v=a;v<=b+1e-9;v+=s)o.push(+v.toFixed(6));return o;};
+const argmax=a=>a.reduce((bi,v,i)=>v>a[bi]?i:bi,0);
+function hexRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+function alpha(col,a){const[r,g,b]=hexRgb(col);return`rgba(${r},${g},${b},${a})`;}
+const mono=(px,w)=>(w?w+' ':'')+px+'px '+C('--mono');
+
+/* ---------- canvas plumbing ---------- */
+const canvases=[];
+function makeCanvas(el, ratio, draw){
+  const o={el,ratio,draw,ctx:el.getContext('2d'),w:0,h:0};
+  canvases.push(o); sizeCanvas(o); return o;
+}
+function sizeCanvas(o){
+  const dpr=window.devicePixelRatio||1;
+  const w=o.el.clientWidth||300;
+  const r=typeof o.ratio==='function'?o.ratio(w):o.ratio;
+  const h=Math.round(w*r);
+  o.el.style.height=h+'px';
+  o.el.width=Math.round(w*dpr); o.el.height=Math.round(h*dpr);
+  o.ctx.setTransform(dpr,0,0,dpr,0,0);
+  o.w=w; o.h=h; o.draw(o);
+}
+let rsT; window.addEventListener('resize',()=>{clearTimeout(rsT);rsT=setTimeout(()=>canvases.forEach(sizeCanvas),80);});
+const redrawAll=()=>canvases.forEach(o=>o.draw(o));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',redrawAll);
+
+// Pointer dragging. A touch that lands on something draggable stops the page
+// from scrolling; anywhere else the page scrolls as usual.
+function interact(o,h){
+  const el=o.el;
+  const loc=(x,y)=>{const r=el.getBoundingClientRect();return{x:x-r.left,y:y-r.top};};
+  let on=false;
+  el.addEventListener('pointerdown',e=>{const p=loc(e.clientX,e.clientY);if(!h.hit(p))return;on=true;el.setPointerCapture(e.pointerId);if(h.down)h.down(p);e.preventDefault();});
+  el.addEventListener('pointermove',e=>{const p=loc(e.clientX,e.clientY);if(on)h.move(p);else if(e.pointerType==='mouse')el.style.cursor=h.hit(p)?(h.cursor||'grab'):'';});
+  const end=()=>{if(on){on=false;if(h.up)h.up();}};
+  el.addEventListener('pointerup',end); el.addEventListener('pointercancel',end);
+  if(!h.scroll)el.addEventListener('touchstart',e=>{const t=e.touches[0];if(t&&h.hit(loc(t.clientX,t.clientY)))e.preventDefault();},{passive:false});
+}
+function onVisible(el,cb){new IntersectionObserver(es=>es.forEach(e=>cb(e.isIntersecting)),{rootMargin:'80px'}).observe(el);}
+
+/* ---------- 2D plot helpers ---------- */
+function frame(o,xr,yr,pad){
+  pad=Object.assign({l:58,r:14,t:12,b:40},pad||{});
+  if(o.w<420){pad.l=Math.min(pad.l,46);}
+  const pw=o.w-pad.l-pad.r, ph=o.h-pad.t-pad.b;
+  return {pad,xr,yr,
+    X:v=>pad.l+(v-xr[0])/(xr[1]-xr[0])*pw,
+    Y:v=>pad.t+ph-(v-yr[0])/(yr[1]-yr[0])*ph,
+    iX:px=>xr[0]+(px-pad.l)/pw*(xr[1]-xr[0]),
+    iY:py=>yr[0]+(pad.t+ph-py)/ph*(yr[1]-yr[0])};
+}
+function axes(o,f,opt){
+  const c=o.ctx; c.clearRect(0,0,o.w,o.h);
+  const {pad}=f, small=o.w<420;
+  c.font=mono(small?10:11);
+  c.lineWidth=1;
+  c.strokeStyle=C('--grid'); c.fillStyle=C('--graphite');
+  c.textAlign='center'; c.textBaseline='top';
+  (opt.xt||[]).forEach(v=>{const x=Math.round(f.X(v))+.5;c.beginPath();c.moveTo(x,pad.t);c.lineTo(x,o.h-pad.b);c.stroke();c.fillText((opt.xf||nf)(v),x,o.h-pad.b+6);});
+  c.textAlign='right'; c.textBaseline='middle';
+  (opt.yt||[]).forEach(v=>{const y=Math.round(f.Y(v))+.5;c.beginPath();c.moveTo(pad.l,y);c.lineTo(o.w-pad.r,y);c.stroke();c.fillText((opt.yf||nf)(v),pad.l-7,y);});
+  c.strokeStyle=C('--ink'); c.lineWidth=1.5;
+  const x0=opt.x0!=null?f.X(opt.x0):pad.l, y0=opt.y0!=null?f.Y(opt.y0):o.h-pad.b;
+  c.beginPath(); c.moveTo(x0,pad.t); c.lineTo(x0,o.h-pad.b); c.moveTo(pad.l,y0); c.lineTo(o.w-pad.r,y0); c.stroke();
+  c.fillStyle=C('--graphite');
+  if(opt.xl){c.textAlign='right';c.textBaseline='bottom';c.fillText(opt.xl,o.w-pad.r,o.h-2);}
+  if(opt.yl){c.textAlign='left';c.textBaseline='top';c.fillText(opt.yl,pad.l+6,pad.t+2);}
+}
+function haloText(c,t,x,y,col,align,base){
+  c.textAlign=align||'left'; c.textBaseline=base||'middle';
+  c.lineWidth=4; c.lineJoin='round'; c.strokeStyle=C('--panel'); c.strokeText(t,x,y);
+  c.fillStyle=col; c.fillText(t,x,y);
+}
+function arrow(c,x0,y0,x1,y1,col,w){
+  w=w||2; const a=Math.atan2(y1-y0,x1-x0), h=7+w*1.6;
+  c.strokeStyle=col; c.fillStyle=col; c.lineWidth=w; c.lineCap='round';
+  c.beginPath(); c.moveTo(x0,y0); c.lineTo(x1-Math.cos(a)*h*.6,y1-Math.sin(a)*h*.6); c.stroke();
+  c.beginPath(); c.moveTo(x1,y1); c.lineTo(x1-h*Math.cos(a-.42),y1-h*Math.sin(a-.42)); c.lineTo(x1-h*Math.cos(a+.42),y1-h*Math.sin(a+.42)); c.closePath(); c.fill();
+}
+function strokePath(c,pts,col,w){c.strokeStyle=col;c.lineWidth=w;c.lineCap='round';c.lineJoin='round';c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.stroke();}
+
+/* ---------- the baseball field ---------- */
+// Field coordinates: home plate is [0,0], x runs down the right field line,
+// y down the left field line, 1 unit = 100 ft. Drawn rotated 45° so home
+// plate sits at the bottom.
+const S2=Math.SQRT1_2, FR=4;
+const REFS=[[1,4],[3,3],[4,1]];            // left, center, right
+const ZN=['left','center','right'];
+const zcol=k=>C(['--cL','--cC','--cR'][k]);
+const dot2=(a,b)=>a[0]*b[0]+a[1]*b[1];
+const bdeg=b=>Math.atan2(b.y,b.x)*180/Math.PI;
+const bdist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const BND=[Math.atan2(1,2),Math.atan2(2,1)]; // where the hand-picked arrows tie: 26.6° and 63.4°
+
+function drawBall(c,x,y,r){
+  c.beginPath(); c.arc(x,y,r,0,7); c.fillStyle=C('--ball'); c.fill();
+  c.lineWidth=1.5; c.strokeStyle='#14223D'; c.stroke();
+  c.strokeStyle=C('--stitch'); c.lineWidth=1.1;
+  c.beginPath(); c.arc(x-r*1.3,y,r*.9,-.62,.62); c.stroke();
+  c.beginPath(); c.arc(x+r*1.3,y,r*.9,Math.PI-.62,Math.PI+.62); c.stroke();
+}
+
+function Field(el,opt){
+  const F={balls:opt.balls||[]};
+  const g={s:1,hx:0,hy:0};
+  F.P=(x,y)=>[g.hx+g.s*(x-y)*S2, g.hy-g.s*(x+y)*S2];
+  F.inv=(sx,sy)=>{const a=(sx-g.hx)/(g.s*S2), b=(g.hy-sy)/(g.s*S2);return[(a+b)/2,(b-a)/2];};
+  F.ang=phi=>-(Math.PI/4+phi);           // field angle (0 = right line) to canvas angle
+  F.home=()=>[g.hx,g.hy]; F.scale=()=>g.s;
+  F.wedge=(c,r)=>{c.beginPath();c.moveTo(g.hx,g.hy);c.arc(g.hx,g.hy,r*g.s,F.ang(Math.PI/2),F.ang(0));c.closePath();};
+  function draw(o){
+    const padX=opt.grid?30:16, padT=opt.padT||20, padB=opt.grid?34:22;
+    g.s=Math.min((o.w-2*padX)/(2*FR*S2),(o.h-padT-padB)/FR);
+    g.hx=o.w/2; g.hy=o.h-padB;
+    const c=o.ctx, s=g.s; c.clearRect(0,0,o.w,o.h);
+    F.wedge(c,FR); c.fillStyle=C('--grass'); c.fill();
+    F.wedge(c,1.45); c.fillStyle=C('--dirt'); c.fill();
+    c.beginPath(); [[.17,.17],[.75,.17],[.75,.75],[.17,.75]].forEach((q,i)=>{const[x,y]=F.P(q[0],q[1]);i?c.lineTo(x,y):c.moveTo(x,y);}); c.closePath(); c.fillStyle=C('--grass'); c.fill();
+    if(opt.under)opt.under(c,F);
+    if(opt.grid){
+      c.save(); F.wedge(c,FR); c.clip(); c.strokeStyle=C('--fgrid'); c.lineWidth=1;
+      c.beginPath();
+      for(let k=1;k<=4;k++){let a=F.P(k,0),b=F.P(k,FR);c.moveTo(a[0],a[1]);c.lineTo(b[0],b[1]);a=F.P(0,k);b=F.P(FR,k);c.moveTo(a[0],a[1]);c.lineTo(b[0],b[1]);}
+      c.stroke();
+      c.restore();
+      c.font=mono(10); c.fillStyle=C('--graphite');
+      for(let k=1;k<=4;k++){
+        let[x,y]=F.P(k,0); c.textAlign='left'; c.textBaseline='top'; c.fillText(k,x+5,y+4);
+        [x,y]=F.P(0,k); c.textAlign='right'; c.fillText(k,x-5,y+4);
+      }
+      c.font=mono(12,500); c.fillStyle=C('--ink');
+      let[x,y]=F.P(FR+.25,0); c.textAlign='left'; c.textBaseline='middle'; c.fillText('x',x,y);
+      [x,y]=F.P(0,FR+.25); c.textAlign='right'; c.fillText('y',x,y);
+    }
+    [[.9,0],[.9,.9],[0,.9]].forEach(q=>{const[x,y]=F.P(q[0],q[1]);const h=Math.max(2.5,s*.045);c.save();c.translate(x,y);c.rotate(Math.PI/4);c.fillStyle=C('--ball');c.fillRect(-h,-h,2*h,2*h);c.strokeStyle=C('--faint');c.lineWidth=1;c.strokeRect(-h,-h,2*h,2*h);c.restore();});
+    c.strokeStyle=C('--ink'); c.lineWidth=1.5;
+    [F.P(FR,0),F.P(0,FR)].forEach(p=>{c.beginPath();c.moveTo(g.hx,g.hy);c.lineTo(p[0],p[1]);c.stroke();});
+    c.beginPath(); c.arc(g.hx,g.hy,FR*s,F.ang(Math.PI/2),F.ang(0)); c.strokeStyle=C('--fence'); c.lineWidth=2.5; c.stroke();
+    const hp=Math.max(3.5,s*.06);
+    c.beginPath(); c.moveTo(g.hx-hp,g.hy-hp*.7); c.lineTo(g.hx+hp,g.hy-hp*.7); c.lineTo(g.hx+hp,g.hy+hp*.1); c.lineTo(g.hx,g.hy+hp); c.lineTo(g.hx-hp,g.hy+hp*.1); c.closePath();
+    c.fillStyle=C('--ball'); c.fill(); c.strokeStyle=C('--ink'); c.lineWidth=1; c.stroke();
+    if(opt.zones){
+      c.font='italic '+(o.w<520?13:15)+'px '+C('--serif');
+      [[76,'left field'],[45,'center field'],[14,'right field']].forEach(([d,t])=>{const p=d*Math.PI/180;const[x,y]=F.P(3.3*Math.cos(p),3.3*Math.sin(p));c.fillStyle=C('--graphite');c.textAlign='center';c.textBaseline='middle';c.globalAlpha=.75;c.fillText(t,x,y);c.globalAlpha=1;});
+    }
+    if(opt.over)opt.over(c,F);
+    c.font=mono(13,500);
+    F.balls.forEach(b=>{const[x,y]=F.P(b.x,b.y);drawBall(c,x,y,7.5);if(b.n)haloText(c,typeof b.n==='function'?b.n(b):b.n,x+12,y-11,C('--ink'));});
+    if(opt.after)opt.after(F);
+  }
+  const o=makeCanvas(el,opt.ratio||(w=>w<520?0.84:0.62),draw);
+  F.o=o; F.redraw=()=>draw(o);
+  if(F.balls.some(b=>b.drag!==false)){
+    let act=null;
+    interact(o,{
+      hit:p=>{let best=26,found=null;F.balls.forEach(b=>{if(b.drag===false)return;const[x,y]=F.P(b.x,b.y);const d=Math.hypot(p.x-x,p.y-y);if(d<best){best=d;found=b;}});act=found||act;return !!found;},
+      move:p=>{
+        let[x,y]=F.inv(p.x,p.y); x=Math.max(0,x); y=Math.max(0,y);
+        const r=Math.hypot(x,y); if(r>FR){x*=FR/r;y*=FR/r;}
+        act.x=r1(x); act.y=r1(y); if(act.x===0&&act.y===0)act.y=.1;
+        F.redraw();
+      }});
+  }
+  return F;
+}
+function ray(c,F,b,col,w){const[hx,hy]=F.home(),[x,y]=F.P(b.x,b.y);c.strokeStyle=col;c.lineWidth=w||1.5;c.setLineDash([]);c.beginPath();c.moveTo(hx,hy);c.lineTo(x,y);c.stroke();}
+function seg(c,F,a,b,col,label){
+  const[x0,y0]=F.P(a.x,a.y),[x1,y1]=F.P(b.x,b.y);
+  c.strokeStyle=col; c.lineWidth=2; c.setLineDash([5,4]); c.beginPath(); c.moveTo(x0,y0); c.lineTo(x1,y1); c.stroke(); c.setLineDash([]);
+  if(label){c.font=mono(12,500);haloText(c,label,(x0+x1)/2,(y0+y1)/2,col,'center');}
+}
+function arcBetween(c,F,a,b,rr,col){
+  const p1=Math.atan2(a.y,a.x), p2=Math.atan2(b.y,b.x), [hx,hy]=F.home();
+  c.strokeStyle=col; c.lineWidth=3; c.beginPath(); c.arc(hx,hy,rr*F.scale(),F.ang(p1),F.ang(p2),p2>p1); c.stroke();
+}
+function shadeRefs(c,F,a){
+  const z=[[BND[1],Math.PI/2],[BND[0],BND[1]],[0,BND[0]]], [hx,hy]=F.home(), R=FR*F.scale();
+  z.forEach(([p0,p1],k)=>{c.beginPath();c.moveTo(hx,hy);c.arc(hx,hy,R,F.ang(p1),F.ang(p0));c.closePath();c.fillStyle=alpha(zcol(k),a);c.fill();});
+}
+function shadeRaster(c,F,W,a){
+  const st=5, [hx,hy]=F.home(), R=FR*F.scale(), cols=[0,1,2].map(k=>alpha(zcol(k),a));
+  c.save(); F.wedge(c,FR); c.clip();
+  for(let py=Math.floor(hy-R);py<hy;py+=st)for(let px=Math.floor(hx-R*S2);px<hx+R*S2;px+=st){
+    const[x,y]=F.inv(px+st/2,py+st/2); if(x<-.2||y<-.2||x*x+y*y>FR*FR*1.1)continue;
+    c.fillStyle=cols[argmax(W.map(w=>w[0]*x+w[1]*y))]; c.fillRect(px,py,st,st);
+  }
+  c.restore();
+}
+
+/* ---------- hero: balls landing and getting sorted ---------- */
+{
+  const H={landed:[],fly:null,next:0,count:[0,0,0]}, el=$('#hero');
+  const cnt=[$('#hL'),$('#hC'),$('#hR')];
+  const spawn=t=>{const p=(4+Math.random()*82)*Math.PI/180, r=1.3+Math.random()*2.6;H.fly={x:r*Math.cos(p),y:r*Math.sin(p),t0:t,dur:700+r*120};};
+  const land=b=>{const k=argmax(REFS.map(w=>dot2(w,[b.x,b.y])));H.landed.push({x:b.x,y:b.y,k});if(H.landed.length>36)H.landed.shift();H.count[k]++;cnt[k].textContent=H.count[k];};
+  const F=Field(el,{zones:true,ratio:w=>w<600?0.8:0.48,
+    under(c,F){shadeRefs(c,F,.13);},
+    over(c,F){
+      H.landed.forEach((b,i)=>{const[x,y]=F.P(b.x,b.y);c.globalAlpha=.35+.65*(i+1)/H.landed.length;c.beginPath();c.arc(x,y,5.5,0,7);c.fillStyle=zcol(b.k);c.fill();c.strokeStyle='#14223D';c.lineWidth=1.2;c.stroke();c.globalAlpha=1;});
+      if(H.fly){
+        const k=clamp((performance.now()-H.fly.t0)/H.fly.dur,0,1), gx=H.fly.x*k, gy=H.fly.y*k;
+        const[sx,sy]=F.P(gx,gy), up=Math.sin(Math.PI*k)*F.scale()*.9*Math.hypot(H.fly.x,H.fly.y)/4;
+        c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(sx,sy,6,3,0,0,7); c.fill();
+        drawBall(c,sx,sy-up,6.5);
+      }
+    }});
+  if(reduceMotion){for(let i=0;i<24;i++){spawn(0);land(H.fly);}H.fly=null;F.redraw();}
+  else{
+    let vis=false, raf=0;
+    const loop=t=>{
+      if(!vis){raf=0;return;}
+      if(!H.fly&&t>H.next)spawn(t);
+      if(H.fly&&t-H.fly.t0>=H.fly.dur){land(H.fly);H.fly=null;H.next=t+350;}
+      F.redraw(); raf=requestAnimationFrame(loop);
+    };
+    onVisible(el,v=>{vis=v;if(v&&!raf)raf=requestAnimationFrame(loop);});
+  }
+}
+
+/* ---------- 1. distance on a plane ---------- */
+{
+  const pts=[{x:2,y:1.5,n:'A'},{x:7,y:4.5,n:'B'}];
+  let f, act=null;
+  const calc=$('#distCalc');
+  const o=makeCanvas($('#distCanvas'),w=>w<520?0.72:0.52,o=>{
+    f=frame(o,[0,10],[0,6],{l:34,b:28,t:14,r:16});
+    axes(o,f,{xt:range(0,10),yt:range(0,6)});
+    const c=o.ctx,[a,b]=pts;
+    c.setLineDash([4,4]); c.strokeStyle=C('--faint'); c.lineWidth=1.5;
+    c.beginPath(); c.moveTo(f.X(a.x),f.Y(a.y)); c.lineTo(f.X(b.x),f.Y(a.y)); c.lineTo(f.X(b.x),f.Y(b.y)); c.stroke(); c.setLineDash([]);
+    strokePath(c,[[f.X(a.x),f.Y(a.y)],[f.X(b.x),f.Y(b.y)]],C('--hi'),7);
+    strokePath(c,[[f.X(a.x),f.Y(a.y)],[f.X(b.x),f.Y(b.y)]],C('--ink'),1.5);
+    const d=bdist(a,b);
+    c.font=mono(12,500); haloText(c,f2(d),(f.X(a.x)+f.X(b.x))/2,(f.Y(a.y)+f.Y(b.y))/2-12,C('--ink'),'center');
+    pts.forEach((p,i)=>{const q=pts[1-i],x=f.X(p.x),y=f.Y(p.y),lt=p.x<q.x||(p.x===q.x&&i===0),dn=p.y<q.y;c.beginPath();c.arc(x,y,7,0,7);c.fillStyle=C('--ink');c.fill();c.font=mono(13,500);haloText(c,`${p.n} [${nf(p.x)}, ${nf(p.y)}]`,x+(lt?-11:11),y+(dn?14:-14),C('--ink'),lt?'right':'left');});
+    calc.innerHTML=`distance(<b>[${nf(a.x)}, ${nf(a.y)}]</b>, <b>[${nf(b.x)}, ${nf(b.y)}]</b>) = <b>${f2(d)}</b>`;
+  });
+  interact(o,{
+    hit:p=>{let best=24,found=null;pts.forEach(q=>{const d=Math.hypot(p.x-f.X(q.x),p.y-f.Y(q.y));if(d<best){best=d;found=q;}});act=found||act;return !!found;},
+    move:p=>{act.x=clamp(Math.round(f.iX(p.x)*2)/2,0,10);act.y=clamp(Math.round(f.iY(p.y)*2)/2,0,6);o.draw(o);}});
+}
+
+/* ---------- 2. distance and alignment on the field ---------- */
+const bstr=b=>`[${f1(b.x)}, ${f1(b.y)}]`;
+{
+  const A={x:1.0,y:2.5,n:'A'}, B={x:2.6,y:1.2,n:'B'}, calc=$('#fdCalc');
+  Field($('#fieldDist'),{grid:true,balls:[A,B],
+    over(c,F){seg(c,F,A,B,C('--ink'),f2(bdist(A,B)));},
+    after(){calc.innerHTML=`distance(A, B) = distance(<b>${bstr(A)}</b>, <b>${bstr(B)}</b>) = <b>${f2(bdist(A,B))}</b>`;}});
+}
+{
+  const A={x:.5,y:1.6,n:'A'}, B={x:1.6,y:.5,n:'B'}, Cb={x:1.0,y:3.6,n:'C'}, calc=$('#fpCalc'), ver=$('#fpVerdict');
+  Field($('#fieldProblem'),{grid:true,balls:[A,B,Cb],
+    over(c,F){seg(c,F,A,B,C('--miss'),f2(bdist(A,B)));seg(c,F,A,Cb,C('--graphite'),f2(bdist(A,Cb)));},
+    after(){
+      const ab=bdist(A,B), ac=bdist(A,Cb);
+      calc.innerHTML=`distance(A, B) = <b>${f2(ab)}</b>\ndistance(A, C) = <b>${f2(ac)}</b>`;
+      ver.innerHTML=ab<ac?'By distance, A looks more like <b>B</b>.':ab>ac?'By distance, A looks more like <b>C</b>.':'By distance, it’s a tie.';
+    }});
+}
+{
+  const lab=b=>`${b.id} ${Math.round(bdeg(b))}°`;
+  const A={x:.5,y:1.6,id:'A',n:lab}, B={x:1.6,y:.5,id:'B',n:lab}, Cb={x:1.0,y:3.6,id:'C',n:lab}, calc=$('#faCalc'), ver=$('#faVerdict');
+  Field($('#fieldAngle'),{grid:true,balls:[A,B,Cb],
+    over(c,F){
+      [A,B,Cb].forEach(b=>ray(c,F,b,C('--ink'),1.5));
+      arcBetween(c,F,A,B,.75,C('--miss')); arcBetween(c,F,A,Cb,1.05,C('--good'));
+    },
+    after(){
+      const ab=Math.abs(bdeg(A)-bdeg(B)), ac=Math.abs(bdeg(A)-bdeg(Cb));
+      calc.innerHTML=`alignment(A, B) = <b class="bad">${Math.round(ab)}°</b>     distance(A, B) = <b>${f2(bdist(A,B))}</b>\nalignment(A, C) = <b class="good">${Math.round(ac)}°</b>     distance(A, C) = <b>${f2(bdist(A,Cb))}</b>`;
+      ver.innerHTML=Math.round(ab)<Math.round(ac)?'By alignment, A looks more like <b>B</b>.':Math.round(ab)>Math.round(ac)?'By alignment, A looks more like <b>C</b>.':'By alignment, it’s a tie.';
+    }});
+}
+
+/* ---------- 3. the dot product ---------- */
+{
+  const A={x:1.0,y:3.0,n:'A'}, B={x:3.0,y:1.5,n:'B'};
+  const oD=$('#fxD'), oA=$('#fxA'), oP=$('#fxP'), calc=$('#fxCalc');
+  Field($('#fieldDot'),{grid:true,balls:[A,B],
+    over(c,F){ray(c,F,A,C('--ink'),1.5);ray(c,F,B,C('--ink'),1.5);arcBetween(c,F,A,B,.8,C('--hi-line'));seg(c,F,A,B,C('--graphite'));},
+    after(){
+      const d=A.x*B.x+A.y*B.y;
+      oD.textContent=f2(bdist(A,B)); oA.textContent=Math.round(Math.abs(bdeg(A)-bdeg(B)))+'°'; oP.textContent=f2(d);
+      calc.innerHTML=`dot(A, B) = ${f1(A.x)} × ${f1(B.x)}  +  ${f1(A.y)} × ${f1(B.y)}\n          = ${f2(A.x*B.x)} + ${f2(A.y*B.y)}\n          = <b>${f2(d)}</b>`;
+    }});
+}
+
+/* ---------- 3D projection, shared by the 3D figures ---------- */
+function proj(o,v,view,ctr,s){
+  const p=[v[0]-ctr[0],v[1]-ctr[1],v[2]-ctr[2]];
+  const cy=Math.cos(view.yaw), sy=Math.sin(view.yaw), cp=Math.cos(view.pitch), sp=Math.sin(view.pitch);
+  const x1=p[0]*cy-p[1]*sy, y1=p[0]*sy+p[1]*cy, z1=p[2];
+  return {x:o.w/2+s*x1, y:o.h/2-s*(z1*cp+y1*sp), d:y1*cp-z1*sp};
+}
+function orbit(o,view,extra){
+  let last=null;
+  o.el.style.touchAction='pan-y';
+  interact(o,{scroll:true,cursor:'grab',hit:()=>true,
+    down:p=>{last=p;view.user=true;if(extra)extra(p);},
+    move:p=>{view.yaw-=(p.x-last.x)*.01;view.pitch=clamp(view.pitch+(p.y-last.y)*.008,-.1,1.35);last=p;o.draw(o);}});
+}
+
+{
+  const V={a:[2,1,2],b:[-1,2,1]}, view={yaw:-.55,pitch:.38};
+  const box=$('#sl3');
+  box.innerHTML=['a','b'].map(k=>`<div><div class="ttl">${k.toUpperCase()}</div>`+
+    [0,1,2].map(i=>`<div class="ctl"><label for="v${k}${i}">${'xyz'[i]}</label><input id="v${k}${i}" type="range" min="-3" max="3" step="0.5" value="${V[k][i]}"><output id="v${k}${i}o"></output></div>`).join('')+'</div>').join('');
+  const oA=$('#d3A'), oP=$('#d3P'), calc=$('#d3Calc');
+  const o=makeCanvas($('#dot3d'),w=>w<520?0.85:0.58,o=>{
+    const c=o.ctx; c.clearRect(0,0,o.w,o.h);
+    const s=Math.min(o.w,o.h)/6.6, P=v=>proj(o,v,view,[0,0,0],s);
+    c.strokeStyle=C('--grid'); c.lineWidth=1;
+    for(let k=-3;k<=3;k++){let a=P([k,-3,0]),b=P([k,3,0]);c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);a=P([-3,k,0]);b=P([3,k,0]);c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();}
+    c.font=mono(12,500);
+    [[1,0,0],[0,1,0],[0,0,1]].forEach((e,i)=>{const n=P(e.map(v=>-v*3)),p=P(e.map(v=>v*3)),l=P(e.map(v=>v*3.4));c.strokeStyle=C('--faint');c.lineWidth=1.2;c.beginPath();c.moveTo(n.x,n.y);c.lineTo(p.x,p.y);c.stroke();haloText(c,'xyz'[i],l.x,l.y,C('--graphite'),'center');});
+    const vecs=[['A',V.a,C('--hi-line')],['B',V.b,C('--cL')]];
+    vecs.forEach(([n,v,col])=>{const t=P(v),f=P([v[0],v[1],0]);c.setLineDash([3,3]);c.strokeStyle=C('--faint');c.lineWidth=1;c.beginPath();c.moveTo(t.x,t.y);c.lineTo(f.x,f.y);c.stroke();c.setLineDash([]);});
+    const O=P([0,0,0]);
+    vecs.forEach(([n,v,col])=>{const t=P(v),l=P(v.map(u=>u*1.12));if(Math.hypot(t.x-O.x,t.y-O.y)>1)arrow(c,O.x,O.y,t.x,t.y,col,3);c.font=mono(13,500);haloText(c,n,l.x,l.y,C('--ink'),'center');});
+    const a=V.a,b=V.b,d=a[0]*b[0]+a[1]*b[1]+a[2]*b[2],la=Math.hypot(...a),lb=Math.hypot(...b);
+    oA.textContent=la&&lb?Math.round(Math.acos(clamp(d/(la*lb),-1,1))*180/Math.PI)+'°':'—';
+    oP.textContent=nf(Math.round(d*100)/100);
+    calc.innerHTML=`dot(A, B) = ${[0,1,2].map(i=>`${nf(a[i])} × ${nf(b[i])}`).join('  +  ')}\n          = <b>${nf(Math.round(d*100)/100)}</b>`;
+  });
+  ['a','b'].forEach(k=>[0,1,2].forEach(i=>{const inp=$(`#v${k}${i}`),out=$(`#v${k}${i}o`);const set=()=>{V[k][i]=+inp.value;out.textContent=nf(V[k][i]);o.draw(o);};inp.addEventListener('input',set);out.textContent=nf(V[k][i]);}));
+  orbit(o,view);
+}
+
+/* ---------- 4. three dot products answer a question ---------- */
+function drawNet(o,ball){
+  const c=o.ctx; c.clearRect(0,0,o.w,o.h);
+  const inp=[ball.x,ball.y], d=REFS.map(w=>dot2(w,inp)), win=argmax(d);
+  const r=clamp(o.w*.055,15,23);
+  const xi=r+22, xo=o.w*.56, xm=o.w-r-24;
+  const yi=[o.h*.36,o.h*.64], yo=[o.h*.17,o.h*.5,o.h*.83], ym=o.h*.5;
+  for(let k=0;k<3;k++)for(let i=0;i<2;i++){c.strokeStyle=k===win?zcol(k):C('--faint');c.lineWidth=.6+REFS[k][i]*.7;c.beginPath();c.moveTo(xi,yi[i]);c.lineTo(xo,yo[k]);c.stroke();}
+  for(let k=0;k<3;k++){c.strokeStyle=k===win?zcol(k):C('--faint');c.lineWidth=k===win?2.5:1.2;c.beginPath();c.moveTo(xo,yo[k]);c.lineTo(xm,ym);c.stroke();}
+  c.font=mono(11,500);
+  for(let k=0;k<3;k++)for(let i=0;i<2;i++){const t=.7;haloText(c,'×'+REFS[k][i],xi+(xo-xi)*t,yi[i]+(yo[k]-yi[i])*t,C(k===win?'--ink':'--graphite'),'center');}
+  const node=(x,y,fill,txt,lab,labCol)=>{c.beginPath();c.arc(x,y,r,0,7);c.fillStyle=fill;c.fill();c.strokeStyle=C('--ink');c.lineWidth=1.5;c.stroke();c.font=mono(12,500);c.fillStyle=C('--ink');c.textAlign='center';c.textBaseline='middle';c.fillText(txt,x,y);if(lab){c.font=mono(11);haloText(c,lab,x,y-r-9,labCol||C('--graphite'),'center');}};
+  node(xi,yi[0],C('--panel'),f1(ball.x),'x'); node(xi,yi[1],C('--panel'),f1(ball.y),'y');
+  for(let k=0;k<3;k++)node(xo,yo[k],alpha(zcol(k),k===win?.9:.2),f1(d[k]),ZN[k],k===win?C('--ink'):null);
+  c.beginPath(); c.arc(xm,ym,r,0,7); c.fillStyle=C('--panel'); c.fill(); c.strokeStyle=C('--ink'); c.lineWidth=1.5; c.stroke();
+  c.font=mono(11,500); c.fillStyle=C('--ink'); c.textAlign='center'; c.textBaseline='middle'; c.fillText('max',xm,ym);
+  c.font=mono(13,500); haloText(c,ZN[win],xm,ym+r+14,C('--ink'),'center');
+  c.fillStyle=zcol(win); c.fillRect(xm-18,ym+r+24,36,3);
+}
+{
+  const ball={x:1.4,y:3.1,n:'ball'};
+  let netO=null;
+  const bars=$('#clsBars'), calc=$('#clsCalc');
+  bars.innerHTML=ZN.map((z,k)=>`<span class="nm">dot_${z}</span><span class="track"><span class="fill z${k}"></span></span><span class="num"></span>`).join('');
+  const nms=bars.querySelectorAll('.nm'), tracks=bars.querySelectorAll('.track'), fills=bars.querySelectorAll('.fill'), nums=bars.querySelectorAll('.num');
+  Field($('#clsField'),{grid:true,balls:[ball],ratio:w=>w<520?0.84:0.8,
+    under(c,F){shadeRefs(c,F,.16);},
+    over(c,F){
+      const[hx,hy]=F.home(); c.font=mono(11,500);
+      REFS.forEach((w,k)=>{const[x,y]=F.P(w[0],w[1]);arrow(c,hx,hy,x,y,zcol(k),2.5);haloText(c,`${ZN[k]} [${w[0]}, ${w[1]}]`,x,y-12,C('--ink'),'center','bottom');});
+      ray(c,F,ball,C('--ink'),1.2);
+    },
+    after(){
+      const d=REFS.map(w=>dot2(w,[ball.x,ball.y])), win=argmax(d), mx=Math.max(...d,1);
+      d.forEach((v,k)=>{[nms[k],tracks[k],nums[k]].forEach(e=>e.classList.toggle('win',k===win));fills[k].style.width=(v/mx*100)+'%';nums[k].textContent=f1(v);});
+      calc.innerHTML=REFS.map((w,k)=>`dot_${ZN[k].padEnd(6)} = ${f1(ball.x)} × ${w[0]} + ${f1(ball.y)} × ${w[1]} = ${k===win?'<b>':''}${f1(d[k]).padStart(4)}${k===win?'</b>':''}`).join('\n')+`\nbiggest: <b>${ZN[win]}</b>`;
+      if(netO)netO.draw(netO);
+    }});
+  netO=makeCanvas($('#netCanvas'),w=>w<520?0.84:0.8,o=>drawNet(o,ball));
+}
+
+/* ---------- 5a. line of best fit ---------- */
+{
+  const rng=mulberry32(11), data=[];
+  for(let i=0;i<30;i++){const t=1.5+rng()*5;data.push([t,62*t+25+gauss(rng)*18]);}
+  const S={m:20,b:150};
+  const mS=$('#mS'),bS=$('#bS'),mO=$('#mO'),bO=$('#bO'),eq=$('#lineEq'),ls=$('#lineLoss'),btn=$('#lineTrain');
+  const loss=()=>data.reduce((s,[x,y])=>s+Math.abs(S.m*x+S.b-y),0)/data.length;
+  const o=makeCanvas($('#lineCanvas'),w=>w<520?0.75:0.5,o=>{
+    const f=frame(o,[0,7],[0,500],{l:44,b:40});
+    axes(o,f,{xt:range(0,7),yt:range(0,500,100),xl:'hang time (seconds)',yl:'distance (ft)'});
+    const c=o.ctx;
+    c.save(); c.beginPath(); c.rect(f.pad.l,f.pad.t,o.w-f.pad.l-f.pad.r,o.h-f.pad.t-f.pad.b); c.clip();
+    c.strokeStyle=alpha(C('--miss'),.55); c.lineWidth=1.2;
+    data.forEach(([x,y])=>{c.beginPath();c.moveTo(f.X(x),f.Y(y));c.lineTo(f.X(x),f.Y(S.m*x+S.b));c.stroke();});
+    const pts=[[f.X(0),f.Y(S.b)],[f.X(7),f.Y(S.m*7+S.b)]];
+    strokePath(c,pts,C('--hi'),7); strokePath(c,pts,C('--ink'),1.5);
+    c.restore();
+    c.fillStyle=C('--ink'); data.forEach(([x,y])=>{c.beginPath();c.arc(f.X(x),f.Y(y),3.6,0,7);c.fill();});
+    mO.textContent=Math.round(S.m); bO.textContent=Math.round(S.b);
+    eq.textContent=`y = ${Math.round(S.m)}x ${S.b<0?'−':'+'} ${Math.abs(Math.round(S.b))}`;
+    ls.textContent=Math.round(loss())+' ft';
+  });
+  mS.addEventListener('input',()=>{S.m=+mS.value;o.draw(o);});
+  bS.addEventListener('input',()=>{S.b=+bS.value;o.draw(o);});
+  // Gradient descent on squared error, in rescaled units so it converges in a few dozen steps.
+  const xs=data.map(d=>d[0]), mu=xs.reduce((a,b)=>a+b)/xs.length, sd=Math.sqrt(xs.reduce((a,x)=>a+(x-mu)**2,0)/xs.length);
+  let raf=0;
+  btn.addEventListener('click',()=>{
+    cancelAnimationFrame(raf);
+    let a=S.m*sd, c0=S.b+S.m*mu, n=0;
+    const step=()=>{let ga=0,gc=0;data.forEach(([x,y])=>{const u=(x-mu)/sd,e=a*u+c0-y;ga+=e*u;gc+=e;});a-=.12*ga/data.length;c0-=.12*gc/data.length;S.m=a/sd;S.b=c0-a*mu/sd;};
+    const tick=()=>{step();n++;mS.value=S.m;bS.value=S.b;o.draw(o);if(n<70)raf=requestAnimationFrame(tick);};
+    if(reduceMotion){for(;n<70;n++)step();mS.value=S.m;bS.value=S.b;o.draw(o);}else tick();
+  });
+}
+
+/* ---------- 5b. learning the three arrows ---------- */
+function softmaxStep(W,data,lr){
+  const G=[[0,0],[0,0],[0,0]]; let L=0, wrong=0;
+  for(const d of data){
+    const z=W.map(w=>w[0]*d.x+w[1]*d.y), m=Math.max(...z), e=z.map(v=>Math.exp(v-m)), S=e[0]+e[1]+e[2];
+    L-=Math.log(e[d.k]/S+1e-12); if(argmax(z)!==d.k)wrong++;
+    for(let k=0;k<3;k++){const g=e[k]/S-(k===d.k?1:0);G[k][0]+=g*d.x;G[k][1]+=g*d.y;}
+  }
+  if(lr)for(let k=0;k<3;k++){W[k][0]-=lr*G[k][0]/data.length;W[k][1]-=lr*G[k][1]/data.length;}
+  return {loss:L/data.length,wrong};
+}
+{
+  const rng=mulberry32(7), data=[];
+  for(let i=0;i<72;i++){const p=(4+rng()*82)*Math.PI/180,r=1.2+rng()*2.8,x=r1(r*Math.cos(p)),y=r1(r*Math.sin(p)),dg=Math.atan2(y,x)*180/Math.PI;data.push({x,y,k:dg>60?0:dg>30?1:2});}
+  const wr=mulberry32(5);
+  let W, steps=0, hist=[], stat, raf=0, runTo=0, lossO=null;
+  const oS=$('#trSteps'), oL=$('#trLoss'), oW=$('#trWrong'), pt=$('#trParams'), go=$('#trGo');
+  const scramble=r=>{W=[0,1,2].map(()=>{const a=r()*Math.PI/2,l=.6+r()*.8;return[l*Math.cos(a),l*Math.sin(a)];});steps=0;stat=softmaxStep(W,data,0);hist=[stat.loss];};
+  scramble(wr);
+  const F=Field($('#trainField'),{grid:true,ratio:w=>w<520?0.84:0.8,
+    under(c,F){shadeRaster(c,F,W,.3);},
+    over(c,F){
+      data.forEach(d=>{const[x,y]=F.P(d.x,d.y);const z=W.map(w=>w[0]*d.x+w[1]*d.y);c.beginPath();c.arc(x,y,4.5,0,7);c.fillStyle=zcol(d.k);c.fill();c.strokeStyle='#14223D';c.lineWidth=1;c.stroke();if(argmax(z)!==d.k){c.strokeStyle=C('--miss');c.lineWidth=2;c.beginPath();c.arc(x,y,8,0,7);c.stroke();}});
+      const[hx,hy]=F.home(); c.font=mono(11,500);
+      W.forEach((w,k)=>{const l=Math.hypot(w[0],w[1])||1,ex=w[0]/l*3.3,ey=w[1]/l*3.3,[x,y]=F.P(ex,ey);arrow(c,hx,hy,x,y,zcol(k),3);haloText(c,ZN[k],x,y-10,C('--ink'),'center','bottom');});
+    },
+    after(){
+      oS.textContent=steps; oL.textContent=f2(stat.loss); oW.textContent=`${stat.wrong} of ${data.length}`;
+      pt.innerHTML='<span class="h"></span><span class="h">x</span><span class="h">y</span>'+W.map((w,k)=>`<span class="h z${'lcr'[k]}">${ZN[k]}</span><span>${sg(w[0])}</span><span>${sg(w[1])}</span>`).join('');
+      if(lossO)lossO.draw(lossO);
+    }});
+  lossO=makeCanvas($('#lossCanvas'),w=>w<520?0.45:0.42,o=>{
+    const top=Math.max(1,Math.ceil(hist[0]*2)/2), n=Math.max(300,hist.length);
+    const f=frame(o,[0,n],[0,top],{l:38,b:26,t:10});
+    axes(o,f,{xt:range(0,n,n>600?300:100),yt:range(0,top,top>2?1:.5),yf:v=>v.toFixed(1),xf:String});
+    strokePath(o.ctx,hist.map((v,i)=>[f.X(i),f.Y(Math.min(v,top))]),C('--ink'),2);
+  });
+  const render=()=>{stat=softmaxStep(W,data,0);F.redraw();};
+  const stepN=n=>{for(let i=0;i<n;i++){softmaxStep(W,data,.2);steps++;hist.push(softmaxStep(W,data,0).loss);}};
+  const stop=()=>{cancelAnimationFrame(raf);raf=0;go.textContent='Train';};
+  const tick=()=>{stepN(4);render();if(steps<runTo)raf=requestAnimationFrame(tick);else stop();};
+  go.addEventListener('click',()=>{
+    if(raf){stop();return;}
+    runTo=steps+800;
+    if(reduceMotion){stepN(800);render();return;}
+    go.textContent='Pause'; raf=requestAnimationFrame(tick);
+  });
+  $('#trStep').addEventListener('click',()=>{stop();stepN(1);render();});
+  $('#trScramble').addEventListener('click',()=>{stop();scramble(Math.random);render();});
+}
+
+/* ---------- a tiny network: 1 input, H dot products, 1 output ---------- */
+function makeNet(H,seed,relu){
+  const rng=mulberry32(seed), n=3*H+1, P=new Float64Array(n);
+  for(let j=0;j<H;j++){const w=(rng()<.5?-1:1)*(1.5+rng()*3),c0=rng()*2-1;P[j]=w;P[H+j]=-w*c0;P[2*H+j]=(rng()*2-1)*.3;}
+  return {H,P,relu,m:new Float64Array(n),v:new Float64Array(n),t:0,z:new Float64Array(H)};
+}
+function netOut(N,x){const{H,P}=N;let y=P[3*H];for(let j=0;j<H;j++){let z=P[j]*x+P[H+j];if(N.relu&&z<0)z=0;y+=P[2*H+j]*z;}return y;}
+function netPiece(N,j,x){let z=N.P[j]*x+N.P[N.H+j];if(N.relu&&z<0)z=0;return N.P[2*N.H+j]*z;}
+function netStep(N,xs,ys,lr){
+  const{H,P,z}=N, n=P.length, G=new Float64Array(n); let cnt=0;
+  for(let i=0;i<xs.length;i++){
+    const y=ys[i]; if(Number.isNaN(y))continue;
+    const x=xs[i]; let out=P[3*H];
+    for(let j=0;j<H;j++){let v=P[j]*x+P[H+j];z[j]=v;if(N.relu&&v<0)v=0;out+=P[2*H+j]*v;}
+    const e=out-y; cnt++;
+    G[3*H]+=e;
+    for(let j=0;j<H;j++){const on=!N.relu||z[j]>0,a=on?z[j]:0;G[2*H+j]+=e*a;if(on){const gz=e*P[2*H+j];G[j]+=gz*x;G[H+j]+=gz;}}
+  }
+  if(!cnt)return;
+  N.t++; const b1=.9,b2=.999,c1=1-Math.pow(b1,N.t),c2=1-Math.pow(b2,N.t);
+  for(let k=0;k<n;k++){const g=2*G[k]/cnt;N.m[k]=b1*N.m[k]+(1-b1)*g;N.v[k]=b2*N.v[k]+(1-b2)*g*g;P[k]-=lr*(N.m[k]/c1)/(Math.sqrt(N.v[k]/c2)+1e-8);}
+}
+function netMiss(N,xs,ys){let s=0,c=0;for(let i=0;i<xs.length;i++){if(Number.isNaN(ys[i]))continue;s+=Math.abs(netOut(N,xs[i])-ys[i]);c++;}return c?s/c:0;}
+// Runs `total` training steps spread over animation frames.
+function trainer(step,draw,total,perFrame){
+  let raf=0,done=0;
+  return {
+    start(){cancelAnimationFrame(raf);done=0;
+      if(reduceMotion){while(done<total){step();done++;}draw();raf=0;return;}
+      const tick=()=>{for(let i=0;i<perFrame&&done<total;i++,done++)step();draw();raf=done<total?requestAnimationFrame(tick):0;};
+      raf=requestAnimationFrame(tick);},
+    stop(){cancelAnimationFrame(raf);raf=0;},
+  };
+}
+
+/* ---------- 6. ReLU and the kink ---------- */
+makeCanvas($('#reluCanvas'),.62,o=>{
+  const f=frame(o,[-3,3],[-1,3],{l:30,b:26,t:10});
+  axes(o,f,{xt:range(-3,3),yt:range(-1,3),x0:0,y0:0});
+  const c=o.ctx;
+  c.setLineDash([4,4]); strokePath(c,[[f.X(-1),f.Y(-1)],[f.X(3),f.Y(3)]],C('--faint'),1.2); c.setLineDash([]);
+  const pts=[[f.X(-3),f.Y(0)],[f.X(0),f.Y(0)],[f.X(3),f.Y(3)]];
+  strokePath(c,pts,C('--hi'),7); strokePath(c,pts,C('--ink'),2);
+  c.font=mono(11); haloText(c,'relu(x)',f.X(1.7),f.Y(2.3),C('--ink'),'right');
+});
+{
+  const xs=range(-1,1,2/23), ys=xs.map(x=>.75*Math.sin(3.2*x));
+  const relu=$('#kRelu'), oS=$('#kSteps'), oL=$('#kLoss');
+  let seed=21, N=makeNet(8,seed,true), steps=0;
+  const o=makeCanvas($('#kinkCanvas'),w=>w<520?0.7:0.46,o=>{
+    const f=frame(o,[-1,1],[-1.3,1.3],{l:36,b:26,t:10});
+    axes(o,f,{xt:range(-1,1,.5),yt:range(-1,1,.5),x0:0,y0:0});
+    const c=o.ctx, grid=range(-1,1,1/80);
+    c.save(); c.beginPath(); c.rect(f.pad.l,f.pad.t,o.w-f.pad.l-f.pad.r,o.h-f.pad.t-f.pad.b); c.clip();
+    for(let j=0;j<N.H;j++)strokePath(c,grid.map(x=>[f.X(x),f.Y(netPiece(N,j,x))]),alpha(C('--graphite'),.45),1);
+    const pts=grid.map(x=>[f.X(x),f.Y(netOut(N,x))]);
+    strokePath(c,pts,C('--ink'),2.5);
+    c.restore();
+    xs.forEach((x,i)=>{c.beginPath();c.arc(f.X(x),f.Y(ys[i]),4.5,0,7);c.fillStyle=C('--hi');c.fill();c.strokeStyle='#14223D';c.lineWidth=1.3;c.stroke();});
+    oS.textContent=steps; oL.textContent=f2(netMiss(N,xs,ys));
+  });
+  const T=trainer(()=>{netStep(N,xs,ys,.03);steps++;},()=>o.draw(o),1500,25);
+  const reset=()=>{T.stop();N=makeNet(8,seed,relu.checked);steps=0;o.draw(o);};
+  $('#kGo').addEventListener('click',()=>T.start());
+  $('#kReset').addEventListener('click',()=>{seed++;reset();});
+  relu.addEventListener('change',()=>{reset();T.start();});
+}
+
+/* ---------- 7. depth ---------- */
+{
+  const L=$('#dpL'), Wd=$('#dpW'), LO=$('#dpLO'), WO=$('#dpWO'), oD=$('#dpDots'), oP=$('#dpParams');
+  const o=makeCanvas($('#deepCanvas'),w=>w<520?0.8:0.46,o=>{
+    const nl=+L.value, w=+Wd.value, layers=[2,...Array(nl).fill(w),3];
+    const c=o.ctx; c.clearRect(0,0,o.w,o.h);
+    const n=layers.length, mx=Math.max(...layers), gap=Math.min((o.h-24)/mx,44), r=clamp(gap*.32,3,11);
+    const X=layers.map((_,i)=>24+r+(o.w-48-2*r)*i/(n-1));
+    const Y=layers.map(m=>Array.from({length:m},(_,j)=>o.h/2+(j-(m-1)/2)*gap));
+    c.strokeStyle=alpha(C('--graphite'),mx>10?.25:.4); c.lineWidth=.8;
+    c.beginPath();
+    for(let i=0;i<n-1;i++)Y[i].forEach(ya=>Y[i+1].forEach(yb=>{c.moveTo(X[i],ya);c.lineTo(X[i+1],yb);}));
+    c.stroke();
+    layers.forEach((m,i)=>Y[i].forEach((y,j)=>{c.beginPath();c.arc(X[i],y,r,0,7);c.fillStyle=i===0?C('--ink'):i===n-1?zcol(j):C('--panel');c.fill();c.strokeStyle=C('--ink');c.lineWidth=1.3;c.stroke();}));
+    let params=0; for(let i=1;i<n;i++)params+=layers[i-1]*layers[i]+layers[i];
+    LO.textContent=nl; WO.textContent=w; oD.textContent=(nl*w+3).toLocaleString('en-US'); oP.textContent=params.toLocaleString('en-US');
+  });
+  [L,Wd].forEach(e=>e.addEventListener('input',()=>o.draw(o)));
+}
+
+/* ---------- 8. draw any function ---------- */
+{
+  const NB=100, xs=range(-1,1,2/(NB-1)).slice(0,NB);
+  let T=Float64Array.from(xs,x=>.55*Math.sin(3.6*x)+.28*Math.sin(9*x+1)-.1);
+  const UN=[1,2,3,4,6,8,12,16,24,32,64];
+  const U=$('#uaU'), UO=$('#uaUO'), oP=$('#uaP'), oS=$('#uaS'), oL=$('#uaL');
+  let N=makeNet(UN[+U.value],3,true), steps=0, drawing=false, last=-1, f;
+  const o=makeCanvas($('#drawCanvas'),w=>w<520?0.8:0.5,o=>{
+    f=frame(o,[-1,1],[-1.2,1.2],{l:14,b:14,t:14,r:14});
+    axes(o,f,{x0:0,y0:0});
+    const c=o.ctx;
+    let run=[];
+    const flush=()=>{if(run.length>1)strokePath(c,run,C('--hi'),9);else if(run.length===1){c.fillStyle=C('--hi');c.beginPath();c.arc(run[0][0],run[0][1],4.5,0,7);c.fill();}run=[];};
+    for(let i=0;i<NB;i++){if(Number.isNaN(T[i]))flush();else run.push([f.X(xs[i]),f.Y(T[i])]);}
+    flush();
+    if(!drawing&&T.some(v=>!Number.isNaN(v))){
+      c.save(); c.beginPath(); c.rect(0,0,o.w,o.h); c.clip();
+      strokePath(c,range(-1,1,1/120).map(x=>[f.X(x),f.Y(clamp(netOut(N,x),-1.4,1.4))]),C('--ink'),2.5);
+      c.restore();
+    }
+    if(!T.some(v=>!Number.isNaN(v))){c.font='italic 18px '+C('--serif');c.fillStyle=C('--graphite');c.textAlign='center';c.textBaseline='middle';c.fillText('draw a curve here',o.w/2,o.h*.3);}
+    UO.textContent=N.H; oP.textContent=(3*N.H+1).toLocaleString('en-US'); oS.textContent=steps; oL.textContent=steps?f2(netMiss(N,xs,T)):'—';
+  });
+  const TR=trainer(()=>{netStep(N,xs,T,.02);steps++;},()=>o.draw(o),2500,40);
+  const retrain=()=>{TR.stop();N=makeNet(UN[+U.value],3,true);steps=0;if(T.some(v=>!Number.isNaN(v)))TR.start();else o.draw(o);};
+  const bin=px=>clamp(Math.round((f.iX(px)+1)/2*(NB-1)),0,NB-1);
+  const paint=p=>{const i=bin(p.x),y=clamp(f.iY(p.y),-1.15,1.15);if(last<0)T[i]=y;else{const a=Math.min(last,i),b=Math.max(last,i),y0=T[last];for(let k=a;k<=b;k++)T[k]=b===a?y:(k===i?y:Number.isNaN(y0)?y:y0+(y-y0)*(k-last)/(i-last));}last=i;o.draw(o);};
+  interact(o,{hit:()=>true,cursor:'crosshair',down:p=>{TR.stop();drawing=true;last=-1;paint(p);},move:paint,up:()=>{drawing=false;last=-1;retrain();}});
+  U.addEventListener('input',retrain);
+  $('#uaClear').addEventListener('click',()=>{TR.stop();T.fill(NaN);steps=0;o.draw(o);});
+  let started=false; onVisible(o.el,v=>{if(v&&!started){started=true;retrain();}});
+}
+
+/* ---------- 9. words as coordinates ---------- */
+{
+  const WORDS=[['woman',[1,0,.5]],['man',[0,1,.5]],['girl',[1,0,.1]],['boy',[0,1,.1]],['grandma',[1,0,.95]],['grandpa',[0,1,.95]],
+    ['queen',[.95,0,.6]],['king',[0,.95,.6]],['baby',[.3,.3,0]],['person',[.5,.5,.5]],['fossil',[0,0,1]]];
+  const dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  const view={yaw:-.95,pitch:.32,user:false};
+  let sel=4, o, pr=[];
+  const chips=$('#wChips'), rank=$('#wRank'), title=$('#wTitle');
+  chips.innerHTML=WORDS.map((w,i)=>`<button type="button" data-i="${i}">${w[0]}</button>`).join('');
+  const pick=i=>{
+    sel=i; chips.querySelectorAll('button').forEach((b,j)=>b.setAttribute('aria-pressed',j===i));
+    const me=WORDS[i], rows=WORDS.map((w,j)=>[w[0],dot3(me[1],w[1]),j]).filter(r=>r[2]!==i).sort((a,b)=>b[1]-a[1]), mx=Math.max(...rows.map(r=>r[1]),.01);
+    title.innerHTML=`dot(<b>${me[0]}</b> [${me[1].join(', ')}], …)`;
+    rank.innerHTML=rows.map(r=>`<span>${r[0]}</span><span class="track"><span style="width:${r[1]/mx*100}%"></span></span><span class="num">${f2(r[1])}</span>`).join('');
+    if(o)o.draw(o);
+  };
+  chips.addEventListener('click',e=>{const b=e.target.closest('button');if(b)pick(+b.dataset.i);});
+  pick(sel);
+  o=makeCanvas($('#wordsCanvas'),w=>w<520?0.9:0.85,o=>{
+    const c=o.ctx; c.clearRect(0,0,o.w,o.h);
+    const s=Math.min(o.w,o.h)*.56, ctr=[.5,.5,.45], P=v=>proj(o,v,view,ctr,s);
+    c.strokeStyle=C('--grid'); c.lineWidth=1; c.beginPath();
+    for(let k=0;k<=4;k++){let a=P([k/4,0,0]),b=P([k/4,1,0]);c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);a=P([0,k/4,0]);b=P([1,k/4,0]);c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);}
+    c.stroke();
+    const O=P([0,0,0]); c.font=mono(11,500);
+    [['female',[1.15,0,0]],['male',[0,1.15,0]],['old',[0,0,1.15]]].forEach(([n,v])=>{const t=P(v);arrow(c,O.x,O.y,t.x,t.y,C('--graphite'),1.5);haloText(c,n,t.x,t.y-9,C('--graphite'),'center','bottom');});
+    const me=WORDS[sel][1], mx=Math.max(...WORDS.map((w,j)=>j===sel?0:dot3(me,w[1])),.01);
+    const t=P(me); arrow(c,O.x,O.y,t.x,t.y,C('--hi-line'),2.5);
+    pr=WORDS.map((w,j)=>({j,p:P(w[1]),f:P([w[1][0],w[1][1],0]),v:j===sel?1:dot3(me,w[1])/mx})).sort((a,b)=>b.p.d-a.p.d);
+    pr.forEach(({j,p,f,v})=>{
+      c.setLineDash([2,3]); c.strokeStyle=C('--faint'); c.lineWidth=1; c.beginPath(); c.moveTo(p.x,p.y); c.lineTo(f.x,f.y); c.stroke(); c.setLineDash([]);
+      c.beginPath(); c.arc(p.x,p.y,j===sel?8:6,0,7); c.fillStyle=j===sel?C('--hi'):alpha(C('--hi'),.12+.88*Math.max(0,v)); c.fill();
+      c.strokeStyle='#14223D'; c.lineWidth=j===sel?2:1.2; c.stroke();
+      c.font=mono(12,j===sel?500:400); haloText(c,WORDS[j][0],p.x+10,p.y-8,C(j===sel?'--ink':'--graphite'));
+    });
+  });
+  orbit(o,view,p=>{let best=20,hit=-1;pr.forEach(({j,p:q})=>{const d=Math.hypot(p.x-q.x,p.y-q.y);if(d<best){best=d;hit=j;}});if(hit>=0)pick(hit);});
+  if(!reduceMotion){
+    let vis=false,raf=0;
+    const spin=()=>{if(!vis||view.user){raf=0;return;}view.yaw+=.003;o.draw(o);raf=requestAnimationFrame(spin);};
+    onVisible(o.el,v=>{vis=v;if(v&&!raf)raf=requestAnimationFrame(spin);});
+  }
+}
+
+/* ---------- 10a. autocomplete loop ---------- */
+{
+  const START='the batter hit the ball';
+  const STEPS=[[['over',.41],['into',.22],['to',.18],['foul',.07]],[['the',.83],['a',.09],['my',.03],['his',.02]],
+    [['fence',.47],['wall',.21],['shortstop',.08],['moon',.01]],[['.',.62],['!',.21],['and',.11],['for',.04]]];
+  let i=0, words=[];
+  const txt=$('#acText'), pr=$('#acProbs'), go=$('#acGo');
+  const show=()=>{
+    const tail=words.map((w,k)=>(w==='.'?'':' ')+(k===words.length-1?`<span class="new">${w}</span>`:w)).join('');
+    txt.innerHTML=START+tail;
+    const opts=STEPS[Math.min(i,STEPS.length-1)];
+    pr.innerHTML=i<STEPS.length?opts.map((o,k)=>`<span>${o[0]}</span><span class="pb${k?'':' top'}"><span style="width:${o[1]*100}%"></span></span><span class="num">${Math.round(o[1]*100)}%</span>`).join(''):'<span style="grid-column:1/-1">done: the model predicted the end of the sentence.</span>';
+    go.disabled=i>=STEPS.length;
+  };
+  go.addEventListener('click',()=>{if(i<STEPS.length){words.push(STEPS[i][0][0]);i++;show();}});
+  $('#acReset').addEventListener('click',()=>{i=0;words=[];show();});
+  show();
+}
+
+/* ---------- 10b. detectors: one dot product each ---------- */
+{
+  const ANIMALS='cat cats dog dogs puppy kitten horse cow pig bird birds fish lion tiger bear spider snake mouse rabbit duck chicken elephant monkey shark whale owl frog'.split(' ');
+  const DET=[
+    ['question?',{what:2,why:2,how:2,who:2,where:2,when:1.5,which:1.5,'?':3,is:.5,are:.5,do:.5,does:.5,can:1,could:1}],
+    ['about math?',{'#':1.5,plus:2.5,minus:2.5,times:2.5,divided:2.5,equals:2,'+':2.5,'-':1.5,'×':2.5,'*':2,'/':2,'=':2,sum:2,add:2,subtract:2,multiply:2.5,half:1.5,percent:2,number:1,many:.5}],
+    ['about animals?',Object.assign(Object.fromEntries(ANIMALS.map(a=>[a,3])),{fur:1.5,paw:1.5,paws:1.5,tail:1.5,legs:1,zoo:2,pet:2,pets:2,bark:1.5,meow:2})],
+  ];
+  const inp=$('#detIn'), out=$('#detOut');
+  const EX=['what is 7 plus 5?','my dog chased the cat','the batter hit a home run','why do owls hunt at night?'];
+  $('#detEx').innerHTML=EX.map(e=>`<button type="button">${e}</button>`).join('');
+  $('#detEx').addEventListener('click',e=>{const b=e.target.closest('button');if(b){inp.value=b.textContent;run();}});
+  $('#detW').innerHTML=DET.map(([n,w])=>`<p><b>${n}</b> ${Object.entries(w).map(([k,v])=>`${k==='#'?'(any number)':k} ${v}`).join(', ')}</p>`).join('');
+  const tok=s=>(s.toLowerCase().match(/[a-z']+|\d+(?:\.\d+)?|[?+\-=×*\/]/g)||[]);
+  function run(){
+    const t=tok(inp.value);
+    out.innerHTML=DET.map(([n,w])=>{
+      const hits=t.map(k=>[k,w[/^\d/.test(k)?'#':k]]).filter(h=>h[1]);
+      const s=hits.reduce((a,h)=>a+h[1],0), on=s>=3;
+      const why=hits.length?hits.map(h=>`${h[0]} ${h[1]}`).join(' + ')+` = ${nf(s)}`:'no matching words = 0';
+      return `<span${on?' style="font-weight:700"':''}>${n}</span><span class="track${on?' on':''}"><span style="width:${Math.min(s/6,1)*100}%"></span></span><span class="num">${nf(s)}</span><span class="why">${why}</span>`;
+    }).join('');
+  }
+  inp.addEventListener('input',run); run();
+}
+})();
+</script>
+</body>
+</html>
