@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Running an LLM, then forgetting it</title>
+<meta name="description" content="llmoxide is a from-scratch LLM engine in Rust. How inference works, from a dot product up to Qwen 3.8's hybrid layers; how weights load and prefill and decode differ; and why a private chat needs more than running locally. With a 135M-parameter model running live in the page.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,700;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F5F8FC; --grid:#E0E8F2; --ink:#14223D; --graphite:#556176; --faint:#98A4B6;
+  --hi:#FFD93D; --hi-line:#E3AE00; --miss:#D6344D; --good:#1E8757; --panel:#FFFFFF; --rule:#C8D3E1;
+  --acc:#2F6FDE; --acc-soft:rgba(47,111,222,.12); --chip-a:#E8EEF7; --chip-b:#FFF4C2;
+  --serif:"Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
+    --hi:#FFD43B; --hi-line:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+    --acc:#6EA8FF; --acc-soft:rgba(110,168,255,.14); --chip-a:#18324F; --chip-b:#3A3520;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
+  --hi:#FFD43B; --hi-line:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+  --acc:#6EA8FF; --acc-soft:rgba(110,168,255,.14); --chip-a:#18324F; --chip-b:#3A3520;
+}
+*,*::before,*::after{box-sizing:inherit}
+body{
+  margin:0; color:var(--ink); background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px; background-position:-1px -1px;
+  font-family:var(--serif); font-size:clamp(18px,1.1vw + 12px,21px); line-height:1.62;
+  font-optical-sizing:auto; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px; margin:0 auto; padding:0 22px}
+.wide{max-width:1000px; margin-left:auto; margin-right:auto; padding:0 22px}
+p{margin:0 0 1em}
+ul,ol{padding-left:1.3em; margin:0 0 1em}
+li{margin:.2em 0}
+a{color:inherit; text-decoration-color:var(--hi-line); text-decoration-thickness:.12em; text-underline-offset:.18em}
+h1,h2,h3{font-weight:500; line-height:1.1; letter-spacing:-0.01em}
+h1{font-size:clamp(44px,7.6vw,92px); margin:0; letter-spacing:-0.035em}
+h2{font-size:clamp(30px,4.2vw,44px); margin:0 0 .55em; display:flex; gap:.45em; align-items:baseline}
+h2 .n{font-family:var(--mono); font-size:.42em; font-weight:500; color:var(--paper); background:var(--ink); border-radius:3px; padding:.12em .45em; transform:translateY(-.35em); white-space:nowrap}
+h3{font-size:1.15em; margin:1.6em 0 .4em; font-weight:700}
+code{font-family:var(--mono); font-size:.8em; background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:.05em .3em; overflow-wrap:anywhere}
+pre{font-family:var(--mono); font-size:.72em; line-height:1.65; margin:.6em 0 1.3em; padding:.9em 1.1em; background:var(--panel); border:1px solid var(--rule); border-left:4px solid var(--ink); border-radius:2px; overflow-x:auto}
+pre code{background:none; border:0; padding:0; font-size:1em; overflow-wrap:normal}
+pre .c{color:var(--faint)}
+pre .k{color:var(--good)}
+mark{background:none; color:inherit; font-weight:500; text-decoration:underline; text-decoration-color:var(--hi-line); text-decoration-thickness:.2em; text-underline-offset:.2em; text-decoration-skip-ink:none}
+
+nav.top{padding-top:28px; font-family:var(--mono); font-size:.72em}
+nav.top a{text-decoration:none; color:var(--graphite)}
+nav.top a:hover{color:var(--ink)}
+header{padding:7vh 0 2vh}
+.dek{font-size:clamp(21px,1.6vw + 12px,28px); line-height:1.4; max-width:34ch; margin:.5em 0 0; color:var(--graphite)}
+.meta{font-family:var(--mono); font-size:.68em; color:var(--graphite); margin-top:1.6em; display:flex; gap:.4em 1.4em; flex-wrap:wrap}
+.meta a{color:var(--ink)}
+.toc{list-style:none; padding:0; margin:2.2em 0 0; border-top:1.5px solid var(--ink); font-size:.92em}
+.toc li{display:grid; grid-template-columns:5.2em 1fr; gap:.8em; padding:.5em 0; border-bottom:1px solid var(--rule); margin:0}
+.toc b{font-family:var(--mono); font-weight:500; font-size:.78em; padding-top:.25em; color:var(--graphite)}
+.toc a{text-decoration:none}
+.toc a:hover{text-decoration:underline}
+
+section{padding:7vh 0 1vh}
+.part{padding:12vh 0 0}
+.part .wrap{border-top:1.5px solid var(--ink); padding-top:.8em}
+.part p.kick{font-family:var(--mono); font-size:.7em; letter-spacing:.08em; text-transform:uppercase; color:var(--graphite); margin:0}
+.part h2{font-size:clamp(38px,6vw,64px); margin:.15em 0 .2em}
+.part .dek{margin-top:0}
+.lede{font-size:1.12em}
+.aside{font-size:.86em; color:var(--graphite); border-left:2px solid var(--rule); padding-left:1em; margin:1.4em 0}
+.pull{font-size:1.3em; line-height:1.3; font-style:italic; margin:1.2em 0; padding-left:.8em; border-left:4px solid var(--hi)}
+
+figure{margin:1.8em 0 2.2em}
+.fig{background:var(--panel); border:1px solid var(--rule); border-radius:4px; padding:18px; box-shadow:0 1px 0 var(--rule)}
+.fig svg{display:block; width:100%; height:auto}
+.fig canvas{display:block; width:100%; touch-action:manipulation}
+figcaption{font-size:.8em; color:var(--graphite); margin-top:.7em; line-height:1.5}
+
+svg text{font-family:var(--mono); fill:var(--ink); font-size:13px}
+svg .sm{font-size:11px; fill:var(--graphite)}
+svg .lbl{font-family:var(--serif); font-size:15px}
+svg .box{fill:var(--panel); stroke:var(--ink); stroke-width:1.5}
+svg .soft{fill:var(--grid); stroke:var(--rule); stroke-width:1}
+svg .hi{fill:var(--hi); stroke:#14223D; stroke-width:1.5}
+svg text.on-hi{fill:#14223D}
+svg .acc{fill:var(--acc-soft); stroke:var(--acc); stroke-width:1.5}
+svg .edge{stroke:var(--ink); stroke-width:1.5; fill:none}
+svg .dash{stroke:var(--graphite); stroke-width:1.5; fill:none; stroke-dasharray:4 4}
+svg .arrow{fill:var(--ink)}
+
+table{border-collapse:collapse; width:100%; font-size:.82em; margin:.6em 0 1.4em}
+th,td{text-align:left; padding:.45em .6em; border-bottom:1px solid var(--rule); vertical-align:top}
+th{font-weight:700; border-bottom:1.5px solid var(--ink)}
+td.num,th.num{text-align:right; font-family:var(--mono); font-size:.92em; white-space:nowrap}
+.tbl{overflow-x:auto}
+
+/* controls */
+.controls{display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; margin-top:14px; font-size:.82em}
+.ctl{display:flex; align-items:center; gap:10px; flex:1 1 220px; min-width:0}
+.ctl label{white-space:nowrap}
+.ctl input[type=range]{flex:1; min-width:80px; accent-color:var(--ink)}
+.ctl output{font-family:var(--mono); font-size:.9em; min-width:4.5ch; text-align:right}
+button{
+  font-family:var(--serif); font-size:.95em; cursor:pointer; color:var(--ink); background:transparent;
+  border:1.5px solid var(--ink); border-radius:3px; padding:.4em .9em; line-height:1.2;
+}
+button:hover{background:var(--grid)}
+button.go{background:var(--hi); color:#14223D; border-color:#14223D; font-weight:500}
+button.go:hover{filter:brightness(.95)}
+button:disabled{opacity:.45; cursor:default}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--hi); outline-offset:2px}
+input[type=text],textarea,select{
+  font-family:var(--mono); font-size:.85em; color:var(--ink); background:var(--paper);
+  border:1.5px solid var(--ink); border-radius:3px; padding:.45em .6em; width:100%;
+}
+textarea{resize:vertical; min-height:2.6em; line-height:1.5}
+.check{display:flex; gap:.45em; align-items:center; cursor:pointer}
+.check input{accent-color:var(--ink); width:1.05em; height:1.05em}
+.readout{display:flex; flex-wrap:wrap; gap:10px 26px; margin-top:12px; font-size:.8em; color:var(--graphite)}
+.readout b{display:block; font-family:var(--mono); font-weight:500; font-size:1.3em; color:var(--ink)}
+
+.probs{display:grid; grid-template-columns:minmax(5em,auto) 1fr 3.6em; gap:5px 10px; align-items:center; font-family:var(--mono); font-size:.74em; margin-top:10px}
+.probs .tk{white-space:pre; overflow:hidden; text-overflow:ellipsis; max-width:12em}
+.probs .pb{height:14px; background:var(--grid); border-radius:2px; overflow:hidden}
+.probs .pb span{display:block; height:100%; background:var(--graphite); transition:width .2s}
+.probs .in .pb span{background:var(--hi); box-shadow:inset 0 0 0 1.5px #14223D}
+.probs .out{opacity:.5}
+.probs .num{text-align:right}
+
+/* the lab */
+.lab{background:var(--panel); border:1.5px solid var(--ink); border-radius:6px; overflow:hidden; box-shadow:0 10px 40px -22px rgba(20,34,61,.5)}
+.lab-bar{display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:14px 18px; border-bottom:1.5px solid var(--ink); background:var(--paper)}
+.lab-bar .st{font-family:var(--mono); font-size:.72em; color:var(--graphite); flex:1 1 260px}
+.lab-bar .st b{color:var(--ink); font-weight:500}
+.meter{height:6px; background:var(--grid); border-radius:3px; overflow:hidden; margin-top:6px; display:none}
+.meter span{display:block; height:100%; width:0; background:var(--hi); transition:width .1s}
+.pane{padding:18px; border-bottom:1px solid var(--rule)}
+.pane:last-child{border-bottom:0}
+.pane h3{margin:0 0 .2em; font-size:1.05em; display:flex; gap:.5em; align-items:baseline}
+.pane h3 .n{font-family:var(--mono); font-size:.7em; font-weight:500; color:var(--graphite)}
+.pane .hint{font-size:.8em; color:var(--graphite); margin:0 0 .8em}
+.lab[data-ready="no"] .pane{opacity:.5; pointer-events:none}
+.lab canvas{display:block; width:100%}
+.chips{display:flex; flex-wrap:wrap; gap:3px; margin-top:12px; font-family:var(--mono); font-size:.74em}
+.chips button{font-family:var(--mono); font-size:1em; padding:.15em .35em; border:1px solid var(--rule); border-radius:3px; white-space:pre; background:var(--chip-a); color:var(--ink); line-height:1.4}
+.chips button:nth-child(even){background:var(--chip-b)}
+.chips button[aria-pressed="true"]{outline:2px solid var(--ink); outline-offset:0}
+.chips button small{display:block; font-size:.72em; color:var(--graphite)}
+.chips .ctrl{font-style:italic; color:var(--graphite)}
+.chips .gen{box-shadow:inset 0 -3px 0 var(--acc)}
+.cols{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+.cols > div{min-width:0}
+@media (max-width:760px){.cols{grid-template-columns:1fr}}
+.subt{font-size:.78em; font-weight:700; margin:16px 0 4px}
+.near{font-family:var(--mono); font-size:.74em; display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px}
+.near span{white-space:pre}
+.near i{font-style:normal; color:var(--graphite)}
+.heads{display:flex; flex-wrap:wrap; gap:4px}
+.heads button{font-family:var(--mono); font-size:.72em; padding:.2em .5em}
+.heads button[aria-pressed="true"]{background:var(--hi); color:#14223D; border-color:#14223D}
+.hover{font-family:var(--mono); font-size:.72em; color:var(--graphite); min-height:1.6em; margin-top:6px; white-space:pre-wrap}
+.lens{font-family:var(--mono); font-size:.72em; display:grid; grid-template-columns:3.5em 1fr 1fr 1fr; gap:1px 10px; margin-top:8px}
+.lens span{white-space:pre; overflow:hidden; text-overflow:ellipsis}
+.lens .h{color:var(--graphite)}
+.lens .top{font-weight:500}
+.lens .p{color:var(--graphite)}
+.log{min-height:8em; max-height:28em; overflow-y:auto; border:1px solid var(--rule); border-radius:3px; padding:10px 12px; background:var(--paper); font-size:.86em}
+.msg{margin:0 0 .8em; white-space:pre-wrap; overflow-wrap:anywhere}
+.msg.user{color:var(--graphite)}
+.msg.user::before{content:"you  "; font-family:var(--mono); font-size:.8em}
+.msg.bot::before{content:"smollm  "; font-family:var(--mono); font-size:.8em; color:var(--graphite)}
+.msg.note{font-family:var(--mono); font-size:.74em; color:var(--graphite)}
+.chatrow{display:flex; gap:10px; margin-top:10px; align-items:flex-end}
+.chatrow textarea{flex:1}
+.err{color:var(--miss)}
+
+footer{padding:10vh 0 8vh; font-size:.85em; color:var(--graphite)}
+footer .wrap{border-top:1.5px solid var(--ink); padding-top:1em; display:flex; justify-content:space-between; gap:1em; flex-wrap:wrap}
+@media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
+</style>
+</head>
+<body>
+
+<nav class="top"><div class="wrap"><a href="index.html">← bigmah</a></div></nav>
+
+<header>
+  <div class="wrap">
+    <h1>Running an LLM, then forgetting it</h1>
+    <p class="dek">How a language model actually runs, built up from a dot product to Qwen 3.8. Then why a local model still isn't private, and what an incognito mode for AI takes.</p>
+    <div class="meta"><span>oct 14, 2026</span><span>for programmers</span><span><a href="https://github.com/bigmah/llmoxide" target="_blank" rel="noopener noreferrer">github.com/bigmah/llmoxide</a></span></div>
+    <ol class="toc">
+      <li><b>part 1</b><a href="#p1">Inference: from one dot product to Qwen 3.8's hybrid layers</a></li>
+      <li><b>part 2</b><a href="#p2">Running it: loading weights, prefill, decode, the KV cache</a></li>
+      <li><b>part 3</b><a href="#p3">Privacy: incognito for AI</a></li>
+      <li><b>lab</b><a href="#lab">A 135M-parameter model, running in this page, with its insides showing</a></li>
+    </ol>
+  </div>
+</header>
+
+<main>
+<section id="intro">
+  <div class="wrap">
+    <p class="lede"><a href="https://github.com/bigmah/llmoxide" target="_blank" rel="noopener noreferrer">llmoxide</a> is a private chat app for open-weight language models. The conversation never leaves your machine and never touches the disk, and when you close the window it gets overwritten.</p>
+    <p>Everything in it is written from scratch in Rust, with no ML libraries: the model file loader, the decoders for compressed weights, the tokenizers, and the GPU kernels. It runs Gemma 4, dense Qwen3, and Qwen 3.8 27B, whose hybrid layers we'll get to. Every model is checked against <a href="https://github.com/ggml-org/llama.cpp" target="_blank" rel="noopener noreferrer">llama.cpp</a> tensor by tensor, and greedy output matches it byte for byte.</p>
+    <p>Writing an engine from nothing turns out to be a great way to learn what an LLM <em>is</em>. There's a lot less to it than the hype suggests. It's a short list of operations, each simple, and a long list of details that will quietly ruin the output if you get one wrong. This post walks the short list, mentions the worst of the details, and then explains why the app exists at all.</p>
+    <p>At the bottom of the page is a lab: a 135M-parameter model running in your browser on the same kind of code this post describes, with its attention patterns, intermediate predictions and memory on display. You can load it now and follow along, or read first.</p>
+    <p class="aside">If you're not a programmer, <a href="neural_network.html">How do neural networks work?</a> covers the first half of this without the code.</p>
+  </div>
+</section>
+
+<!-- ================================================================ PART 1 -->
+<section class="part" id="p1">
+  <div class="wrap">
+    <p class="kick">part 1</p>
+    <h2>Inference</h2>
+    <p class="dek">From one dot product to a 27B hybrid, one piece at a time.</p>
+  </div>
+</section>
+
+<section id="dot">
+  <div class="wrap">
+    <h2><span class="n">1</span>A neuron is a dot product</h2>
+    <p>Multiply two lists of numbers element by element and add up the results. That's a dot product, and it measures how much two vectors point the same way. A row of dot products, one per row of a matrix, is a matrix-vector product:</p>
+<pre><code><span class="c">/// y = W x. W is stored [out][in]: one row per output.</span>
+fn matvec(y: &amp;mut [f32], w: &amp;[f32], x: &amp;[f32]) {
+    let n = x.len();
+    for (o, out) in y.iter_mut().enumerate() {
+        *out = dot(&amp;w[o * n..(o + 1) * n], x);
+    }
+}</code></pre>
+    <p>Each output asks one question of the input (how much does <code>x</code> look like this row?), and the rows are what training learned. Nearly all of an LLM's work is this loop. Qwen 3.8 27B runs it about 27 billion times per token, once for every weight. Almost everything else in this post is about feeding it the right vectors, and doing it fast.</p>
+  </div>
+</section>
+
+<section id="mlp">
+  <div class="wrap">
+    <h2><span class="n">2</span>Layers, and the bend between them</h2>
+    <p>Stacking two matrix multiplies gets you nothing: <code>A(Bx)</code> is just <code>(AB)x</code>, one matrix. To stack usefully you need a non-linear function between them. Modern LLMs use <mark>SiLU</mark>, <code>x · sigmoid(x)</code>, which is roughly ReLU with the corner rounded off.</p>
+    <p>The feed-forward block in every model in this post is a gated variant called <mark>SwiGLU</mark>. It uses three matrices instead of two: one to make values, one to make gates, and one to bring the result back down to the model's width.</p>
+<pre><code>let gate = Wg · x;     <span class="c">// d_model -&gt; ffn_dim, e.g. 576 -&gt; 1536</span>
+let up   = Wu · x;     <span class="c">// d_model -&gt; ffn_dim</span>
+for i in 0..ffn_dim {
+    gate[i] = silu(gate[i]) * up[i];   <span class="c">// each value scaled by its own gate</span>
+}
+let out  = Wd · gate;  <span class="c">// ffn_dim -&gt; d_model</span></code></pre>
+    <p>This block holds most of a model's parameters: roughly three quarters of everything outside the embedding table. People often describe it as where the model's facts live. Attention moves information between positions, and the FFN transforms it in place.</p>
+  </div>
+</section>
+
+<section id="tokens">
+  <div class="wrap">
+    <h2><span class="n">3</span>Text in, vectors out</h2>
+    <p>Matrices want vectors, and we have text. Two steps bridge the gap.</p>
+    <p><strong>Tokenizing</strong> turns text into integer ids. Every model here uses byte-pair encoding: start from the raw bytes, then repeatedly merge the adjacent pair with the best rank in a table of learned merges (49,152 tokens and 48,900 merges for the lab's model) until nothing merges. Common words end up as one token, and rare ones as several.</p>
+    <p>Before any merging, a <mark>pre-tokenizer</mark> splits the text into chunks, and merges never cross a chunk boundary. This is the first of many places where an engine can be silently wrong. The lab's model, SmolLM2, cuts every digit out on its own first and only then applies GPT-2's split. Qwen's split differs in how it handles punctuation before a word. Run a model's vocabulary through the wrong split and nothing errors. You get valid token ids, just not the ones the model was trained on, and the output quietly gets worse. So llmoxide's splitters are ports of llama.cpp's, and they're tested id for id against <code>llama-tokenize</code> on thousands of tokens of prose and code.</p>
+    <p><strong>Embedding</strong> turns each id into a vector, and it's the cheapest step in the model: row <code>id</code> of a big table. No arithmetic at all.</p>
+<pre><code>for (i, &amp;tok) in tokens.iter().enumerate() {
+    embed.dequant_row_into(tok as usize, &amp;mut h[i * d..(i + 1) * d]);
+}</code></pre>
+    <p>Training arranges that table so tokens used in similar ways point in similar directions. In the lab, click a token to see its 576 numbers and its nearest neighbors. <code> king</code>'s are <code> King</code>, <code> kings</code>, <code> queen</code>, <code> emperor</code> and <code> prince</code>.</p>
+  </div>
+</section>
+
+<section id="norm">
+  <div class="wrap">
+    <h2><span class="n">4</span>Keeping the numbers in range</h2>
+    <p>Pass a vector through dozens of layers and its scale drifts. <mark>RMSNorm</mark> rescales a vector to unit root-mean-square, then multiplies each element by a learned gain:</p>
+<pre><code>fn rms_norm_mul(x: &amp;mut [f32], w: &amp;[f32], eps: f32) {
+    let ms = x.iter().map(|v| v * v).sum::&lt;f32&gt;() / x.len() as f32;
+    let scale = 1.0 / (ms + eps).sqrt();
+    for (v, g) in x.iter_mut().zip(w) { *v *= scale * g; }
+}</code></pre>
+    <p>Every block normalizes its <em>input</em> before working on it (that's called pre-norm), and one last norm runs before the output. Gemma also normalizes each block's output before adding it back. Qwen and llama don't, so a shared code path has to know which model it's running.</p>
+  </div>
+</section>
+
+<section id="attention">
+  <div class="wrap">
+    <h2><span class="n">5</span>Attention</h2>
+    <p>Everything so far works on each position by itself. Attention is the one step where positions exchange information, and it's what lets <code>it</code> find the noun it refers to.</p>
+    <p>Each position projects its vector three ways: a <mark>query</mark> (what am I looking for?), a <mark>key</mark> (what do I contain?) and a <mark>value</mark> (what do I hand over if picked?). A position scores its query against every earlier key with a dot product, turns the scores into weights that sum to 1 with a softmax, and takes the weighted sum of the values. Here's the loop the lab runs, lightly trimmed:</p>
+<pre><code>for i in 0..t {                              <span class="c">// each new position</span>
+    let seen = base + i + 1;                 <span class="c">// causal: it sees 0..=itself</span>
+    for h in 0..n_heads {
+        let kvh = h / group;                 <span class="c">// GQA: heads share K/V</span>
+        let q = &amp;q_all[i * q_dim + h * hd..][..hd];
+        for p in 0..seen {
+            scores[p] = dot(q, key(p, kvh)) / (hd as f32).sqrt();
+        }
+        softmax(&amp;mut scores[..seen]);
+        let out = &amp;mut attn[i * q_dim + h * hd..][..hd];
+        for p in 0..seen {
+            for (o, v) in out.iter_mut().zip(value(p, kvh)) { *o += scores[p] * v; }
+        }
+    }
+}
+<span class="c">// then: h += Wo · attn</span></code></pre>
+    <p>A few details matter:</p>
+    <ul>
+      <li><strong>Causal.</strong> Position <code>i</code> only sees positions up to <code>i</code>. That's what makes generation possible: the past never needs recomputing when the future arrives.</li>
+      <li><strong>Multi-head.</strong> The query is cut into heads (9 of width 64 in the lab's model), and each head attends separately with its own pattern. In the lab you can watch different heads specialize: some look at the previous token, some at the start of the text, some at the matching word.</li>
+      <li><strong>Grouped-query attention.</strong> Several query heads share one key/value head: 9 share 3 in SmolLM2, and 24 share 4 in Qwen 3.8. Keys and values are what gets cached (more in <a href="#kv">part 2</a>), so this divides the memory per token by the group size.</li>
+      <li><strong>The <code>1/√d</code>.</strong> It keeps dot products of wide vectors from saturating the softmax. Gemma 4 is the exception: its scale is folded into its norm weights, and applying <code>1/√d</code> on top flattens attention until every position emits the same filler token.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="rope">
+  <div class="wrap">
+    <h2><span class="n">6</span>Where things are: RoPE</h2>
+    <p>Attention as written doesn't care about order: shuffle the keys and the weighted sum comes out the same. Position has to be put in, and every model here does it with <mark>rotary position embeddings</mark>. Treat the query and key as lists of 2D pairs, and rotate each pair by an angle proportional to the token's position, with each pair spinning at its own frequency:</p>
+<pre><code>fn rope(head: &amp;mut [f32], pos: usize, base: f32, mode: Rope) {
+    let half = head.len() / 2;
+    let mut theta = pos as f64;
+    for i in 0..half {
+        let (sin, cos) = (theta.sin() as f32, theta.cos() as f32);
+        let (a, b) = match mode {
+            Rope::Adjacent =&gt; (2 * i, 2 * i + 1),  <span class="c">// llama</span>
+            Rope::Halves   =&gt; (i, i + half),       <span class="c">// qwen (NeoX)</span>
+        };
+        let (x0, x1) = (head[a], head[b]);
+        head[a] = x0 * cos - x1 * sin;
+        head[b] = x0 * sin + x1 * cos;
+        theta *= (base as f64).powf(-2.0 / head.len() as f64);
+    }
+}</code></pre>
+    <p>Rotating both vectors changes their dot product only by the <em>difference</em> of their angles. So the score between a query at position <code>m</code> and a key at <code>n</code> depends on <code>m − n</code>, which is how far apart they are, and not on where they sit in the text. Try it:</p>
+    <figure class="fig">
+      <canvas id="ropeCv" aria-label="A query and a key as arrows, each rotated by an angle proportional to its position"></canvas>
+      <div class="controls">
+        <div class="ctl"><label for="ropeM">query position <code>m</code></label><input id="ropeM" type="range" min="0" max="24" step="1" value="7"><output id="ropeMo"></output></div>
+        <div class="ctl"><label for="ropeN">key position <code>n</code></label><input id="ropeN" type="range" min="0" max="24" step="1" value="4"><output id="ropeNo"></output></div>
+      </div>
+      <div class="controls"><button id="ropeShift">Shift both by +1</button></div>
+      <div class="readout"><div>m − n<b id="ropeGap">—</b></div><div>q · k after rotation<b id="ropeDot">—</b></div></div>
+      <figcaption>One pair of dimensions, rotating 0.3 radians per position. Shift both and the score doesn't change. Change the gap and it does.</figcaption>
+    </figure>
+    <p>Note the two pairings in the code. Qwen rotates dimension <code>i</code> with <code>i + d/2</code>, while llama-family files rotate neighbors, because llama's converter permutes the Q and K weights to match. Pick the wrong one and nothing crashes. The model just produces confident garbage, a failure mode this post will keep coming back to.</p>
+  </div>
+</section>
+
+<section id="block">
+  <div class="wrap">
+    <h2><span class="n">7</span>The block, and the residual stream</h2>
+    <p>Now put it together. The model keeps one vector per token, the <mark>residual stream</mark>, and each block reads from it and adds back to it. A block never replaces the stream. It only writes a correction into it.</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <svg viewBox="0 0 940 210" role="img" aria-label="Tokens are embedded into the residual stream. Each of 30 blocks reads the stream through an RMSNorm into attention and adds the result back, then through another RMSNorm into the feed-forward network and adds that back. After the last block, a final norm and the output matrix produce logits.">
+        <defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path class="arrow" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+        <rect class="box" x="6" y="44" width="78" height="34" rx="4"/><text x="45" y="66" text-anchor="middle">tokens</text>
+        <rect class="box" x="104" y="44" width="78" height="34" rx="4"/><text x="143" y="66" text-anchor="middle">embed</text>
+        <path class="edge" d="M84 61 H100" marker-end="url(#ah)"/>
+        <path class="edge" d="M182 61 H744" marker-end="url(#ah)"/>
+        <text class="sm" x="196" y="18">the residual stream h</text>
+        <rect class="dash" x="222" y="26" width="486" height="176" rx="6"/>
+        <text class="sm" x="630" y="196">× 30 blocks</text>
+        <circle class="box" cx="440" cy="61" r="11"/><text x="440" y="66" text-anchor="middle">+</text>
+        <circle class="box" cx="670" cy="61" r="11"/><text x="670" y="66" text-anchor="middle">+</text>
+        <path class="edge" d="M250 61 V130 H272" marker-end="url(#ah)"/>
+        <rect class="soft" x="276" y="114" width="60" height="32" rx="4"/><text x="306" y="135" text-anchor="middle">norm</text>
+        <path class="edge" d="M336 130 H350" marker-end="url(#ah)"/>
+        <rect class="acc" x="354" y="110" width="72" height="40" rx="4"/><text x="390" y="135" text-anchor="middle">attn</text>
+        <path class="edge" d="M426 130 H440 V76" marker-end="url(#ah)"/>
+        <path class="edge" d="M478 61 V130 H500" marker-end="url(#ah)"/>
+        <rect class="soft" x="504" y="114" width="60" height="32" rx="4"/><text x="534" y="135" text-anchor="middle">norm</text>
+        <path class="edge" d="M564 130 H578" marker-end="url(#ah)"/>
+        <rect class="hi" x="582" y="110" width="72" height="40" rx="4"/><text class="on-hi" x="618" y="135" text-anchor="middle">FFN</text>
+        <path class="edge" d="M654 130 H670 V76" marker-end="url(#ah)"/>
+        <rect class="soft" x="748" y="44" width="60" height="34" rx="4"/><text x="778" y="66" text-anchor="middle">norm</text>
+        <path class="edge" d="M808 61 H822" marker-end="url(#ah)"/>
+        <rect class="box" x="826" y="44" width="108" height="34" rx="4"/><text x="880" y="66" text-anchor="middle">W_out</text><text class="sm" x="880" y="96" text-anchor="middle">logits</text>
+        <text class="sm" x="354" y="172">positions talk</text>
+        <text class="sm" x="548" y="172">each position thinks</text>
+      </svg>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>And that's the whole model. The lab's model is the next few lines, run 30 times with <code>d_model = 576</code>:</p>
+<pre><code>h = embed(tokens)
+for layer in layers:
+    h = h + attention(rms_norm(h) * attn_norm)
+    h = h + ffn(rms_norm(h) * ffn_norm)
+logits = W_out · (rms_norm(h) * output_norm)    <span class="c">// last position only</span></code></pre>
+    <p>The additive stream is why the <mark>logit lens</mark> works: since every layer only adds to <code>h</code>, you can push the stream through the output head after <em>any</em> layer and ask what the model would say if it stopped there. In the lab, for <code>The capital of France is</code>, SmolLM2 predicts <code>.</code> or a space for most of its depth, then <code> the</code>, and <code> Paris</code> only shows up at the very last layer.</p>
+    <div class="tbl"><table>
+      <tr><th></th><th class="num">SmolLM2-135M (the lab)</th><th class="num">Qwen 3.8 27B</th></tr>
+      <tr><td>layers</td><td class="num">30</td><td class="num">64 (48 delta-net + 16 attention)</td></tr>
+      <tr><td>d_model</td><td class="num">576</td><td class="num">5,120</td></tr>
+      <tr><td>FFN width</td><td class="num">1,536</td><td class="num">17,408</td></tr>
+      <tr><td>attention heads (Q / KV)</td><td class="num">9 / 3, width 64</td><td class="num">24 / 4, width 256</td></tr>
+      <tr><td>vocabulary</td><td class="num">49,152</td><td class="num">248,320</td></tr>
+      <tr><td>output head</td><td class="num">tied to the embedding</td><td class="num">its own matrix</td></tr>
+      <tr><td>file</td><td class="num">145 MB, Q8_0</td><td class="num">22.4 GB, Q6_K</td></tr>
+    </table></div>
+  </div>
+</section>
+
+<section id="sampling">
+  <div class="wrap">
+    <h2><span class="n">8</span>From logits to text</h2>
+    <p>The output head is one more matrix multiply, a score for every token in the vocabulary. A softmax turns the scores into probabilities. <mark>Temperature</mark> divides the scores before the softmax, sharpening the distribution below 1 and flattening it above. <mark>Top-p</mark> keeps the smallest set of tokens whose probability adds up to <code>p</code>, so the long tail of nonsense can never get sampled. Then you draw one token, append it, and run again.</p>
+    <figure class="fig">
+      <div class="probs" id="smBars"></div>
+      <div class="controls">
+        <div class="ctl"><label for="smT">temperature</label><input id="smT" type="range" min="0.05" max="2" step="0.05" value="0.7"><output id="smTo"></output></div>
+        <div class="ctl"><label for="smP">top-p</label><input id="smP" type="range" min="0.1" max="1" step="0.05" value="0.9"><output id="smPo"></output></div>
+      </div>
+      <figcaption>SmolLM2's actual top eight scores for the token after <code>The capital of France is</code>. Yellow tokens are inside the top-p cut and can be drawn. Grey ones can't. Near temperature 0 it's greedy: always <code> Paris</code>.</figcaption>
+    </figure>
+    <p>Generation stops at an <em>end-of-turn</em> token. A chat is plain token sequence underneath, laid out by a <mark>chat template</mark>. SmolLM2 and Qwen use ChatML:</p>
+<pre><code>&lt;|im_start|&gt;system
+You are a helpful AI assistant named SmolLM, trained by Hugging Face&lt;|im_end|&gt;
+&lt;|im_start|&gt;user
+What is the capital of France?&lt;|im_end|&gt;
+&lt;|im_start|&gt;assistant
+</code></pre>
+    <p>Those markers are single control tokens. llmoxide inserts them by id and tokenizes the text between them, so a user who <em>types</em> <code>&lt;|im_end|&gt;</code> gets that string shattered into ordinary pieces, and can't forge a turn boundary. (llama.cpp parses special-token spellings out of text by default, so there, typing one in really does end the turn.) The template has its own traps. Some Qwen files omit the "add BOS" flag, and the default for that differs by vocabulary type. Prepend a stray <code>&lt;|endoftext|&gt;</code> and the model reads your prompt as the tail of some other document. That one was found by diffing greedy output against llama.cpp, after it had looked like a numeric near-tie.</p>
+  </div>
+</section>
+
+<section id="qwen">
+  <div class="wrap">
+    <h2><span class="n">9</span>What Qwen 3.8 adds</h2>
+    <p>Everything above is a complete, working LLM: it's what runs in the lab. Qwen 3.8 27B keeps that skeleton and changes two things that matter, one small and one big.</p>
+    <h3>Attention, with a gate and partial rotation</h3>
+    <p>Its attention layers have three changes:</p>
+    <ul>
+      <li><strong>QK-norm.</strong> Each query and key head gets RMS-normalized (with learned per-dimension gains) before rotation, which keeps attention scores in a stable range as the model gets deep.</li>
+      <li><strong>Partial RoPE.</strong> Only the first 64 of each head's 256 dimensions rotate, with base 10,000,000. The other 192 are position-free, so part of every head matches on content alone.</li>
+      <li><strong>A gate on the output.</strong> The query projection is fused: it emits <code>[query | gate]</code> per head. After the weighted sum of values, each head's output is multiplied by <code>sigmoid(gate)</code>, so a head can switch itself off for a token. Forget the gate and every activation still looks plausible, and the output is subtly wrong.</li>
+    </ul>
+    <h3>The hybrid: three of every four layers aren't attention</h3>
+    <p>Here's the big change. Attention's memory is the <a href="#kv">KV cache</a>, a key and value for every past token, in every attention layer, forever. It grows with the context, and at 262k tokens of context it's enormous. Qwen 3.8 makes only every fourth layer full attention. The other 48 are <mark>gated delta-net</mark> layers, a kind of linear attention with a fixed-size memory.</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <svg id="qwenStrip" viewBox="0 0 940 112" role="img" aria-label="Qwen 3.8's 64 layers in order: three gated delta-net layers, then one full-attention layer, repeated 16 times. A 65th block, the multi-token-prediction head, is not run."></svg>
+      <figcaption>Qwen 3.8's 64 layers, in order. Blue: gated delta-net, with a fixed 3 MB state each. Yellow: full attention with a KV cache that grows with the context. The 65th block in the file is a multi-token-prediction head for speculative decoding. The main pass never runs it, and llmoxide doesn't load it.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>A delta-net layer replaces "keep every key and value" with a single matrix <code>S</code> per head (128×128 here) that maps keys to values: an associative memory. To read it, multiply by the query. To write, it uses the <mark>delta rule</mark>: ask what <code>S</code> currently recalls for this token's key, and nudge it toward the actual value by however much it was wrong. Here's llmoxide's CPU reference, per token and value head:</p>
+<pre><code>let g = (a[h] * softplus(alpha[h] + dt_bias[h])).exp();  <span class="c">// decay, in (0, 1)</span>
+let b = sigmoid(beta[h]);                                  <span class="c">// how hard to write</span>
+for x in s.iter_mut() { *x *= g; }                         <span class="c">// forget a little</span>
+for j in 0..128 {                                          <span class="c">// row j of S: value dim j</span>
+    let row = &amp;mut s[j * 128..(j + 1) * 128];
+    let pred  = dot(row, k);                               <span class="c">// what S recalls for k</span>
+    let delta = (v[j] - pred) * b;                         <span class="c">// how wrong that was</span>
+    for (r, &amp;kk) in row.iter_mut().zip(k) { *r += delta * kk; }
+    o[j] = dot(row, q) / (128f32).sqrt();                  <span class="c">// read with the query</span>
+}</code></pre>
+    <p>Around that core, the fused Q/K/V stream goes through a short causal convolution (width 4) and a SiLU first, q and k are L2-normalized, and the output passes through a gated RMSNorm before its projection. The cost is the point. Per token, a delta-net layer does the same work at position 10 as at position 100,000, and its state never grows: about 3 MB per layer, roughly 150 MB for all 48, at any context length. The 16 attention layers keep exact recall over the whole context, and they're the only ones paying per-token memory.</p>
+    <p class="aside">This is also the one part of the model that's a <em>recurrence</em>: token <code>t</code>'s state needs token <code>t−1</code>'s. Prefill can batch the matrix multiplies around it, but the loop itself runs in order. On the GPU it's one dispatch with a workgroup per value head, looping over the tokens inside.</p>
+    <p>It also comes with its own set of traps, every one of them silent:</p>
+    <ul>
+      <li>There are 48 value heads but only 16 key/query heads. Value head <code>h</code> uses key head <code>h % 16</code> (ggml repeats by tiling). The <code>h / 3</code> you'd guess from Hugging Face's <code>repeat_interleave</code> produces plausible garbage.</li>
+      <li><code>ssm_a</code> is stored already negated (the converter bakes in <code>-exp(A_log)</code>). Negate it again and the state explodes.</li>
+      <li>The L2 norm's epsilon floors the norm (<code>x / max(‖x‖, ε)</code>). It isn't added under the square root the way RMSNorm's is.</li>
+      <li>Some metadata keys are misnamed: <code>ssm.time_step_rank</code> is actually the value-head count.</li>
+    </ul>
+    <p>With all of that right, llmoxide's 27B matches llama.cpp at 567 intermediate tensors within 4×10<sup>−4</sup>, and greedy decoding is byte-identical.</p>
+  </div>
+</section>
+
+<!-- ================================================================ PART 2 -->
+<section class="part" id="p2">
+  <div class="wrap">
+    <p class="kick">part 2</p>
+    <h2>Running it</h2>
+    <p class="dek">Getting 22 GB of weights off the disk, and why the first token and the hundredth take such different amounts of time.</p>
+  </div>
+</section>
+
+<section id="load">
+  <div class="wrap">
+    <h2><span class="n">10</span>Loading weights</h2>
+    <p>Models ship as a single <mark>GGUF</mark> file. It's a simple format: a header, typed key/value metadata (architecture, sizes, the tokenizer's whole vocabulary and merge list, the chat template), a table of tensors, and then the tensor bytes, each aligned.</p>
+  </div>
+  <div class="wide">
+    <figure class="fig">
+      <svg viewBox="0 0 940 196" role="img" aria-label="A GGUF file: magic and counts, metadata key/values, the tensor table of name, shape, type and offset, padding, then aligned tensor data. One Q8_0 block is zoomed: a 2-byte f16 scale and 32 signed bytes, 34 bytes for 32 weights.">
+        <rect class="box" x="6" y="24" width="96" height="46" rx="3"/><text x="54" y="44" text-anchor="middle">GGUF v3</text><text class="sm" x="54" y="60" text-anchor="middle">counts</text>
+        <rect class="soft" x="102" y="24" width="210" height="46"/><text x="207" y="44" text-anchor="middle">metadata</text><text class="sm" x="207" y="60" text-anchor="middle">arch, sizes, vocab, template</text>
+        <rect class="soft" x="312" y="24" width="210" height="46"/><text x="417" y="44" text-anchor="middle">tensor table</text><text class="sm" x="417" y="60" text-anchor="middle">name · shape · type · offset</text>
+        <rect class="box" x="522" y="24" width="20" height="46"/>
+        <rect class="acc" x="542" y="24" width="392" height="46"/><text x="738" y="44" text-anchor="middle">tensor data</text><text class="sm" x="738" y="60" text-anchor="middle">99.9% of the file</text>
+        <text class="sm" x="6" y="16">a few MB: parseable on its own, before any weights move</text>
+        <path class="dash" d="M600 70 L330 118 M640 70 L910 118"/>
+        <rect class="hi" x="330" y="118" width="62" height="40"/><text class="on-hi" x="361" y="142" text-anchor="middle">f16 d</text>
+        <g id="q8cells"></g>
+        <text class="sm" x="330" y="178">one Q8_0 block: weight = d × int8. 34 bytes for 32 weights, 8.5 bits each</text>
+      </svg>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>The weights are <mark>quantized</mark>: stored as small integers in blocks that share a scale. Q8_0 keeps 32 signed bytes and one f16 scale per block. The k-quants used for big models (Q4_K, Q6_K) nest blocks in 256-weight super-blocks with their own scales, getting down to 4.5 and 6.6 bits per weight. You never decompress the whole thing. Each dot product decodes its row on the fly:</p>
+<pre><code>GgmlType::Q8_0 =&gt; {
+    let mut acc = 0f32;
+    for (bi, blk) in row.chunks_exact(34).enumerate() {
+        let d = f16_at(blk, 0);                           <span class="c">// the block's scale</span>
+        let qs: &amp;[i8] = bytemuck::cast_slice(&amp;blk[2..]);  <span class="c">// 32 weights</span>
+        let xb = &amp;x[bi * 32..bi * 32 + 32];
+        acc += d * qs.iter().zip(xb).map(|(&amp;q, &amp;b)| q as f32 * b).sum::&lt;f32&gt;();
+    }
+    acc
+}</code></pre>
+    <p>The loader reads the header and tensor table, checks every tensor's shape against the config (so a converter quirk fails at load time instead of 60 layers into a reply), and then hands the data region over. Natively, that's an <code>mmap</code>: no copy, and the OS pages weights in as they're touched. The GPU path then uploads it, and at 22 GB that turned up two failures that return all zeros with no error. Mapping every buffer at once doubles memory with staging copies and the writes just get dropped, so llmoxide uploads one buffer at a time and reads back samples to confirm. And a whole forward pass submitted as one command buffer (about 1,500 dispatches) trips Metal's GPU watchdog, so it's chunked at 64.</p>
+    <p>The browser is stricter still. wasm32 can address only 4 GB, and the larger models don't fit. So the header gets parsed from a <em>prefix</em> of the file, which is enough to plan the whole upload, and the weights stream from the JS <code>File</code> to the GPU 32 MB at a time without ever entering wasm memory. One more trap: <code>Blob.slice</code> must get its offsets as <code>f64</code>, because the <code>i32</code> overload saturates past 2 GB, and every tensor after that loads from the wrong place.</p>
+  </div>
+</section>
+
+<section id="prefill">
+  <div class="wrap">
+    <h2><span class="n">11</span>Prefill and decode</h2>
+    <p>Generating a reply has two phases. <mark>Prefill</mark> runs the whole prompt through the model at once. <mark>Decode</mark> then runs one token at a time, each one depending on the one before. They're the same function. In the lab's engine the only difference is <code>t</code>, the number of rows going through the matrix multiplies:</p>
+<pre><code>pub fn matmul(y: &amp;mut [f32], w: &amp;TensorView, x: &amp;[f32], t: usize, row: &amp;mut [f32]) {
+    for o in 0..w.out_dim() {
+        w.dequant_row_into(o, row);             <span class="c">// read and decode this row ONCE</span>
+        for i in 0..t {                         <span class="c">// ...then use it for every token</span>
+            y[i * n_out + o] = dot(row, &amp;x[i * n_in..(i + 1) * n_in]);
+        }
+    }
+}</code></pre>
+    <p>The expensive part is reading the weights. In decode, <code>t = 1</code>, so every weight in the model is read from memory to do <em>one</em> multiply-add. Decode speed is therefore set by memory bandwidth, not by compute. For the 27B that's simple arithmetic: 22.4 GB per token at 9.4 tokens a second is about 210 GB/s, and the M4 Pro's measured ceiling for a kernel that only <em>reads</em> those bytes is 225–242 GB/s. There's at most 10% left to find in decode, and that's why llmoxide stopped looking.</p>
+    <p>Prefill shares each weight read across every prompt token, so it becomes compute-bound, and the right tool is a real GEMM. llmoxide has a hand-written Metal one that dequantizes a tile of weights once into threadgroup memory and runs it on the GPU's 8×8 matrix units at about 4.4 TFLOP/s. That took 27B prefill from 14 to 79 tokens a second.</p>
+    <div class="tbl"><table>
+      <tr><th>measured on an M4 Pro</th><th class="num">prefill</th><th class="num">decode</th></tr>
+      <tr><td>Qwen 3.8 27B, GPU</td><td class="num">79 tok/s</td><td class="num">9.4 tok/s</td></tr>
+      <tr><td>Gemma 4 12B, GPU</td><td class="num">35 tok/s</td><td class="num">22 tok/s</td></tr>
+      <tr><td>SmolLM2-135M, the lab: CPU, one thread, wasm</td><td class="num">~110 tok/s</td><td class="num">~40 tok/s</td></tr>
+    </table></div>
+    <p>The lab shows both phases. Its prefill and per-token decode times come straight from the engine running in your tab.</p>
+  </div>
+</section>
+
+<section id="kv">
+  <div class="wrap">
+    <h2><span class="n">12</span>The KV cache</h2>
+    <p>Because attention is causal, a token's keys and values never change once computed. So they're kept: every attention layer appends each new token's K and V to a cache, and decode computes only the newest token's. Without the cache, every token would re-run the whole conversation.</p>
+    <p>The cache is the conversation's memory, and its size is easy to work out: <code>2 × layers × kv_heads × head_dim × bytes</code> per token.</p>
+    <div class="tbl"><table>
+      <tr><th></th><th class="num">per token</th><th class="num">at 32k tokens</th></tr>
+      <tr><td>SmolLM2-135M (30 layers × 3 × 64, f32)</td><td class="num">45 KB</td><td class="num">1.5 GB</td></tr>
+      <tr><td>Qwen 3.8 27B, 16 attention layers (× 4 × 256, f32)</td><td class="num">128 KB</td><td class="num">4.3 GB</td></tr>
+      <tr><td>…if all 64 layers were attention</td><td class="num">512 KB</td><td class="num">17 GB</td></tr>
+    </table></div>
+    <p>Keeping the cache between turns means a follow-up question only prefills the new tokens. The lab's chat shows this: the second turn reports something like <em>prefilled 19, reused 81</em>. But reuse only works if the new prompt is token for token an extension of the old one, and that's harder than it sounds. llmoxide once regressed because a replayed assistant turn encoded an empty thinking block as <code>"\n" + "" + "\n"</code>, which tokenizes to <code>[198, 198]</code>, while the original generation prompt had written <code>"\n\n"</code>, which BPE merges into the single id <code>271</code>. Same string, different tokens, and the whole conversation re-prefilled every turn.</p>
+    <p>The delta-net layers make it stricter. Their state has already absorbed every token, so it can't be rewound to an earlier point. Cache reuse is append-only.</p>
+    <p class="pull">The cache is also the conversation, sitting in memory as numbers. Hold that thought.</p>
+  </div>
+</section>
+
+<section id="check">
+  <div class="wrap">
+    <h2><span class="n">13</span>Knowing it's right</h2>
+    <p>Look back at how many traps in this post <em>don't crash</em>. Wrong pre-tokenizer, wrong RoPE pairing, a missing gate, a doubled negation, a stray BOS: every one produces fluent, confident, slightly worse text. "The output looks fine" is not a test.</p>
+    <p>So llmoxide is checked against llama.cpp the hard way. <code>llama-eval-callback</code> dumps every intermediate tensor, and a validator compares each one to llmoxide's CPU reference path, which passes everything it computes through a trace hook under llama.cpp's own names. The GPU path is then diffed against the CPU path at every checkpoint (771 of 771 match on the 27B), and greedy output is compared byte for byte. Compare elements against the tensor's own magnitude rather than whole-tensor sums, which cancel. And check a token <em>other than the first</em>, because position 0 only attends to itself and matches even when attention is completely broken.</p>
+    <p>The lab's engine got the same treatment before going in this page. Greedy output on SmolLM2-135M and on Qwen3-0.6B is byte-identical to <code>llama-completion</code>.</p>
+  </div>
+</section>
+
+<!-- ================================================================ PART 3 -->
+<section class="part" id="p3">
+  <div class="wrap">
+    <p class="kick">part 3</p>
+    <h2>Incognito for AI</h2>
+    <p class="dek">Most AI isn't private, and running it locally isn't the fix people think it is.</p>
+  </div>
+</section>
+
+<section id="notprivate">
+  <div class="wrap">
+    <h2><span class="n">14</span>Where your conversations go</h2>
+    <p>People tell AI things they don't tell anyone else: symptoms, money trouble, relationship problems, legal worries, the code from work they're not supposed to paste anywhere. Then they treat the conversation as if it evaporated.</p>
+    <p><strong>A hosted model</strong> turns every prompt into a record on someone else's server. It may be logged for abuse monitoring, kept for a retention period, read by a reviewer, or held for litigation. In 2025, a US court ordered OpenAI to preserve ChatGPT conversations, including ones users had deleted, as evidence in a copyright case. You can't delete what you don't hold, and whatever a provider's policy says today, the copy is theirs.</p>
+    <p><strong>A local model</strong> fixes the server and nothing else. Inference stays local, but the conversation still leaves copies all over the machine:</p>
+    <div class="tbl"><table>
+      <tr><th>where a local conversation usually persists</th><th>how long</th></tr>
+      <tr><td>the chat client's history database</td><td>until you delete it, and in every backup since</td></tr>
+      <tr><td>shell history, if the prompt was an argument</td><td>indefinitely, often timestamped</td></tr>
+      <tr><td>terminal scrollback; a webview's caches and helper processes</td><td>until cleared; under <code>~/Library</code></td></tr>
+      <tr><td>swap and the hibernation image</td><td>until overwritten (encrypted on a Mac, often not on Linux)</td></tr>
+      <tr><td>freed heap memory</td><td>until reused; readable by a debugger or a core dump</td></tr>
+      <tr><td>GPU memory (the KV cache)</td><td>until the next allocation happens to overwrite it</td></tr>
+      <tr><td>crash reports, clipboard managers, the accessibility tree</td><td>varies; some forever</td></tr>
+    </table></div>
+    <p>Most of that list isn't a bug in anyone's app. It's what a normal program on a normal OS leaves behind.</p>
+  </div>
+</section>
+
+<section id="agents">
+  <div class="wrap">
+    <h2><span class="n">15</span>Why it matters more now</h2>
+    <p>Recovering that residue used to take a forensics specialist. Now it takes a sentence. An AI agent with shell access will happily run every one of these, and it knows where to look better than most people do:</p>
+<pre><code><span class="c">$</span> sqlite3 ~/Library/Application\ Support/&lt;some-chat-app&gt;/*.db "select content from messages"
+<span class="c">$</span> grep -i "ollama run\|llama-cli -p" ~/.zsh_history
+<span class="c">$</span> sudo strings -n 12 /dev/nvme0n1p3 | grep -i "diagnos"   <span class="c"># an unencrypted Linux swap partition</span>
+<span class="c">$</span> tmutil listbackups   <span class="c"># ...and the history database is in every one of them</span></code></pre>
+    <p>So the person who can read your old conversations is no longer just a lab with a warrant. It's anyone who gets a few minutes at your unlocked laptop with an agent, malware that ships with one, a stolen or resold machine, a backup drive, or a family computer. As agents make everyone capable of this kind of digging, the only reliable defense is for the residue not to exist in the first place.</p>
+    <p class="pull">Browsers solved a version of this years ago. Incognito mode doesn't hide you from the network. It just doesn't leave a history on the machine. AI needs the same thing.</p>
+  </div>
+</section>
+
+<section id="incognito">
+  <div class="wrap">
+    <h2><span class="n">16</span>What llmoxide does</h2>
+    <p>The design goal is narrow and testable: after you close the window or press <strong>New chat</strong>, nothing on the machine holds the conversation. Not on disk, not in memory, not on the GPU.</p>
+    <div class="tbl"><table>
+      <tr><th>residue</th><th>what llmoxide does instead</th></tr>
+      <tr><td>chat history database</td><td>there's no client: the UI is the engine's own process, and it writes nothing</td></tr>
+      <tr><td>webview copies and caches</td><td>a <strong>native</strong> renderer (Dioxus on Blitz/wgpu) lays out and paints in-process, with no WebKit helpers and no JavaScript</td></tr>
+      <tr><td>swap, hibernation image</td><td>prompt ids and the reply live in <code>mlock</code>ed pages, which are never written to swap</td></tr>
+      <tr><td>freed heap</td><td>a global allocator that zeroes every block as it's freed, including <code>realloc</code>'s old block</td></tr>
+      <tr><td>GPU memory</td><td>every device buffer cleared on New chat, verified by reading them back</td></tr>
+      <tr><td>shell history</td><td>prompts are typed into the window, never passed as arguments</td></tr>
+      <tr><td>core dumps, debuggers, crash reports</td><td><code>RLIMIT_CORE=0</code> and <code>PT_DENY_ATTACH</code>; a panic wipes, then <code>_exit</code>s before macOS can write a report</td></tr>
+      <tr><td>accessibility tree, network</td><td>compiled out; <code>nm</code> on the release binary finds no HTTP client</td></tr>
+      <tr><td>clipboard</td><td>only on <strong>Copy</strong>, marked concealed so clipboard managers skip it, and cleared on New chat</td></tr>
+    </table></div>
+    <p>Every claim like this gets tested, because "we clear the cache" is exactly the kind of statement that's easy to make and easy to get wrong. Resetting a KV cache's length looks like clearing it and isn't. A <code>clear_buffer</code> that was queued but never submitted looks the same from the CPU side. So <code>wipe_check</code> prefills a prompt, confirms the GPU buffers are full of it, wipes, and reads every buffer back. On the 27B: <strong>41,487,330 nonzero words across 147 buffers before, 0 after</strong>. It refuses to pass if nothing was there to begin with. The read-only file tools get the same treatment: every read restores the file's access time, and a checker confirms that atime, mtime and ctime are unchanged to the nanosecond and that no filesystem event fired.</p>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="wrap">
+    <h2><span class="n">17</span>Incognito, not invisible</h2>
+    <p>It's not perfect, and it says so. What it doesn't cover:</p>
+    <ul>
+      <li><strong>That you used it.</strong> The model file's access time, the process launch in the system log, the GPU running hot. <em>What</em> was asked can be made unrecoverable. <em>That</em> something was asked can't.</li>
+      <li><strong>Root on a running machine</strong>, or anything already watching live: a keylogger, screen capture, an EDR agent logging every <code>open</code>.</li>
+      <li><strong>Pixels and input.</strong> Rendered text sits in the compositor until it's repainted, and keystrokes pass through the OS input system like any app's.</li>
+      <li><strong>A <code>SIGKILL</code> before the wipe</strong>, though locked pages still never reached swap, and the kernel zeroes freed pages before reusing them.</li>
+    </ul>
+    <p>That's the same deal browser incognito offers, and it's the right one. The threat that's growing fastest is the cheap, after-the-fact one: someone, or something, going through a machine later. Closing that off for everyone matters more than chasing an attacker with root, who has easier options anyway.</p>
+    <p class="aside">The lab below is weaker than the app, and it's worth being exact about how. It runs in a browser tab, which can't <code>mlock</code>, and the text you type also lives in the page's DOM and in the message posted to the worker, which are the browser's copies, not the engine's. What it <em>does</em> do is real: the engine's heap zeroes on free, and <strong>Forget</strong> overwrites both KV caches and shows you the count of nonzero floats before and after. Nothing you type is sent anywhere. The only network request is the one-time download of the model file.</p>
+  </div>
+</section>
+
+<!-- ================================================================ LAB -->
+<section class="part" id="lab">
+  <div class="wrap">
+    <p class="kick">the lab</p>
+    <h2>Watch it think</h2>
+    <p class="dek">SmolLM2-135M-Instruct, running in this tab on the CPU through WebAssembly.</p>
+  </div>
+</section>
+<section id="labbody" style="padding-top:3vh">
+  <div class="wrap">
+    <p>This is the dense transformer from part 1, written as a small Rust crate (<a href="https://github.com/bigmah/llmoxide/tree/main/crates/lab" target="_blank" rel="noopener noreferrer"><code>crates/lab</code></a>) on top of llmoxide's GGUF loader, tokenizer, and sampler. It's compiled to wasm with SIMD and runs in a Web Worker, so the page stays responsive. Every forward pass can record its attention weights and residual stream, and that's what the panels draw.</p>
+    <p>It's a 135M-parameter model, 200 times smaller than the 27B. It's coherent for a sentence or two and then wanders. That's what a model this size is like, and it's small enough to download in seconds and fast enough to chat with on one CPU thread.</p>
+  </div>
+  <div class="wide">
+    <div class="lab" id="labBox" data-ready="no">
+      <div class="lab-bar">
+        <div class="st"><span id="labStatus">Not loaded. The model is a 145 MB download, fetched once and cached by your browser.</span><div class="meter" id="labMeter"><span></span></div></div>
+        <button class="go" id="labLoad">Load SmolLM2-135M · 145 MB</button>
+      </div>
+
+      <div class="pane">
+        <h3><span class="n">A</span>Tokens and embeddings</h3>
+        <p class="hint">Type anything. Each chip is one token, with its id. Click one to see its embedding vector and its nearest neighbors.</p>
+        <input type="text" id="tokIn" value="Tokenizers don't see words: they see 1234 pieces, like naïve unbelievably." aria-label="Text to tokenize">
+        <div class="readout"><div>tokens<b id="tokN">—</b></div><div>characters per token<b id="tokCpt">—</b></div></div>
+        <div class="chips" id="tokChips"></div>
+        <div id="embBox" hidden>
+          <p class="subt" id="embTitle"></p>
+          <canvas id="embCv" aria-label="The token's embedding vector as bars"></canvas>
+          <p class="subt">nearest by cosine similarity</p>
+          <div class="near" id="embNear"></div>
+        </div>
+      </div>
+
+      <div class="pane">
+        <h3><span class="n">B</span>One prompt, layer by layer</h3>
+        <p class="hint">Prefill a prompt with probes on, then step it a token at a time. Raw text is completed as-is. Turn on the chat template to see the system prompt and control tokens the model actually reads.</p>
+        <div class="chatrow">
+          <input type="text" id="insIn" value="The capital of France is" aria-label="Prompt to inspect">
+          <button class="go" id="insRun">Prefill</button>
+        </div>
+        <div class="controls">
+          <label class="check"><input type="checkbox" id="insChat"> wrap in the chat template</label>
+        </div>
+        <div class="readout">
+          <div>prompt tokens<b id="insT">—</b></div>
+          <div>prefill<b id="insPre">—</b></div>
+          <div>last decode step<b id="insDec">—</b></div>
+          <div>KV cache<b id="insKv">—</b></div>
+        </div>
+        <div class="chips" id="insChips"></div>
+
+        <div class="cols">
+          <div>
+            <p class="subt">Attention: who each token looks at</p>
+            <div class="controls" style="margin-top:4px">
+              <div class="ctl"><label for="insL">layer</label><input id="insL" type="range" min="1" max="30" step="1" value="1"><output id="insLo"></output></div>
+            </div>
+            <div class="heads" id="insHeads" style="margin-top:8px"></div>
+            <canvas id="attCv" style="margin-top:10px" aria-label="Attention heatmap: rows are query tokens, columns are the tokens they attend to"></canvas>
+            <div class="hover" id="attHover">Rows are tokens, columns are what they attend to. Hover a cell.</div>
+          </div>
+          <div>
+            <p class="subt">Next token</p>
+            <div class="controls" style="margin-top:4px">
+              <div class="ctl"><label for="insTemp">temperature <span style="color:var(--graphite)">(0 = greedy)</span></label><input id="insTemp" type="range" min="0" max="1.5" step="0.05" value="0"><output id="insTempo"></output></div>
+            </div>
+            <div class="probs" id="insTop"></div>
+            <div class="controls">
+              <button class="go" id="insStep">Next token</button>
+              <button id="insStep10">×10</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cols">
+          <div>
+            <p class="subt">Logit lens: the prediction after each layer</p>
+            <div class="controls" style="margin-top:4px"><button id="insLens">Run the lens</button></div>
+            <div class="lens" id="insLensOut"></div>
+          </div>
+          <div>
+            <p class="subt">The residual stream's size (RMS) through the layers</p>
+            <canvas id="rmsCv" aria-label="Residual stream RMS per layer, one line per token"></canvas>
+            <div class="hover" id="rmsNote">One line per token. The last token is bold.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane">
+        <h3><span class="n">C</span>Chat, then forget</h3>
+        <p class="hint">A normal chat with its own KV cache. Watch prefill reuse the cache on follow-ups, then press Forget and watch the cache go to zero.</p>
+        <div class="log" id="chatLog" aria-live="polite"><p class="msg note">Ask it something short. It's 135M parameters.</p></div>
+        <div class="chatrow">
+          <textarea id="chatIn" rows="2" aria-label="Message">What is the capital of France?</textarea>
+          <button class="go" id="chatSend">Send</button>
+          <button id="chatStop" disabled>Stop</button>
+        </div>
+        <div class="readout">
+          <div>last prefill<b id="chatPre">—</b></div>
+          <div>decode<b id="chatDec">—</b></div>
+          <div>KV cache in use<b id="chatKv">—</b></div>
+          <div>nonzero floats in the caches<b id="chatNz">—</b></div>
+        </div>
+        <div class="controls"><button id="chatWipe">Forget</button><span id="wipeOut" class="hover" style="margin:0"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="end">
+  <div class="wrap">
+    <h2>Try the real thing</h2>
+    <p>The lab is the teaching version. The app is the real one: Qwen 3.8 27B or Gemma 4 on your GPU, in a native window that leaves nothing behind. It's one Rust binary with no Python and no runtime to install:</p>
+<pre><code>git clone https://github.com/bigmah/llmoxide &amp;&amp; cd llmoxide
+cargo run --release -p llmoxide-hub --bin llmoxide-fetch -- gemma4-e4b-q4   <span class="c"># 5.3 GB, once</span>
+cargo run --release                                                        <span class="c"># the chat window</span></code></pre>
+    <p>It's developed on macOS, and the privacy layer calls macOS APIs directly, so Linux and Windows need small ports before the app builds there. The repo's <a href="https://github.com/bigmah/llmoxide/blob/main/docs/privacy.md" target="_blank" rel="noopener noreferrer">privacy doc</a> has the full threat model and how each claim is checked. Issues and PRs are welcome.</p>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap"><a href="index.html">← back to bigmah</a><span>oct 14, 2026</span></div></footer>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const root = document.documentElement;
+const C = n => getComputedStyle(root).getPropertyValue(n).trim();
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const vis = s => s.replace(/ /g, '·').replace(/\n/g, '↵').replace(/\t/g, '→');
+const fmtMs = ms => ms < 10 ? ms.toFixed(1) + ' ms' : Math.round(ms) + ' ms';
+const fmtB = b => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
+const nf = n => n.toLocaleString('en-US');
+
+function canvas(cv, h) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth || cv.parentElement.clientWidth;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + 'px';
+  const x = cv.getContext('2d');
+  x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { x, w, h };
+}
+const redraws = [];
+let rt = 0;
+addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => redraws.forEach(f => f()), 120); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => redraws.forEach(f => f()));
+
+/* ---------------------------------------------------------- the Qwen strip */
+(() => {
+  const svg = $('#qwenStrip');
+  let s = '';
+  const w = 12.4, gap = 1.6, x0 = 10, y0 = 30;
+  for (let i = 0; i < 65; i++) {
+    const x = x0 + i * (w + gap);
+    const cls = i === 64 ? 'dash' : (i + 1) % 4 === 0 ? 'hi' : 'acc';
+    s += `<rect class="${cls}" x="${x}" y="${y0}" width="${w}" height="40" rx="2"/>`;
+    if (i % 8 === 0) s += `<text class="sm" x="${x + w / 2}" y="88" text-anchor="middle">${i}</text>`;
+  }
+  s += `<text class="sm" x="10" y="20">layer 0</text>`;
+  s += `<text class="sm" x="${x0 + 64 * (w + gap) + w / 2}" y="20" text-anchor="end">MTP · skipped</text>`;
+  s += `<text class="sm" x="10" y="106">3 delta-net : 1 attention, ×16</text>`;
+  svg.innerHTML = s;
+})();
+
+/* ---------------------------------------------------------- Q8_0 block cells */
+(() => {
+  let s = '';
+  for (let i = 0; i < 32; i++) s += `<rect class="soft" x="${392 + i * 16.4}" y="118" width="15" height="40"/>`;
+  s += `<text x="${392 + 16 * 16.4}" y="143" text-anchor="middle">32 × int8</text>`;
+  $('#q8cells').innerHTML = s;
+})();
+
+/* ---------------------------------------------------------- softmax widget */
+(() => {
+  // SmolLM2-135M's own log-probabilities for the next token, measured with the lab engine.
+  const cands = [[' Paris', -0.76], [' the', -1.33], [' located', -2.41], [' called', -4.19], [' Le', -4.27], [' a', -4.72], [' situated', -4.95], [' known', -5.03]];
+  const T = $('#smT'), P = $('#smP');
+  function draw() {
+    const t = +T.value, p = +P.value;
+    $('#smTo').value = t.toFixed(2); $('#smPo').value = p.toFixed(2);
+    const m = Math.max(...cands.map(c => c[1]));
+    const e = cands.map(c => Math.exp((c[1] - m) / t));
+    const z = e.reduce((a, b) => a + b, 0);
+    const pr = e.map(v => v / z);
+    let acc = 0, cut = cands.length;
+    for (let i = 0; i < pr.length; i++) { acc += pr[i]; if (acc >= p) { cut = i + 1; break; } }
+    $('#smBars').innerHTML = cands.map((c, i) =>
+      `<span class="tk ${i < cut ? '' : 'out'}">${esc(vis(c[0]))}</span>` +
+      `<span class="${i < cut ? 'in' : 'out'}"><span class="pb"><span style="width:${(pr[i] * 100).toFixed(1)}%"></span></span></span>` +
+      `<span class="num ${i < cut ? '' : 'out'}">${(pr[i] * 100).toFixed(1)}%</span>`).join('');
+  }
+  T.addEventListener('input', draw); P.addEventListener('input', draw);
+  draw();
+})();
+
+/* ---------------------------------------------------------- RoPE widget */
+(() => {
+  const cv = $('#ropeCv'), M = $('#ropeM'), N = $('#ropeN');
+  const th = 0.3, aq = 0.35, ak = -0.2, lq = 1, lk = 0.85;
+  function draw() {
+    const m = +M.value, n = +N.value;
+    $('#ropeMo').value = m; $('#ropeNo').value = n;
+    const { x, w, h } = canvas(cv, 220);
+    const cx = w / 2, cy = h / 2, r = Math.min(w, h) * 0.4;
+    x.clearRect(0, 0, w, h);
+    x.strokeStyle = C('--rule'); x.lineWidth = 1;
+    x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.stroke();
+    x.beginPath(); x.moveTo(cx - r - 10, cy); x.lineTo(cx + r + 10, cy); x.moveTo(cx, cy - r - 10); x.lineTo(cx, cy + r + 10); x.stroke();
+    const qa = aq + m * th, ka = ak + n * th;
+    const arrow = (a, len, col, label) => {
+      const ex = cx + Math.cos(a) * r * len, ey = cy - Math.sin(a) * r * len;
+      x.strokeStyle = col; x.fillStyle = col; x.lineWidth = 3;
+      x.beginPath(); x.moveTo(cx, cy); x.lineTo(ex, ey); x.stroke();
+      const hl = 10, ha = 0.45;
+      x.beginPath(); x.moveTo(ex, ey);
+      x.lineTo(ex - hl * Math.cos(a - ha), ey + hl * Math.sin(a - ha));
+      x.lineTo(ex - hl * Math.cos(a + ha), ey + hl * Math.sin(a + ha)); x.closePath(); x.fill();
+      x.font = '500 13px ' + C('--mono');
+      x.fillText(label, cx + Math.cos(a) * r * (len + 0.16) - 8, cy - Math.sin(a) * r * (len + 0.16) + 4);
+    };
+    x.strokeStyle = C('--faint'); x.lineWidth = 1.5;
+    x.beginPath(); x.arc(cx, cy, r * 0.32, -Math.max(qa, ka), -Math.min(qa, ka)); x.stroke();
+    arrow(ka, lk, C('--acc'), 'k@' + n);
+    arrow(qa, lq, C('--hi-line'), 'q@' + m);
+    const dotv = lq * lk * Math.cos(qa - ka);
+    $('#ropeGap').textContent = m - n;
+    $('#ropeDot').textContent = dotv.toFixed(3);
+  }
+  M.addEventListener('input', draw); N.addEventListener('input', draw);
+  $('#ropeShift').addEventListener('click', () => {
+    if (+M.value >= 24 || +N.value >= 24) { M.value = +M.value - Math.min(+M.value, +N.value); N.value = +N.value - Math.min(+M.value, +N.value); }
+    else { M.value = +M.value + 1; N.value = +N.value + 1; }
+    draw();
+  });
+  redraws.push(draw);
+  draw();
+})();
+
+/* ================================================================ the lab */
+const MODEL = 'lab/SmolLM2-135M-Instruct-Q8_0.gguf';
+const box = $('#labBox'), status = $('#labStatus'), meter = $('#labMeter');
+let worker = null, seq = 0, cfg = null;
+const pending = new Map();
+
+function call(op, args = {}, onEvent) {
+  return new Promise((resolve, reject) => {
+    const id = ++seq;
+    pending.set(id, { resolve, reject, onEvent });
+    worker.postMessage({ ...args, id, op });
+  });
+}
+function onMessage(e) {
+  const m = e.data, p = pending.get(m.id);
+  if (!p) return;
+  if (m.type) { p.onEvent && p.onEvent(m); return; }
+  pending.delete(m.id);
+  m.ok ? p.resolve(m) : p.reject(new Error(m.error));
+}
+function fail(err) { status.innerHTML = `<span class="err">${esc(String(err.message || err))}</span>`; }
+
+$('#labLoad').addEventListener('click', async () => {
+  const btn = $('#labLoad');
+  btn.disabled = true;
+  try {
+    if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') throw new Error('This browser has no WebAssembly or Web Workers.');
+    worker = new Worker(new URL('lab/lab-worker.js', location.href), { type: 'module' });
+    worker.onmessage = onMessage;
+    worker.onerror = e => fail(e.message ? e : new Error('The worker failed to start. Module workers need Chrome 80+, Safari 15+ or Firefox 114+.'));
+    meter.style.display = 'block';
+    status.textContent = 'Downloading…';
+    const r = await call('load', { url: new URL(MODEL, location.href).href }, ev => {
+      if (ev.type !== 'progress') return;
+      const f = ev.total ? ev.loaded / ev.total : 0;
+      meter.firstElementChild.style.width = (f * 100).toFixed(1) + '%';
+      status.textContent = `Downloading… ${(ev.loaded / 1e6).toFixed(0)}${ev.total ? ' / ' + (ev.total / 1e6).toFixed(0) : ''} MB`;
+    });
+    cfg = r.config;
+    meter.style.display = 'none';
+    status.innerHTML = `<b>Loaded</b> ${r.cached ? 'from your browser cache' : 'in ' + (r.fetchMs / 1000).toFixed(1) + ' s'}. ` +
+      `${cfg.arch}, ${(cfg.params / 1e6).toFixed(0)}M parameters: ${cfg.n_layers} layers, d_model ${cfg.d_model}, ` +
+      `${cfg.n_heads} query / ${cfg.n_kv_heads} KV heads of ${cfg.head_dim}, vocab ${nf(cfg.vocab)}.`;
+    btn.textContent = 'Loaded';
+    box.dataset.ready = 'yes';
+    $('#insL').max = cfg.n_layers;
+    $('#insL').value = Math.min(cfg.n_layers, 4);
+    buildHeads();
+    await tokenize();
+    await inspect();
+    stats();
+  } catch (err) {
+    fail(err);
+    btn.disabled = false;
+  }
+});
+
+/* ---------- A: tokens and embeddings ---------- */
+let tokTimer = 0, tokSeq = 0;
+$('#tokIn').addEventListener('input', () => { clearTimeout(tokTimer); tokTimer = setTimeout(tokenize, 80); });
+async function tokenize() {
+  if (!worker) return;
+  const my = ++tokSeq, text = $('#tokIn').value;
+  const r = await call('tokenize', { text });
+  if (my !== tokSeq) return;
+  $('#tokN').textContent = r.tokens.length;
+  $('#tokCpt').textContent = r.tokens.length ? (text.length / r.tokens.length).toFixed(2) : '—';
+  $('#tokChips').innerHTML = r.tokens.map(([id, p]) =>
+    `<button type="button" data-id="${id}" data-p="${esc(p)}" aria-pressed="false">${esc(vis(p))}<small>${id}</small></button>`).join('');
+}
+$('#tokChips').addEventListener('click', async e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  $('#tokChips').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  const id = +b.dataset.id, piece = b.dataset.p;
+  const [emb, nn] = await Promise.all([call('embedding', { token: id }), call('neighbors', { token: id, k: 12 })]);
+  $('#embBox').hidden = false;
+  $('#embTitle').textContent = `token ${id}, “${vis(piece)}”: ${emb.vec.length} numbers`;
+  lastEmb = emb.vec;
+  drawEmb();
+  $('#embNear').innerHTML = nn.near.map(([p, s]) => `<span>${esc(vis(p))} <i>${s.toFixed(2)}</i></span>`).join('');
+});
+let lastEmb = null;
+function drawEmb() {
+  if (!lastEmb) return;
+  const { x, w, h } = canvas($('#embCv'), 70);
+  x.clearRect(0, 0, w, h);
+  const n = lastEmb.length, bw = w / n;
+  const mx = Math.max(...lastEmb.map(Math.abs)) || 1;
+  const pos = C('--acc'), neg = C('--miss');
+  x.fillStyle = C('--rule'); x.fillRect(0, h / 2, w, 1);
+  for (let i = 0; i < n; i++) {
+    const v = lastEmb[i] / mx, bh = Math.abs(v) * (h / 2 - 2);
+    x.fillStyle = v >= 0 ? pos : neg;
+    x.fillRect(i * bw, v >= 0 ? h / 2 - bh : h / 2, Math.max(bw, 1), bh);
+  }
+}
+redraws.push(drawEmb);
+
+/* ---------- B: inspector ---------- */
+// rows[l][h] is a list of Float32Arrays: one attention row per token so far.
+let ins = null;
+let head = -1; // -1 = average over heads
+function buildHeads() {
+  let s = `<button type="button" data-h="-1" aria-pressed="true">avg</button>`;
+  for (let h = 0; h < cfg.n_heads; h++) s += `<button type="button" data-h="${h}" aria-pressed="false">h${h}</button>`;
+  $('#insHeads').innerHTML = s;
+}
+$('#insHeads').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  head = +b.dataset.h;
+  $('#insHeads').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  drawAtt();
+});
+$('#insL').addEventListener('input', drawAtt);
+$('#insTemp').addEventListener('input', async () => {
+  $('#insTempo').value = (+$('#insTemp').value).toFixed(2);
+  if (!ins) return;
+  const r = await call('top', { temp: shownTemp() });
+  drawTop(r.top);
+});
+$('#insTempo').value = (+$('#insTemp').value).toFixed(2);
+// Greedy picks the top bar; the bars then show the model's own (T = 1) odds.
+const shownTemp = () => +$('#insTemp').value || 1;
+
+function absorb(r, fresh) {
+  const [L, H, t, ctx] = r.shape;
+  if (fresh) {
+    ins = { L, H, rows: Array.from({ length: L }, () => Array.from({ length: H }, () => [])), rms: [], toks: [], gen: 0 };
+  }
+  for (let l = 0; l < L; l++) for (let h = 0; h < H; h++) for (let i = 0; i < t; i++) {
+    const off = ((l * H + h) * t + i) * ctx;
+    ins.rows[l][h].push(r.attn.slice(off, off + ctx));
+  }
+  for (let i = 0; i < t; i++) {
+    const line = [];
+    for (let b = 0; b <= L; b++) line.push(r.rms[b * t + i]);
+    ins.rms.push(line);
+  }
+  drawTop(r.top);
+}
+
+async function inspect() {
+  const btns = [$('#insRun'), $('#insStep'), $('#insStep10')];
+  btns.forEach(b => b.disabled = true);
+  try {
+    const r = await call('inspect', { text: $('#insIn').value, chat: $('#insChat').checked, temp: shownTemp() });
+    absorb(r, true);
+    ins.toks = r.tokens;
+    $('#insT').textContent = r.tokens.length;
+    $('#insPre').textContent = `${fmtMs(r.ms)} · ${(r.tokens.length / r.ms * 1000).toFixed(0)} tok/s`;
+    $('#insDec').textContent = '—';
+    $('#insLensOut').innerHTML = '';
+    renderInsChips(); drawAtt(); drawRms();
+  } catch (err) { fail(err); }
+  btns.forEach(b => b.disabled = false);
+}
+$('#insRun').addEventListener('click', inspect);
+$('#insIn').addEventListener('keydown', e => { if (e.key === 'Enter') inspect(); });
+$('#insChat').addEventListener('change', inspect);
+
+async function step(n) {
+  if (!ins) return;
+  const btns = [$('#insRun'), $('#insStep'), $('#insStep10')];
+  btns.forEach(b => b.disabled = true);
+  try {
+    for (let i = 0; i < n; i++) {
+      const pick = +$('#insTemp').value;
+      const r = await call('step', { pick, temp: shownTemp() });
+      absorb(r, false);
+      ins.toks.push([r.tok.id, r.tok.piece]);
+      ins.gen++;
+      $('#insDec').textContent = `${fmtMs(r.ms)} · ${(1000 / r.ms).toFixed(0)} tok/s`;
+      renderInsChips(); drawAtt(); drawRms();
+      if (r.tok.done) break;
+    }
+    $('#insLensOut').innerHTML = '';
+  } catch (err) { fail(err); }
+  btns.forEach(b => b.disabled = false);
+}
+$('#insStep').addEventListener('click', () => step(1));
+$('#insStep10').addEventListener('click', () => step(10));
+
+function renderInsChips() {
+  const n = ins.toks.length, g0 = n - ins.gen;
+  $('#insChips').innerHTML = ins.toks.map(([id, p], i) => {
+    const ctrl = /^<\|.*\|>$/.test(p);
+    return `<button type="button" tabindex="-1" class="${ctrl ? 'ctrl' : ''} ${i >= g0 ? 'gen' : ''}">${esc(vis(p))}<small>${i}</small></button>`;
+  }).join('');
+  const kv = cfg.kv_bytes_per_token * n;
+  $('#insKv').textContent = `${n} × ${(cfg.kv_bytes_per_token / 1024).toFixed(0)} KB = ${fmtB(kv)}`;
+}
+
+function drawTop(top) {
+  $('#insTop').innerHTML = top.map(([id, p, pr], i) =>
+    `<span class="tk">${esc(vis(p))}</span><span class="${i === 0 ? 'in' : ''}"><span class="pb"><span style="width:${(pr * 100).toFixed(1)}%"></span></span></span><span class="num">${(pr * 100).toFixed(1)}%</span>`).join('');
+}
+
+let attGeom = null;
+function drawAtt() {
+  $('#insLo').value = $('#insL').value;
+  if (!ins) return;
+  const l = +$('#insL').value - 1, N = ins.rows[l][0].length;
+  const cv = $('#attCv');
+  const wAvail = cv.clientWidth || cv.parentElement.clientWidth;
+  const labW = Math.min(110, Math.round(wAvail * 0.3));
+  const cell = Math.max(2, Math.min(22, Math.floor((wAvail - labW) / N)));
+  const H = Math.max(120, cell * N + 4);
+  const { x, w, h } = canvas(cv, H);
+  x.clearRect(0, 0, w, h);
+  const acc = C('--acc'), ink = C('--ink'), rule = C('--rule');
+  x.font = `${Math.min(12, Math.max(8, cell - 4))}px ${C('--mono')}`;
+  x.textBaseline = 'middle'; x.textAlign = 'right';
+  for (let i = 0; i < N; i++) {
+    let row;
+    if (head >= 0) row = ins.rows[l][head][i];
+    else {
+      row = new Float32Array(ins.rows[l][0][i].length);
+      for (let hh = 0; hh < ins.H; hh++) { const r = ins.rows[l][hh][i]; for (let j = 0; j < r.length; j++) row[j] += r[j] / ins.H; }
+    }
+    for (let j = 0; j <= i && j < row.length; j++) {
+      // sqrt so the small weights are visible next to the big first-token sink
+      x.globalAlpha = Math.sqrt(row[j]);
+      x.fillStyle = acc;
+      x.fillRect(labW + j * cell, 2 + i * cell, cell - (cell > 4 ? 1 : 0), cell - (cell > 4 ? 1 : 0));
+    }
+    x.globalAlpha = 1;
+    x.strokeStyle = rule;
+    if (cell >= 9) { x.fillStyle = ink; x.fillText(vis(ins.toks[i][1]).slice(0, 12), labW - 6, 2 + i * cell + cell / 2); }
+  }
+  x.strokeStyle = rule; x.lineWidth = 1;
+  x.strokeRect(labW - 0.5, 1.5, cell * N + 1, cell * N + 1);
+  attGeom = { labW, cell, N, l };
+}
+redraws.push(drawAtt);
+$('#attCv').addEventListener('mousemove', e => {
+  if (!attGeom || !ins) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  const i = Math.floor((e.clientY - r.top - 2) / attGeom.cell), j = Math.floor((e.clientX - r.left - attGeom.labW) / attGeom.cell);
+  if (i < 0 || j < 0 || i >= attGeom.N || j > i) return;
+  let v = 0;
+  if (head >= 0) v = ins.rows[attGeom.l][head][i][j];
+  else for (let hh = 0; hh < ins.H; hh++) v += ins.rows[attGeom.l][hh][i][j] / ins.H;
+  $('#attHover').textContent = `layer ${attGeom.l + 1}, ${head >= 0 ? 'head ' + head : 'mean of heads'}: “${vis(ins.toks[i][1])}” (${i}) gives ${(v * 100).toFixed(1)}% of its attention to “${vis(ins.toks[j][1])}” (${j})`;
+});
+
+function drawRms() {
+  if (!ins) return;
+  const { x, w, h } = canvas($('#rmsCv'), 200);
+  x.clearRect(0, 0, w, h);
+  const B = ins.L + 1, pad = 28;
+  let mx = 0;
+  ins.rms.forEach(r => r.forEach(v => { if (v > mx) mx = v; }));
+  const lx = b => pad + (b / (B - 1)) * (w - pad - 8);
+  const ly = v => h - 18 - (Math.log10(v + 1e-3) - Math.log10(1e-2)) / (Math.log10(mx) - Math.log10(1e-2)) * (h - 30);
+  x.strokeStyle = C('--rule'); x.lineWidth = 1;
+  x.beginPath(); x.moveTo(pad, h - 18); x.lineTo(w - 8, h - 18); x.stroke();
+  x.fillStyle = C('--graphite'); x.font = `10px ${C('--mono')}`; x.textAlign = 'center';
+  for (let b = 0; b < B; b += 5) x.fillText(b === 0 ? 'emb' : b, lx(b), h - 5);
+  x.textAlign = 'left'; x.fillText('log RMS', 0, 10);
+  ins.rms.forEach((r, i) => {
+    const last = i === ins.rms.length - 1;
+    x.strokeStyle = last ? C('--ink') : C('--acc');
+    x.globalAlpha = last ? 1 : 0.25;
+    x.lineWidth = last ? 2 : 1;
+    x.beginPath();
+    r.forEach((v, b) => b ? x.lineTo(lx(b), ly(v)) : x.moveTo(lx(b), ly(v)));
+    x.stroke();
+  });
+  x.globalAlpha = 1;
+}
+redraws.push(drawRms);
+
+$('#insLens').addEventListener('click', async () => {
+  if (!ins) return;
+  const b = $('#insLens'); b.disabled = true;
+  try {
+    const r = await call('lens', { k: 3 });
+    let s = `<span class="h">after</span><span class="h">1st</span><span class="h">2nd</span><span class="h">3rd</span>`;
+    r.rows.forEach((row, i) => {
+      s += `<span class="h">${i === 0 ? 'emb' : 'L' + i}</span>` + row.map(([p, pr], k) =>
+        `<span class="${k === 0 ? 'top' : ''}">${esc(vis(p))} <span class="p">${(pr * 100).toFixed(0)}%</span></span>`).join('');
+    });
+    $('#insLensOut').innerHTML = s;
+    b.textContent = `Run the lens (${fmtMs(r.ms)})`;
+  } catch (err) { fail(err); }
+  b.disabled = false;
+});
+
+/* ---------- C: chat ---------- */
+const log = $('#chatLog');
+function addMsg(cls, text) {
+  const p = document.createElement('p');
+  p.className = 'msg ' + cls; p.textContent = text;
+  log.appendChild(p); log.scrollTop = log.scrollHeight;
+  return p;
+}
+async function stats() {
+  const r = await call('stats');
+  $('#chatKv').textContent = `${r.stats.tokens} tokens · ${fmtB(r.stats.kv_bytes)}`;
+  $('#chatNz').textContent = nf(r.stats.nonzero);
+}
+let chatting = false;
+async function send() {
+  const text = $('#chatIn').value.trim();
+  if (!text || chatting || !worker) return;
+  chatting = true;
+  $('#chatSend').disabled = true; $('#chatStop').disabled = false;
+  $('#chatIn').value = '';
+  addMsg('user', text);
+  const bot = addMsg('bot', '');
+  try {
+    const r = await call('chat', { text }, ev => {
+      if (ev.type === 'prefill') $('#chatPre').textContent = `${ev.ran} new tokens, ${ev.reused} reused · ${fmtMs(ev.ms)}`;
+      if (ev.type === 'chat') {
+        bot.textContent += ev.piece; log.scrollTop = log.scrollHeight;
+        if (ev.n % 4 === 0) $('#chatDec').textContent = `${ev.n} tokens · ${(ev.n / ev.ms * 1000).toFixed(0)} tok/s`;
+      }
+    });
+    $('#chatDec').textContent = `${r.n} tokens · ${(r.n / r.decodeMs * 1000).toFixed(0)} tok/s`;
+    $('#chatKv').textContent = `${r.stats.tokens} tokens · ${fmtB(r.stats.kv_bytes)}`;
+    $('#chatNz').textContent = nf(r.stats.nonzero);
+  } catch (err) { addMsg('note err', String(err.message || err)); }
+  chatting = false;
+  $('#chatSend').disabled = false; $('#chatStop').disabled = true;
+}
+$('#chatSend').addEventListener('click', send);
+$('#chatIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+$('#chatStop').addEventListener('click', () => worker && call('stop'));
+$('#chatWipe').addEventListener('click', async () => {
+  if (!worker || chatting) return;
+  const r = await call('wipe');
+  log.innerHTML = '';
+  addMsg('note', 'Forgotten. The KV caches were overwritten, and the token ids and text were zeroed as they were freed.');
+  $('#wipeOut').textContent = `nonzero floats in the caches: ${nf(r.before)} → ${nf(r.after)}`;
+  ins = null;
+  ['#insChips', '#insTop', '#insLensOut'].forEach(s => $(s).innerHTML = '');
+  const { x, w, h } = canvas($('#attCv'), 120); x.clearRect(0, 0, w, h);
+  const c2 = canvas($('#rmsCv'), 200); c2.x.clearRect(0, 0, c2.w, c2.h);
+  ['#insT', '#insPre', '#insDec', '#insKv', '#chatPre', '#chatDec'].forEach(s => $(s).textContent = '—');
+  stats();
+});
+})();
+</script>
+</body>
+</html>

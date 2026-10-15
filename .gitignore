@@ -4,6 +4,14 @@
 #   cp ~/dev/llmoxide/models/Qwen3-0.6B-Q4_K_M.gguf weights.gguf
 weights.gguf
 
+# The checkpoint the llmoxide post's lab runs, 145 MB, also over the limit and
+# also copied to the host out-of-band. Rebuild it with:
+#   curl -L -o lab/SmolLM2-135M-Instruct-Q8_0.gguf \
+#     https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/main/SmolLM2-135M-Instruct-Q8_0.gguf
+# The lab's .js and .wasm are tracked; ~/dev/llmoxide/scripts/build-lab.sh lab
+# rebuilds them.
+lab/*.gguf
+
 .DS_Store
 
 __pycache__/
