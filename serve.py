@@ -5,10 +5,12 @@
     ./serve.py 8765 --bind ''   # every interface, for a proxy on another host
     ./serve.py 443 --cert fullchain.pem --key privkey.pem   # https, unproxied
 
-Nothing here wants a real web server. Neither page fetches by ranges, so there
-is no Range support to arrange. What they want is an origin: opened as a
-file://, a page gets an opaque one and Chrome then refuses to let it read the
-weights.gguf or the .wasm sitting right beside it.
+Nothing here wants a real web server. The one thing beyond plain files is a
+single byte range, for the rl post's videos: Safari will not play an mp4 from a
+server that answers a Range request with the whole file. Otherwise what the
+pages want is an origin: opened as a file://, a page gets an opaque one and
+Chrome then refuses to let it read the weights.gguf or the .wasm sitting right
+beside it.
 
 The one header pair that is not optional is COOP/COEP, and bike/ is why. That
 folder is tools/make_web.sh's output from the bike_or_die tree, copied in whole
@@ -71,6 +73,7 @@ import argparse
 import http.server
 import ipaddress
 import pathlib
+import re
 import socket
 import socketserver
 import ssl
@@ -102,6 +105,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # Set per request in send_head, read in end_headers, which errors reach too.
     _cache_control = None
+    # Bytes left to send of a 206, or None for a whole file.
+    _range_left = None
 
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(HERE), **kw)
@@ -116,6 +121,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # so the last one's Cache-Control must not ride along with a response
         # that never reaches send_head — a 400 on a malformed request, say.
         self._cache_control = None
+        self._range_left = None
         super().handle_one_request()
 
     def send_head(self):
@@ -145,7 +151,49 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if target.suffix.lower() in (".gguf", ".gba")
             else "no-cache"
         )
+        rng = self.headers.get("Range")
+        if rng and target.is_file():
+            return self.send_range(target, rng)
         return super().send_head()
+
+    def send_range(self, target, rng):
+        # One range, bytes=a-b, bytes=a- or bytes=-n, which is all a <video>
+        # asks for. Anything else gets the whole file, as the spec allows.
+        m = re.fullmatch(r"bytes=(\d*)-(\d*)", rng.strip())
+        size = target.stat().st_size
+        if not m or m.group(1) == m.group(2) == "":
+            return super().send_head()
+        if m.group(1) == "":
+            start, end = max(0, size - int(m.group(2))), size - 1
+        else:
+            start = int(m.group(1))
+            end = min(int(m.group(2)), size - 1) if m.group(2) else size - 1
+        if start >= size or start > end:
+            self.send_response(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+            self.send_header("Content-Range", f"bytes */{size}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return None
+        f = open(target, "rb")
+        f.seek(start)
+        self._range_left = end - start + 1
+        self.send_response(HTTPStatus.PARTIAL_CONTENT)
+        self.send_header("Content-Type", self.guess_type(str(target)))
+        self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(self._range_left))
+        self.send_header("Last-Modified", self.date_time_string(int(target.stat().st_mtime)))
+        self.end_headers()
+        return f
+
+    def copyfile(self, source, outputfile):
+        if self._range_left is None:
+            return super().copyfile(source, outputfile)
+        while self._range_left > 0:
+            chunk = source.read(min(64 * 1024, self._range_left))
+            if not chunk:
+                break
+            outputfile.write(chunk)
+            self._range_left -= len(chunk)
 
     def list_directory(self, path):
         # index.html is found before this is reached, so arriving here means a
@@ -160,6 +208,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # Every Content-Type here is right, so there is no reason to let a
         # browser guess a different one.
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Accept-Ranges", "bytes")
         # Cross-origin isolation, for the threads bike/ runs on. On every
         # response rather than just that one: see the note at the top.
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")

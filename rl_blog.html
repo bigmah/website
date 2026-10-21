@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Teaching Mario to speedrun</title>
+<meta name="description" content="Reinforcement learning from the ground up: policies, environments, reward, a policy that learns live in the page, and PPO. Then puff-rs, PufferLib's trainer ported to Rust and wgpu, training agents to speedrun stars in the real Super Mario 64 with Go-Explore.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,700;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F5F8FC; --grid:#E0E8F2; --ink:#14223D; --graphite:#556176; --faint:#98A4B6;
+  --hi:#FFD93D; --hi-line:#E3AE00; --miss:#D6344D; --good:#1E8757; --panel:#FFFFFF; --rule:#C8D3E1;
+  --acc:#2F6FDE; --acc-soft:rgba(47,111,222,.12);
+  --serif:"Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
+    --hi:#FFD43B; --hi-line:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+    --acc:#6EA8FF; --acc-soft:rgba(110,168,255,.14);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0C1E32; --grid:#15304D; --ink:#E6EEF8; --graphite:#A8B7CA; --faint:#5E7591;
+  --hi:#FFD43B; --hi-line:#FFD43B; --miss:#FF6B80; --good:#4CD39A; --panel:#10263E; --rule:#25476B;
+  --acc:#6EA8FF; --acc-soft:rgba(110,168,255,.14);
+}
+*,*::before,*::after{box-sizing:inherit}
+body{
+  margin:0; color:var(--ink); background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px; background-position:-1px -1px;
+  font-family:var(--serif); font-size:clamp(18px,1.1vw + 12px,21px); line-height:1.62;
+  font-optical-sizing:auto; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:720px; margin:0 auto; padding:0 22px}
+.wide{max-width:1000px; margin-left:auto; margin-right:auto; padding:0 22px}
+p{margin:0 0 1em}
+ul,ol{padding-left:1.3em; margin:0 0 1em}
+li{margin:.2em 0}
+a{color:inherit; text-decoration-color:var(--hi-line); text-decoration-thickness:.12em; text-underline-offset:.18em}
+h1,h2,h3{font-weight:500; line-height:1.1; letter-spacing:-0.01em}
+h1{font-size:clamp(44px,7.6vw,92px); margin:0; letter-spacing:-0.035em}
+h2{font-size:clamp(30px,4.2vw,44px); margin:0 0 .55em; display:flex; gap:.45em; align-items:baseline}
+h2 .n{font-family:var(--mono); font-size:.42em; font-weight:500; color:var(--paper); background:var(--ink); border-radius:3px; padding:.12em .45em; transform:translateY(-.35em); white-space:nowrap}
+h3{font-size:1.15em; margin:1.6em 0 .4em; font-weight:700}
+code{font-family:var(--mono); font-size:.8em; background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:.05em .3em; overflow-wrap:anywhere}
+pre{font-family:var(--mono); font-size:.72em; line-height:1.65; margin:.6em 0 1.3em; padding:.9em 1.1em; background:var(--panel); border:1px solid var(--rule); border-left:4px solid var(--ink); border-radius:2px; overflow-x:auto}
+pre code{background:none; border:0; padding:0; font-size:1em; overflow-wrap:normal}
+pre .c{color:var(--faint)}
+pre .k{color:var(--good)}
+mark{background:none; color:inherit; font-weight:500; text-decoration:underline; text-decoration-color:var(--hi-line); text-decoration-thickness:.2em; text-underline-offset:.2em; text-decoration-skip-ink:none}
+
+nav.top{padding-top:28px; font-family:var(--mono); font-size:.72em}
+nav.top a{text-decoration:none; color:var(--graphite)}
+nav.top a:hover{color:var(--ink)}
+header{padding:7vh 0 2vh}
+.dek{font-size:clamp(21px,1.6vw + 12px,28px); line-height:1.4; max-width:34ch; margin:.5em 0 0; color:var(--graphite)}
+.meta{font-family:var(--mono); font-size:.68em; color:var(--graphite); margin-top:1.6em; display:flex; gap:.4em 1.4em; flex-wrap:wrap}
+.meta a{color:var(--ink)}
+.toc{list-style:none; padding:0; margin:2.2em 0 0; border-top:1.5px solid var(--ink); font-size:.92em}
+.toc li{display:grid; grid-template-columns:5.2em 1fr; gap:.8em; padding:.5em 0; border-bottom:1px solid var(--rule); margin:0}
+.toc b{font-family:var(--mono); font-weight:500; font-size:.78em; padding-top:.25em; color:var(--graphite)}
+.toc a{text-decoration:none}
+.toc a:hover{text-decoration:underline}
+
+.hero{margin-top:5vh}
+section{padding:7vh 0 1vh}
+.part{padding:12vh 0 0}
+.part .wrap{border-top:1.5px solid var(--ink); padding-top:.8em}
+.part p.kick{font-family:var(--mono); font-size:.7em; letter-spacing:.08em; text-transform:uppercase; color:var(--graphite); margin:0}
+.part h2{font-size:clamp(38px,6vw,64px); margin:.15em 0 .2em}
+.part .dek{margin-top:0}
+.lede{font-size:1.12em}
+.aside{font-size:.86em; color:var(--graphite); border-left:2px solid var(--rule); padding-left:1em; margin:1.4em 0}
+.pull{font-size:1.3em; line-height:1.3; font-style:italic; margin:1.2em 0; padding-left:.8em; border-left:4px solid var(--hi)}
+
+figure{margin:1.8em 0 2.2em}
+.fig{background:var(--panel); border:1px solid var(--rule); border-radius:4px; padding:18px; box-shadow:0 1px 0 var(--rule)}
+.fig svg{display:block; width:100%; height:auto}
+.fig canvas{display:block; width:100%; touch-action:manipulation}
+figcaption{font-size:.8em; color:var(--graphite); margin-top:.7em; line-height:1.5}
+
+video{display:block; width:100%; height:auto; background:#000; border-radius:3px}
+.vid{background:var(--panel); border:1px solid var(--rule); border-radius:4px; padding:10px; box-shadow:0 1px 0 var(--rule)}
+.vids{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+.vids > figure{margin:0; min-width:0}
+@media (max-width:760px){.vids{grid-template-columns:1fr}}
+.stat{font-family:var(--mono); font-weight:500}
+
+svg text{font-family:var(--mono); fill:var(--ink); font-size:13px}
+svg .sm{font-size:11px; fill:var(--graphite)}
+svg .lbl{font-family:var(--serif); font-size:16px}
+svg .box{fill:var(--panel); stroke:var(--ink); stroke-width:1.5}
+svg .soft{fill:var(--grid); stroke:var(--rule); stroke-width:1}
+svg .hi{fill:var(--hi); stroke:#14223D; stroke-width:1.5}
+svg text.on-hi{fill:#14223D}
+svg .acc{fill:var(--acc-soft); stroke:var(--acc); stroke-width:1.5}
+svg .edge{stroke:var(--ink); stroke-width:1.5; fill:none}
+svg .dash{stroke:var(--graphite); stroke-width:1.5; fill:none; stroke-dasharray:4 4}
+svg .arrow{fill:var(--ink)}
+
+table{border-collapse:collapse; width:100%; font-size:.82em; margin:.6em 0 1.4em}
+th,td{text-align:left; padding:.45em .6em; border-bottom:1px solid var(--rule); vertical-align:top}
+th{font-weight:700; border-bottom:1.5px solid var(--ink)}
+td.num,th.num{text-align:right; font-family:var(--mono); font-size:.92em; white-space:nowrap}
+tr.best td{font-weight:700}
+.tbl{overflow-x:auto}
+
+.controls{display:flex; flex-wrap:wrap; gap:10px 12px; align-items:center; margin-top:14px; font-size:.82em}
+button{
+  font-family:var(--serif); font-size:.95em; cursor:pointer; color:var(--ink); background:transparent;
+  border:1.5px solid var(--ink); border-radius:3px; padding:.4em .9em; line-height:1.2;
+}
+button:hover{background:var(--grid)}
+button.go{background:var(--hi); color:#14223D; border-color:#14223D; font-weight:500}
+button.go:hover{filter:brightness(.95)}
+button:disabled{opacity:.45; cursor:default}
+button:focus-visible{outline:3px solid var(--hi); outline-offset:2px}
+.check{display:flex; gap:.45em; align-items:center; cursor:pointer}
+.check input{accent-color:var(--ink); width:1.05em; height:1.05em}
+.readout{display:flex; flex-wrap:wrap; gap:10px 26px; margin-top:12px; font-size:.8em; color:var(--graphite)}
+.readout b{display:block; font-family:var(--mono); font-weight:500; font-size:1.3em; color:var(--ink)}
+.gridpair{display:grid; grid-template-columns:3fr 2fr; gap:18px; align-items:start}
+.gridpair > div{min-width:0}
+@media (max-width:760px){.gridpair{grid-template-columns:1fr}}
+.subt{font-size:.78em; font-weight:700; margin:0 0 4px}
+
+footer{padding:10vh 0 8vh; font-size:.85em; color:var(--graphite)}
+footer .wrap{border-top:1.5px solid var(--ink); padding-top:1em; display:flex; justify-content:space-between; gap:1em; flex-wrap:wrap}
+@media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
+</style>
+</head>
+<body>
+
+<nav class="top"><div class="wrap"><a href="index.html">← bigmah</a></div></nav>
+
+<header>
+  <div class="wrap">
+    <h1>Teaching Mario to speedrun</h1>
+    <p class="dek">How reinforcement learning works, from the loop at its heart up to PPO. Then an agent that teaches itself to speedrun stars in the real Super Mario 64.</p>
+    <div class="meta"><span>oct 21, 2026</span><span>for programmers</span><span><a href="https://github.com/bigmah/puff-rs" target="_blank" rel="noopener noreferrer">github.com/bigmah/puff-rs</a></span></div>
+    <ol class="toc">
+      <li><b>part 1</b><a href="#p1">Reinforcement learning: the loop, reward, a policy that learns in this page, and PPO</a></li>
+      <li><b>part 2</b><a href="#p2">Super Mario 64: PufferLib, the game as an environment, Go-Explore</a></li>
+      <li><b>results</b><a href="#results">Stars, with video</a></li>
+    </ol>
+  </div>
+  <div class="wrap hero">
+    <figure>
+      <div class="vid">
+        <video src="rl/slide-674.mp4" poster="rl/slide-674.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Mario goes down Peach's Secret Slide, jumps off the upper track, falls onto the lower one and takes the star"></video>
+      </div>
+      <figcaption>Peach's Secret Slide, start to star in <span class="stat">674 frames</span> (22.5 seconds), by a route training found on its own. Ten seconds in it jumps off the upper track and falls 6,750 units onto the lower one.</figcaption>
+    </figure>
+  </div>
+</header>
+
+<main>
+<section id="intro">
+  <div class="wrap">
+    <p class="lede">Reinforcement learning is getting a lot more attention lately, mostly because of its role in post-training LLMs. The models that “think” before they answer got that way through RL.</p>
+    <p>It's also a field that's hard to learn from the ground up. The literature takes quite a journey to get from its beginnings to what people actually use today: bandits, Markov decision processes, Bellman equations, dynamic programming, Q-learning, then deep Q-networks, policy gradients, TRPO, and finally PPO. A lot of that history doesn't translate to what's important now. You can get a long way on a few ideas, and this post tries to give you exactly those.</p>
+    <p>It comes in two parts. The first is the basic formulation and the algorithm underneath nearly everything, with a tiny agent you can train right here in the page. The second is a real project: <a href="https://github.com/bigmah/puff-rs" target="_blank" rel="noopener noreferrer">puff-rs</a>, which trains agents to speedrun stars in Super Mario 64, the actual cartridge, recompiled to native code. Along the way it covers <a href="https://github.com/PufferAI/PufferLib" target="_blank" rel="noopener noreferrer">PufferLib</a>, the library it's built on, and Go-Explore, the trick that got it to its first stars.</p>
+    <p class="aside">If neural networks themselves are new to you, <a href="neural_network.html">How do neural networks work?</a> covers them. Here they're just a function with knobs that gradient descent can turn.</p>
+  </div>
+</section>
+
+<!-- ================================================================ PART 1 -->
+<section class="part" id="p1">
+  <div class="wrap">
+    <p class="kick">part 1</p>
+    <h2>Reinforcement learning</h2>
+    <p class="dek">One loop, one number, and a way to learn from it.</p>
+  </div>
+</section>
+
+<section id="loop">
+  <div class="wrap">
+    <h2><span class="n">1</span>The loop</h2>
+    <p>Like the rest of machine learning, RL is about learning a function from data. The function we want is called a <mark>policy</mark>. It takes in an observation of some environment and puts out an action:</p>
+<pre><code>action = policy(observation)</code></pre>
+    <p>What makes RL its own thing is that the policy isn't labeling a fixed dataset. Its actions go back into an <mark>environment</mark>, which changes because of them, and hands back the next observation:</p>
+<pre><code>observation = environment(action)</code></pre>
+    <p>Put the two together and you get a loop that looks a lot like playing a game:</p>
+<pre><code>observation = environment.reset()
+<span class="k">while</span> True:
+    action = policy(observation)
+    observation = environment(action)</code></pre>
+    <p>That's the heart of RL. Everything else is about making the policy good.</p>
+    <figure>
+      <div class="fig">
+        <svg viewBox="0 0 640 210" role="img" aria-label="The policy sends an action to the environment, which sends an observation back to the policy">
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrow"/></marker></defs>
+          <rect x="30" y="60" width="200" height="90" rx="6" class="hi"/>
+          <text x="130" y="100" text-anchor="middle" class="lbl on-hi">policy</text>
+          <text x="130" y="124" text-anchor="middle" class="sm" style="fill:#14223D">a neural network</text>
+          <rect x="410" y="60" width="200" height="90" rx="6" class="box"/>
+          <text x="510" y="100" text-anchor="middle" class="lbl">environment</text>
+          <text x="510" y="124" text-anchor="middle" class="sm">the game</text>
+          <path d="M230 82 C300 30 340 30 410 82" class="edge" marker-end="url(#ah)"/>
+          <text x="320" y="36" text-anchor="middle">action</text>
+          <text x="320" y="52" text-anchor="middle" class="sm">stick left, hold A</text>
+          <path d="M410 128 C340 180 300 180 230 128" class="edge" marker-end="url(#ah)"/>
+          <text x="320" y="178" text-anchor="middle">observation</text>
+          <text x="320" y="194" text-anchor="middle" class="sm">position, speed, floor below …</text>
+        </svg>
+      </div>
+      <figcaption>The loop. The policy acts, the environment responds, and around it goes, fifteen times a second for Mario.</figcaption>
+    </figure>
+    <p>For Mario, an observation is a list of numbers: where he is, how fast he's going, which way he faces, whether he's in the air, how high the floor is around him. An action is what you'd do with a controller: push the stick some direction, hold A or don't, hold B or don't, hold Z or don't. One trip around the loop is one <mark>step</mark>. A run from start to finish, whether that's grabbing the star, falling off the course or running out of time, is an <mark>episode</mark>.</p>
+  </div>
+</section>
+
+<section id="imitation">
+  <div class="wrap">
+    <h2><span class="n">2</span>Copying someone</h2>
+    <p>How does a policy learn which action to take given which observation? The simplest approach is <mark>imitation learning</mark>. Record someone good playing the game, save every (observation, action) pair, and you have a labeled dataset:</p>
+<pre><code><span class="c"># a few hours of a human playing</span>
+dataset = [(obs_0, action_0), (obs_1, action_1), ...]
+
+<span class="c"># ordinary supervised learning: predict the human's action</span>
+<span class="k">for</span> obs, action <span class="k">in</span> dataset:
+    loss = cross_entropy(policy(obs), action)
+    loss.backward(); optimizer.step()</code></pre>
+    <p>This works, and it's essentially how an LLM is pretrained: copy the next word a human wrote. But it has a ceiling built in. A policy trained to copy a player is at best as good as the player. Worse, it's only seen the situations the player got into. Once its own small mistakes push it somewhere the player never went, it has no data for it, and the mistakes compound.</p>
+  </div>
+</section>
+
+<section id="superhuman">
+  <div class="wrap">
+    <h2><span class="n">3</span>Past the teacher</h2>
+    <p>The magic of RL is that it isn't capped by anyone's examples. It can find things no human would.</p>
+    <ul>
+      <li><b>TD-Gammon</b> (1992) taught itself backgammon by playing itself, and changed how top humans played some opening moves.</li>
+      <li><b>DQN</b> (2013–15) learned dozens of Atari games from the pixels and the score alone, with the same network and settings for every game.</li>
+      <li><b>AlphaGo</b> (2016) beat Lee Sedol, and its move 37 in game two was one that professionals first took for a mistake. It started from imitating human games and then improved by playing itself. Its successors, <b>AlphaGo Zero</b> and <b>AlphaZero</b>, skipped the human games entirely and got stronger.</li>
+      <li><b>OpenAI Five</b> and <b>AlphaStar</b> (2019) reached the top level of Dota 2 and StarCraft II.</li>
+      <li><b>Reasoning LLMs</b> (2024 on) are trained with RL on problems whose answers can be checked, and learn to work through long chains of thought nobody wrote down for them.</li>
+    </ul>
+    <p>What all of these have in common is that learning wasn't confined to a dataset. It came from interacting with the environment itself. For that to work, the environment has to say whether things are going well.</p>
+  </div>
+</section>
+
+<section id="reward">
+  <div class="wrap">
+    <h2><span class="n">4</span>Reward</h2>
+    <p>That's where <mark>reward</mark> comes in. Along with each observation, the environment hands back a single number saying how good the last step was. We decide what good and bad mean by deciding where that number comes from.</p>
+<pre><code>observation = environment.reset()
+<span class="k">while</span> True:
+    action = policy(observation)
+    observation, reward, done = environment(action)
+    <span class="k">if</span> done:
+        observation = environment.reset()</code></pre>
+    <p>For a star in Mario the reward can be very simple: +1 for touching the star, and a small cost for every frame that passes, so sooner is better. Nobody tells the policy how to get there. Its only job is to make the total reward of an episode, the <mark>return</mark>, as large as possible.</p>
+    <p>Rewards a few steps from now usually count for a bit less than reward right now. The return from step <code>t</code> is</p>
+<pre><code>G_t = r_t + γ·r_(t+1) + γ²·r_(t+2) + …       <span class="c"># γ (gamma) around 0.97 to 0.999</span></code></pre>
+    <p>which answers the question “from here, doing what I did, how did things turn out?” That is the signal everything learns from. And notice the hard part: if the policy has never once touched the star, every episode returns the same bad number, and there's nothing to learn from at all. Keep that in mind for part 2.</p>
+  </div>
+</section>
+
+<section id="gridworld">
+  <div class="wrap">
+    <h2><span class="n">5</span>A whole example, live</h2>
+    <p>Here's all of it in one small place. The environment is a grid. The agent starts in the bottom-left corner and the star is in the top-right. The red squares are pits. Four actions: up, right, down, left.</p>
+    <ul>
+      <li><b>Observation:</b> which square the agent is on.</li>
+      <li><b>Reward:</b> +1 for the star, −0.3 for falling in a pit, −0.01 for every step. An episode ends at the star, in a pit, or after 80 steps.</li>
+      <li><b>Policy:</b> a table with four numbers for each square, turned into probabilities with a softmax. It starts out all zeros, so every action is equally likely: a random walk.</li>
+    </ul>
+    <p>Press train. Each episode plays the current policy, then nudges each square's numbers toward the actions that turned out better than expected and away from the ones that turned out worse. The arrows show the policy: the longer an arrow, the more likely that move.</p>
+  </div>
+  <div class="wrap">
+    <figure>
+      <div class="fig">
+        <div class="gridpair">
+          <div>
+            <canvas id="gw" height="300" aria-label="A grid world: the agent's policy drawn as arrows in each square"></canvas>
+          </div>
+          <div>
+            <p class="subt">success rate, last 100 episodes</p>
+            <canvas id="gwChart" height="160" aria-label="Success rate over training"></canvas>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="go" id="gwTrain">train 100 episodes</button>
+          <button id="gwPlay">play one episode</button>
+          <button id="gwReset">reset</button>
+          <label class="check"><input type="checkbox" id="gwValue"> show value</label>
+        </div>
+        <div class="readout">
+          <span>episodes<b id="gwEp">0</b></span>
+          <span>reached the star<b id="gwRate">—</b></span>
+          <span>steps, last win<b id="gwSteps">—</b></span>
+        </div>
+      </div>
+      <figcaption>Reinforcement learning on a 7×5 grid, running in your browser. Usually it finds the star within a couple of hundred episodes and the shortest way there a few hundred later. Now and then a seed learns to fear the pits first and takes longer. “Show value” shades each square by how much return the agent expects from there.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <p>The whole learning rule fits in a few lines. This is the code running above:</p>
+<pre><code><span class="k">def</span> train_one_episode():
+    trajectory = play(policy)                  <span class="c"># [(square, action, reward), ...]</span>
+    G = 0
+    <span class="k">for</span> square, action, reward <span class="k">in</span> reversed(trajectory):
+        G = reward + gamma * G                 <span class="c"># the return from this step</span>
+        advantage = G - value[square]          <span class="c"># better or worse than usual from here?</span>
+        value[square] += 0.1 * advantage       <span class="c"># update what's usual</span>
+        probs = softmax(logits[square])
+        <span class="k">for</span> a <span class="k">in</span> range(4):                     <span class="c"># the gradient of log probs[action]</span>
+            logits[square][a] += lr * advantage * ((a == action) - probs[a])</code></pre>
+    <p>This is a <mark>policy gradient</mark> (REINFORCE, with a baseline). Two ideas are doing all the work:</p>
+    <ul>
+      <li><b>Try things, and do more of what worked.</b> The term <code>(a == action) - probs[a]</code> is the gradient of the log-probability of the action taken. Following it makes that action more likely. Multiplying by the advantage decides which way and how far.</li>
+      <li><b>“Worked” means “better than expected.”</b> The <code>value</code> table is a running guess of the return from each square. Subtracting it means an action is only reinforced if it did better than the agent usually does from there. Without it, every action in a winning episode gets credit, including the dumb ones.</li>
+    </ul>
+    <p>Replace the table with a neural network and the square with a real observation, and that's the core of modern RL.</p>
+  </div>
+</section>
+
+<section id="ppo">
+  <div class="wrap">
+    <h2><span class="n">6</span>PPO, which is just a neural network</h2>
+    <p>The workhorse algorithm in RL today, for robots, for games and (with variations) for LLM post-training, is <mark>PPO</mark>: proximal policy optimization (<a href="https://arxiv.org/abs/1707.06347" target="_blank" rel="noopener noreferrer">Schulman et al., 2017</a>). It's the grid example above with three upgrades.</p>
+    <h3>The policy and the value are one network</h3>
+    <p>The tables become a neural network. The observation goes in. Out come <em>logits</em>, one per possible action, which a softmax turns into probabilities to sample from, plus one extra number: the <em>value</em>, the network's guess of the return from here. That's the same <code>value</code> table, now a second head on the same network.</p>
+<pre><code>logits, value = network(observation)
+action = sample(softmax(logits))</code></pre>
+    <p>When the action has parts, like a stick direction and three buttons, there's one group of logits per part, called a <em>head</em>, and each is sampled separately.</p>
+    <h3>Collect a batch, then learn from it</h3>
+    <p>Instead of learning after every episode, PPO runs many copies of the environment at once for a fixed number of steps, the <em>horizon</em>, and stores everything: observations, actions, the probability each action had, rewards, values and where episodes ended. Then it learns from that whole batch.</p>
+    <h3>Better advantages</h3>
+    <p>The full return <code>G</code> is noisy: it lumps together everything that happened for the rest of the episode. PPO usually uses <em>generalized advantage estimation</em> (GAE), which leans on the value head to judge each step more locally:</p>
+<pre><code>δ_t = r_t + γ·V(s_(t+1)) - V(s_t)            <span class="c"># how much better this step went than expected</span>
+A_t = δ_t + (γλ)·δ_(t+1) + (γλ)²·δ_(t+2) + …  <span class="c"># λ around 0.95 blends near and far</span></code></pre>
+    <h3>Don't move too far at once</h3>
+    <p>This is the “proximal” part. The batch was collected by the old policy, but we want to take several gradient steps on it. If the policy changes a lot, the batch stops describing what the policy now does, and learning can fall off a cliff. So PPO compares the new probability of each action to the old one, and clips that ratio to stay within about 20%:</p>
+<pre><code>ratio  = new_prob(action) / old_prob(action)
+loss_π = -min(ratio * A, clip(ratio, 1 - 0.2, 1 + 0.2) * A)
+loss_V = (value - return)²
+loss   = loss_π + 0.5 * loss_V - 0.01 * entropy  <span class="c"># entropy: keep some randomness</span></code></pre>
+    <p>The whole algorithm, then:</p>
+<pre><code><span class="k">while</span> training:
+    <span class="c"># 1. collect: run the current policy in N environments for `horizon` steps</span>
+    <span class="k">for</span> t <span class="k">in</span> range(horizon):
+        logits, values[t] = network(obs)
+        actions[t] = sample(logits); old_probs[t] = prob(logits, actions[t])
+        obs, rewards[t], dones[t] = envs.step(actions[t])
+
+    <span class="c"># 2. judge: how much better than expected was each action?</span>
+    advantages = gae(rewards, values, dones)
+
+    <span class="c"># 3. learn: a few passes of gradient descent over minibatches of the batch</span>
+    <span class="k">for</span> minibatch <span class="k">in</span> shuffle(batch):
+        loss = ppo_loss(network, minibatch, advantages)
+        loss.backward(); optimizer.step()</code></pre>
+    <p>That's it. Everything that makes it work in practice is in the details: how big the batch is, how the network carries memory between steps, how fast the environment can be stepped. Which brings us to Mario.</p>
+  </div>
+</section>
+
+<!-- ================================================================ PART 2 -->
+<section class="part" id="p2">
+  <div class="wrap">
+    <p class="kick">part 2</p>
+    <h2>Super Mario 64</h2>
+    <p class="dek">PufferLib, the real cartridge as an environment, and Go-Explore.</p>
+  </div>
+</section>
+
+<section id="puffer">
+  <div class="wrap">
+    <h2><span class="n">7</span>PufferLib</h2>
+    <p><a href="https://github.com/PufferAI/PufferLib" target="_blank" rel="noopener noreferrer">PufferLib</a> is a super sensible and very fast RL library. Its environments are written in plain C, its trainer is one tight program, and its defaults work without much tuning. On a single GPU it trains simple environments at millions of steps a second. Most RL code spends its time in Python glue between the game and the network. PufferLib's whole design is about not doing that.</p>
+    <p>The core of it is a <mark>data contract</mark>. For every agent, in every copy of every environment, there are four flat arrays the trainer and the environments share:</p>
+<pre><code>observations  float[num_agents][obs_size]    <span class="c"># env writes, trainer reads</span>
+actions       float[num_agents][num_heads]   <span class="c"># trainer writes, env reads</span>
+rewards       float[num_agents]              <span class="c"># env writes, trainer reads</span>
+terminals     float[num_agents]              <span class="c"># env writes: 1 where an episode just ended</span></code></pre>
+    <figure>
+      <div class="fig">
+        <svg viewBox="0 0 640 250" role="img" aria-label="Four shared buffers, one row per agent. The trainer writes actions and reads observations, rewards and terminals. Each environment owns its rows.">
+          <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrow"/></marker></defs>
+          <rect x="10" y="95" width="110" height="60" rx="5" class="hi"/>
+          <text x="65" y="122" text-anchor="middle" class="on-hi">trainer</text>
+          <text x="65" y="139" text-anchor="middle" class="sm" style="fill:#14223D">GPU</text>
+          <g>
+            <text x="170" y="28" class="sm">observations</text>
+            <text x="352" y="28" class="sm">actions</text>
+            <text x="426" y="28" class="sm">rew</text>
+            <text x="464" y="28" class="sm">term</text>
+          </g>
+          <g id="rows"></g>
+          <rect x="520" y="38" width="110" height="88" rx="5" class="box"/>
+          <text x="575" y="78" text-anchor="middle">env 0</text>
+          <text x="575" y="95" text-anchor="middle" class="sm">agents 0–3</text>
+          <rect x="520" y="134" width="110" height="88" rx="5" class="box"/>
+          <text x="575" y="174" text-anchor="middle">env 1</text>
+          <text x="575" y="191" text-anchor="middle" class="sm">agents 4–7</text>
+          <path d="M120 115 L146 115" class="edge" marker-end="url(#ah2)"/>
+          <path d="M146 135 L120 135" class="edge" marker-end="url(#ah2)"/>
+          <text x="320" y="244" text-anchor="middle" class="sm">one row per agent · each env holds pointers into its own rows</text>
+        </svg>
+      </div>
+      <figcaption>The data contract. Eight agents in two environments: each environment reads its rows of <code>actions</code> and writes its rows of the rest. Nothing is copied or serialized. A step is everyone reading and writing memory in place.</figcaption>
+    </figure>
+    <p>Stepping every environment is then a loop over indices. It's the same <code>observation = environment(action)</code> from part 1, done for every agent at once, with no allocation and no copying:</p>
+<pre><code><span class="c">// vecenv.c, simplified: one step of every env, in parallel on CPU threads</span>
+memset(rewards, 0, num_agents * sizeof(float));
+memset(terminals, 0, num_agents * sizeof(float));
+#pragma omp parallel for
+<span class="k">for</span> (int i = 0; i &lt; num_envs; i++) {
+    puf_step(&amp;envs[i]);   <span class="c">// reads its actions, writes its observations, rewards, terminals</span>
+}</code></pre>
+    <p>And the trainer's side of it, collecting one horizon:</p>
+<pre><code><span class="k">for</span> t <span class="k">in</span> range(horizon):                <span class="c"># 128 steps</span>
+    logits, value = policy(observations)    <span class="c"># all agents at once, on the GPU</span>
+    actions[:] = sample(logits)             <span class="c"># written straight into the shared buffer</span>
+    vec_step()                              <span class="c"># every env steps, on CPU threads</span>
+    store(observations, actions, rewards, terminals, logits, value)</code></pre>
+
+    <h3>What it means to be a Puffer env</h3>
+    <p>A PufferLib environment is a C header that defines a struct called <code>Env</code> and a handful of functions. The struct holds whatever the game needs, plus an <code>Agent</code> for each agent it runs, whose pointers the vecenv aims at that agent's rows of the four buffers. The functions are:</p>
+<pre><code><span class="k">void</span> puf_init(Env* env, Dict* config);   <span class="c">// read settings from the .ini, allocate</span>
+<span class="k">void</span> puf_reset(Env* env);                <span class="c">// start an episode, write the first observation</span>
+<span class="k">void</span> puf_step(Env* env);                 <span class="c">// read actions, advance, write obs/rewards/terminals</span>
+<span class="k">void</span> puf_render(Env* env);               <span class="c">// draw it, for watching</span>
+<span class="k">void</span> puf_close(Env* env);
+<span class="c">// plus a Log struct of floats, summed over finished episodes for the dashboard</span></code></pre>
+    <p>Here's the step function of the 2D platformer in puff-rs, the trainer's smoke test, trimmed a little. It's an ordinary game update that happens to read its controller from <code>agent-&gt;actions</code> and write its score to <code>agent-&gt;rewards</code>:</p>
+<pre><code><span class="k">void</span> puf_step(Platformer* env) {
+    Agent* agent = &amp;env-&gt;agents[0];
+    int move = agent-&gt;actions[0];          <span class="c">// head 0: none, left, right</span>
+    int vert = agent-&gt;actions[1];          <span class="c">// head 1: none, jump, drop</span>
+    <span class="k">for</span> (int i = 0; i &lt; env-&gt;frameskip; i++) {
+        int outcome = physics_tick(env, move, vert);
+        <span class="c">// pay for new ground covered toward the flag; the whole level is worth 1</span>
+        <span class="k">if</span> (player_x &gt; env-&gt;best_x) {
+            agent-&gt;rewards[0] += (player_x - env-&gt;best_x) * progress_scale;
+            env-&gt;best_x = player_x;
+        }
+        <span class="k">if</span> (outcome == TICK_GOAL)  { agent-&gt;rewards[0] += 1.0f; end_episode(env); <span class="k">return</span>; }
+        <span class="k">if</span> (outcome == TICK_DEATH) { agent-&gt;rewards[0] -= 0.1f; end_episode(env); <span class="k">return</span>; }
+    }
+    compute_observations(env);             <span class="c">// write agent-&gt;observations</span>
+}</code></pre>
+    <p>There's no Python, no gym wrapper and no inter-process messaging between the game and the trainer. It's why a Puffer env can step millions of times a second, and why an environment as heavy as a whole Nintendo 64 still fits the same mold.</p>
+  </div>
+</section>
+
+<section id="trainer">
+  <div class="wrap">
+    <h2><span class="n">8</span>The Puffer net, and the trainer</h2>
+    <p>PufferLib 5.0's default policy is small, and that's on purpose. When an environment steps millions of times a second, a big network becomes the bottleneck, and in RL more experience usually beats more parameters.</p>
+    <figure>
+      <div class="fig">
+        <svg viewBox="0 0 640 200" role="img" aria-label="Observation into a linear encoder, then four MinGRU layers carrying a hidden state from step to step, then a decoder producing action logits for each head and a value">
+          <defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrow"/></marker></defs>
+          <rect x="6" y="70" width="96" height="56" rx="5" class="soft"/>
+          <text x="54" y="95" text-anchor="middle">obs</text>
+          <text x="54" y="112" text-anchor="middle" class="sm">292 floats</text>
+          <path d="M102 98 L128 98" class="edge" marker-end="url(#ah3)"/>
+          <rect x="130" y="70" width="100" height="56" rx="5" class="box"/>
+          <text x="180" y="95" text-anchor="middle">encoder</text>
+          <text x="180" y="112" text-anchor="middle" class="sm">linear → 128</text>
+          <path d="M230 98 L256 98" class="edge" marker-end="url(#ah3)"/>
+          <rect x="258" y="60" width="140" height="76" rx="5" class="hi"/>
+          <text x="328" y="92" text-anchor="middle" class="on-hi">MinGRU ×4</text>
+          <text x="328" y="110" text-anchor="middle" class="sm" style="fill:#14223D">hidden 128</text>
+          <path d="M300 60 C300 22 356 22 356 60" class="dash" marker-end="url(#ah3)"/>
+          <text x="328" y="18" text-anchor="middle" class="sm">memory, step to step</text>
+          <path d="M398 98 L424 98" class="edge" marker-end="url(#ah3)"/>
+          <rect x="426" y="70" width="90" height="56" rx="5" class="box"/>
+          <text x="471" y="95" text-anchor="middle">decoder</text>
+          <text x="471" y="112" text-anchor="middle" class="sm">one matrix</text>
+          <path d="M516 86 L540 62" class="edge" marker-end="url(#ah3)"/>
+          <path d="M516 110 L540 134" class="edge" marker-end="url(#ah3)"/>
+          <text x="545" y="52">logits</text>
+          <text x="545" y="68" class="sm">17 + 2 + 2 + 2</text>
+          <text x="545" y="146">value</text>
+          <text x="545" y="162" class="sm">the last row</text>
+        </svg>
+      </div>
+      <figcaption>The Puffer net with Mario's numbers. The decoder's last row is the value head, so the policy and the critic share everything but one row of weights.</figcaption>
+    </figure>
+    <ul>
+      <li><b>Encoder.</b> One bias-free linear layer from the observation to 128 numbers. If the observation includes a picture, three convolutions from the classic Atari DQN go in front.</li>
+      <li><b>MinGRU.</b> Four layers of a minimal recurrent unit. This is the policy's memory: it carries a hidden state from step to step, so it can know it pressed jump a moment ago, or that it's been falling for a second. Its state carries across horizons and clears when an episode ends. A MinGRU's gates depend only on the input, not the previous state, so a whole training segment can be computed as a parallel scan instead of one step at a time.</li>
+      <li><b>Decoder.</b> One matrix from the hidden state to every head's logits plus the value.</li>
+    </ul>
+    <p>The training algorithm is PPO as described above, with a few 5.0 choices: advantages are computed per minibatch from fresh values (GAE, or V-trace), and the optimizer is <a href="https://kellerjordan.github.io/posts/muon/" target="_blank" rel="noopener noreferrer">Muon</a>, which orthogonalizes each weight matrix's update instead of scaling it per parameter as Adam does.</p>
+    <h3>puff-rs: the trainer on any GPU</h3>
+    <p>PufferLib 5.0 trains with one CUDA program, which only runs on NVIDIA cards. I wanted it on a Mac. So <a href="https://github.com/bigmah/puff-rs" target="_blank" rel="noopener noreferrer">puff-rs</a> is that trainer ported to Rust on <a href="https://wgpu.rs" target="_blank" rel="noopener noreferrer">wgpu</a>, which runs on Metal, Vulkan or DX12. There's no CUDA, no Python and no autograd: every forward and backward pass is a hand-written WGSL compute kernel, the way the CUDA original hand-writes its own. A matmul kernel stands in for cuBLAS, the MinGRU gets a scan forward and backward, the PPO loss computes its gradient in the same pass, and Muon does five Newton-Schulz iterations on the GPU.</p>
+    <p>Every shape is known when training starts, so every GPU dispatch is built once. A minibatch is 146 dispatches, which the CPU encodes in 0.2 ms. All the weights live in one buffer in PufferLib's checkpoint layout, so saving a checkpoint is writing that buffer to disk, and PufferLib's own tools can read it. Tests check every gradient against golden numbers from an autograd implementation.</p>
+    <p>On an M4 Pro, the platformer trains at 445,000 steps a second with 1,024 agents, and reaches the flag in 99.7% of episodes after 45 seconds of training. Super Mario 64 is a different story, because each “environment” is a whole game.</p>
+  </div>
+</section>
+
+<section id="sm64">
+  <div class="wrap">
+    <h2><span class="n">9</span>The game as an environment</h2>
+    <p>The game isn't emulated, and it isn't reimplemented. <a href="https://github.com/N64Recomp/N64Recomp" target="_blank" rel="noopener noreferrer">N64Recomp</a> showed that an N64 cartridge's MIPS machine code can be <em>statically recompiled</em>: translated, ahead of time, into C, and compiled into a native program that runs the original game logic directly on your CPU. <a href="https://github.com/bigmah/n64bundler" target="_blank" rel="noopener noreferrer">N64Bundler</a>, a separate project of mine, packages that up: give it your ROM, and it recompiles it and runs it.</p>
+    <p>For RL, its important feature is a gym mode, which hands control of the console to another process. Three properties make training possible:</p>
+    <ul>
+      <li><b>The game runs off the clock.</b> It advances one frame when the environment asks, as fast as the machine can manage. Headless, that's about 5,000 frames a second per game, around 170 times real time.</li>
+      <li><b>Steps are deterministic.</b> A frame is over when every thread of the game is parked waiting on the hardware, and that's checked rather than waited out. The same inputs from the same state give the same Mario, to the bit.</li>
+      <li><b>Savestates.</b> The console's 8 MB of memory plus the registers of each of the game's threads. Every episode starts by loading one.</li>
+    </ul>
+    <figure>
+      <div class="fig">
+        <svg viewBox="0 0 640 230" role="img" aria-label="The trainer on the GPU shares buffers with the sm64 env in the vecenv library. Each env drives one n64b-run process through a socket, and reads Mario from the console's 8 MB of memory, mapped into both processes.">
+          <defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrow"/></marker></defs>
+          <rect x="10" y="80" width="120" height="70" rx="5" class="hi"/>
+          <text x="70" y="110" text-anchor="middle" class="on-hi">trainer</text>
+          <text x="70" y="128" text-anchor="middle" class="sm" style="fill:#14223D">Rust + wgpu</text>
+          <path d="M130 115 L176 115" class="edge" marker-end="url(#ah4)"/>
+          <path d="M176 115 L130 115" class="edge" marker-end="url(#ah4)"/>
+          <text x="153" y="100" text-anchor="middle" class="sm">buffers</text>
+          <rect x="178" y="30" width="170" height="170" rx="5" class="box"/>
+          <text x="263" y="56" text-anchor="middle">vecenv (C)</text>
+          <rect x="196" y="72" width="134" height="40" rx="4" class="soft"/>
+          <text x="263" y="97" text-anchor="middle" class="sm">sm64.h · agent 0</text>
+          <rect x="196" y="118" width="134" height="40" rx="4" class="soft"/>
+          <text x="263" y="143" text-anchor="middle" class="sm">sm64.h · agent 1</text>
+          <text x="263" y="182" text-anchor="middle" class="sm">… one per game</text>
+          <rect x="440" y="62" width="190" height="56" rx="5" class="acc"/>
+          <text x="535" y="86" text-anchor="middle">n64b-run</text>
+          <text x="535" y="104" text-anchor="middle" class="sm">recompiled SM64 · game 0</text>
+          <rect x="440" y="126" width="190" height="56" rx="5" class="acc"/>
+          <text x="535" y="150" text-anchor="middle">n64b-run</text>
+          <text x="535" y="168" text-anchor="middle" class="sm">recompiled SM64 · game 1</text>
+          <path d="M330 86 L438 86" class="edge" marker-end="url(#ah4)"/>
+          <text x="384" y="78" text-anchor="middle" class="sm">step · pad</text>
+          <path d="M438 100 L330 100" class="dash" marker-end="url(#ah4)"/>
+          <text x="384" y="124" text-anchor="middle" class="sm">8 MB shared</text>
+          <path d="M330 140 L438 140" class="edge" marker-end="url(#ah4)"/>
+          <path d="M438 154 L330 154" class="dash" marker-end="url(#ah4)"/>
+        </svg>
+      </div>
+      <figcaption>Each agent's game is a process of its own, because a recompiled N64 is a pile of globals: one memory, one scheduler, one set of threads. The console's memory is mapped into both processes, so reading Mario's state is a memory load, not a request.</figcaption>
+    </figure>
+    <p>So the Mario environment is a Puffer env like any other. <code>puf_step</code> turns the four action numbers into a controller state, asks the game for two frames, then reads Mario out of RAM at the addresses the US cartridge keeps him at, and writes the observation and reward. Eight games at once train at about 3,500 to 5,000 steps a second on a laptop. That's a hundred times slower than the platformer, and it shapes every decision after this.</p>
+    <p>A goal is one named star, like <code>pss-2</code>: Peach's Secret Slide's second star, the one that appears only if Mario reaches the bottom within 21 seconds. The first time a star is asked for, the environment plays through the intro, walks Mario into the course, picks the act, and saves a savestate. Every episode loads that and starts the clock. The episode ends the frame Mario <em>touches</em> the star, checked by that star's own bit flipping in the save file.</p>
+  </div>
+</section>
+
+<section id="obs">
+  <div class="wrap">
+    <h2><span class="n">10</span>What the policy sees, and does</h2>
+    <p>The observation is 292 floats, almost all of it read straight out of the game's memory every step:</p>
+    <div class="tbl">
+    <table>
+      <thead><tr><th>what</th><th class="num">floats</th><th>details</th></tr></thead>
+      <tbody>
+        <tr><td>Motion</td><td class="num">21</td><td>position, velocity, forward speed, facing (as sin and cos), pitch and roll, spin, slide direction and velocity</td></tr>
+        <tr><td>The stick and camera</td><td class="num">5</td><td>how hard and which way the game read the stick, and where the camera is, all relative to Mario's facing</td></tr>
+        <tr><td>Floor, wall, ceiling</td><td class="num">15</td><td>height above the floor, headroom, the surfaces he's touching, with their normals turned into his frame</td></tr>
+        <tr><td>Status and timers</td><td class="num">8</td><td>health, water, how far below the top of his jump he is, frames since A and B, wall-kick, double-jump and invincibility timers</td></tr>
+        <tr><td>Action</td><td class="num">170</td><td>what Mario is doing and was doing before (one-hot over the game's own action ids and groups), the action's flags, timer and state</td></tr>
+        <tr><td>Input and Mario flags</td><td class="num">32</td><td>the game's own bit fields</td></tr>
+        <tr><td>Floor probes</td><td class="num">32</td><td>the height of the floor in 8 directions at 4 distances, 150 to 2,000 units out</td></tr>
+        <tr><td>The star</td><td class="num">8</td><td>offset, distance and direction to it, and the closest he's been as a share of the way</td></tr>
+        <tr><td>The clock</td><td class="num">1</td><td>how much time is left</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>A few of these needed real work. The <b>floor probes</b> walk the course's collision geometry in RAM the way the game's own <code>find_floor</code> does, and they agree with the game to a tenth of a unit. They're how the policy can know the slide's track ends in a 6,750-unit drop before it jumps. <b>Everything angular is relative to Mario's facing</b>, so “the star is ahead and to the left” looks the same wherever he is on the course.</p>
+    <p>The action has four heads: a stick direction (none, or one of sixteen), and A, B and Z, each held or not. The stick is also relative to the way Mario faces, and that took fixing. The game adds the camera's angle to whatever the stick says, so a policy pushing “up” would run wherever the camera happened to point, and would have to learn the camera too. Instead, the environment measures the offset between the stick it sent and the direction the game took from it every frame, and corrects for it. One decision lasts two frames, so the policy acts fifteen times a second, which is fast enough for a long jump's A-then-Z.</p>
+    <p>There's an optional mode that appends the game's actual picture, shrunk to 80×60, read from the console's video interface. On the slide it roughly paid for the half of the throughput it costs, and elsewhere it was worth nothing measurable, so the runs below use the numbers alone.</p>
+    <h3>The reward</h3>
+    <ul>
+      <li><b>The star</b> pays 1 and ends the episode.</li>
+      <li><b>The clock</b> costs a little every frame, adding up to 1 over the whole episode. Sooner is better.</li>
+      <li><b>Progress</b> pays for each new closest approach to the star, worth less the later it comes. It's measured along the paths episodes have actually taken, not as the crow flies. The slide winds, so for long stretches of the fastest route the straight-line distance to the star doesn't shrink at all.</li>
+      <li><b>Death</b>, or warping out of the course, costs whatever is left of the clock at once, so dying is never a way to stop it early.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="goexplore">
+  <div class="wrap">
+    <h2><span class="n">11</span>Go-Explore</h2>
+    <p>Remember the problem from part 1: if the policy never touches the star, every episode returns the same number and there's nothing to learn. Mario makes this about as bad as it gets. <code>pss-2</code> only appears if he reaches the bottom within 21 seconds, so a careful, slow run down the slide pays exactly as much as falling off at the top. This env's first goal was just opening the castle's front door, and 12 million steps of a goal and a clock alone never found it once.</p>
+    <p>Rewarding <em>novelty</em>, being somewhere new, helps a bit. Cut the course into cubes 500 units on a side and pay the first time an episode enters each one. But novelty alone still gets stuck: one run swam the castle moat for 10 million steps, because there were always new cubes in the water.</p>
+    <p>The fix is <a href="https://arxiv.org/abs/1901.10995" target="_blank" rel="noopener noreferrer">Go-Explore</a> (Ecoffet et al., 2019), the method that set records on Montezuma's Revenge, the Atari game that long stumped RL for exactly this reason. Its idea is simple: <em>remember the places you've been, go back to the promising ones, and explore from there</em>.</p>
+<pre><code>archive = {}   <span class="c"># cell -&gt; the shortest list of pad inputs that reached it</span>
+
+<span class="k">def</span> reset():
+    load(start_savestate)
+    <span class="k">if</span> random() &lt; go_explore:
+        cell = pick(archive)               <span class="c"># rare cells, or ones on the way to the star</span>
+        <span class="k">for</span> pad <span class="k">in</span> archive[cell]:
+            game.step(pad)                 <span class="c"># replay: deterministic, so this lands exactly there</span>
+    start_clock()
+
+<span class="k">def</span> step(action):
+    ...
+    cell = cell_of(mario)
+    <span class="k">if</span> cell not <span class="k">in</span> archive <span class="k">or</span> len(inputs) &lt; len(archive[cell]):
+        archive[cell] = inputs.copy()      <span class="c"># a new place, or a faster way to an old one</span></code></pre>
+    <p>Because the game is deterministic, a list of pad inputs <em>is</em> a place. It's a few kilobytes, against a savestate's 8 MB, so the archive can hold over a hundred thousand cells. A share of episodes start from the archive instead of the real start, which turns one impossible problem, getting all the way down the slide fast, into many small ones: getting a little further than anyone has from here.</p>
+    <p>Most of the work went into choosing <em>which</em> cells to start from:</p>
+    <ul>
+      <li><b>Cells</b> are a 500-unit cube plus a speed bucket, whether Mario is in the air, and one of eight headings. With cubes alone, a slow approach and a fast one to the same spot were the same cell, and whichever got there first was kept forever.</li>
+      <li><b>Rarity.</b> Some starts are weighted toward cells few episodes have entered. That's the exploring.</li>
+      <li><b>The frontier.</b> Others come from the cells most on pace for the star: reached early, and close to the star measured along the way episodes have actually gone. With fine cells, the archive grows to tens of thousands of them, and rarity alone spreads starts evenly over the whole course.</li>
+      <li><b>The clock.</b> An episode from the frontier starts with its clock at the frames its way there took, so it races the star's real time limit. Other archive starts get a clock of their own to explore with, so the archive can still work its way down the slide in stages.</li>
+      <li><b>The ghost.</b> Entering a cell on the way to the star sooner than the archive's best way into it pays a little per frame of difference, and then the archive keeps the faster way. Only a run faster than every run before it gets paid.</li>
+    </ul>
+    <p>The policy and the archive help each other. The archive puts the policy in useful places it couldn't reach on its own, and the policy, trained by PPO from those starts, gets better at moving fast, which adds faster ways to the archive. Each new record run is then a sequence of inputs that can be replayed, checked and recorded as video.</p>
+    <p class="aside">A bug worth mentioning: the archive's cubes originally stopped at a height of −4,096. The bottom of the slide, star included, is below that. For several runs Go-Explore had never kept a single place at the bottom. After extending them, the first star from a blank slate came 26 minutes in.</p>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <h2><span class="n">12</span>Results</h2>
+    <p>Here's where things stand. More to come.</p>
+    <div class="tbl">
+    <table>
+      <thead><tr><th>star</th><th class="num">frames</th><th class="num">seconds</th><th>how it was found</th></tr></thead>
+      <tbody>
+        <tr><td>Peach's Secret Slide</td><td class="num">1,326</td><td class="num">44.2</td><td>random play from the archive: the very first star</td></tr>
+        <tr><td>Peach's Secret Slide</td><td class="num">786</td><td class="num">26.2</td><td>training with the archive, then the backward algorithm along that run</td></tr>
+        <tr><td>Peach's Secret Slide</td><td class="num">750</td><td class="num">25.0</td><td>the ghost</td></tr>
+        <tr class="best"><td>Peach's Secret Slide</td><td class="num">674</td><td class="num">22.5</td><td>the long flight, with the archive seeded from earlier runs</td></tr>
+        <tr><td>Peach's Secret Slide</td><td class="num">700</td><td class="num">23.3</td><td>from a blank slate: new policy, empty archive, 140M steps</td></tr>
+        <tr><td>Shoot into the Wild Blue</td><td class="num">656</td><td class="num">21.9</td><td>from a blank slate, about 100M steps over twelve hours</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>Times are from the moment the course starts to the frame Mario touches the star. About a hundred of those frames on the slide are a cutscene while the star comes out, which no run can shorten.</p>
+  </div>
+  <div class="wide">
+    <div class="vids">
+      <figure>
+        <div class="vid"><video src="rl/slide-674.mp4" poster="rl/slide-674.jpg" controls muted playsinline preload="none" aria-label="Peach's Secret Slide in 674 frames"></video></div>
+        <figcaption><b>Peach's Secret Slide, 674 frames.</b> It takes the last turn of the upper track backwards at 72 to 81 units a frame, swings round, and jumps at frame 296. Three and a half seconds in the air, falling from 3,220 to −3,529, it lands past two turns of the lower track. 52 frames slower into the landing than the 750, and 89 faster out of it.</figcaption>
+      </figure>
+      <figure>
+        <div class="vid"><video src="rl/wild-blue-656.mp4" poster="rl/wild-blue-656.jpg" controls muted playsinline preload="none" aria-label="Shoot into the Wild Blue in 656 frames"></video></div>
+        <figcaption><b>Shoot into the Wild Blue, 656 frames, from nothing.</b> Whomp's Fortress, act 3. No cannon: Mario crosses to the foot of the outer wall, then jumps up to the ledge and takes the star from the air. Same method as the slide. The star's own config only adds where it is, a 40-second clock and respawning after a fall.</figcaption>
+      </figure>
+    </div>
+  </div>
+  <div class="wrap">
+    <p>The code, the record inputs and the full experiment log are at <a href="https://github.com/bigmah/puff-rs" target="_blank" rel="noopener noreferrer">github.com/bigmah/puff-rs</a>. You need your own copy of the cartridge, and then <code>make sm64-train</code> builds everything and starts training.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span><a href="index.html">← bigmah</a></span>
+    <span>oct 21, 2026</span>
+  </div>
+</footer>
+
+<script>
+(() => {
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const $ = s => document.querySelector(s);
+
+/* ---------- the data-contract rows ---------- */
+(() => {
+  const g = $('#rows'), ns = 'http://www.w3.org/2000/svg';
+  const rect = (x, y, w, h, cls) => { const r = document.createElementNS(ns, 'rect'); r.setAttribute('x', x); r.setAttribute('y', y); r.setAttribute('width', w); r.setAttribute('height', h); r.setAttribute('class', cls); r.setAttribute('rx', 2); g.appendChild(r); };
+  for (let i = 0; i < 8; i++) {
+    const y = 38 + i * 23 + (i >= 4 ? 4 : 0);
+    rect(170, y, 172, 18, 'soft');
+    rect(352, y, 64, 18, 'hi');
+    rect(426, y, 28, 18, 'soft');
+    rect(464, y, 28, 18, 'soft');
+    const t = document.createElementNS(ns, 'text'); t.setAttribute('x', 164); t.setAttribute('y', y + 13); t.setAttribute('text-anchor', 'end'); t.setAttribute('class', 'sm'); t.textContent = i; g.appendChild(t);
+  }
+})();
+
+/* ---------- gridworld ---------- */
+const MAP = [
+  '......*',
+  '.#.....',
+  '.#.##..',
+  '...#...',
+  'S......'];
+const H = MAP.length, W = MAP[0].length, NA = 4, DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+const MAX_STEPS = 80, GAMMA = 0.97, LR = 0.5, VLR = 0.1;
+let start, goal;
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  if (MAP[y][x] === 'S') start = [x, y];
+  if (MAP[y][x] === '*') goal = [x, y];
+}
+let L, V, episodes, results, history, lastWin, anim = null, busy = false;
+function reset() {
+  L = new Float32Array(W * H * NA); V = new Float32Array(W * H);
+  episodes = 0; results = []; history = []; lastWin = null; anim = null;
+  update();
+}
+function pi(c) {
+  let m = -1e9; for (let a = 0; a < NA; a++) m = Math.max(m, L[c * NA + a]);
+  const e = []; let z = 0;
+  for (let a = 0; a < NA; a++) { e[a] = Math.exp(L[c * NA + a] - m); z += e[a]; }
+  return e.map(v => v / z);
+}
+function play() {
+  let [x, y] = start; const traj = [], path = [[x, y]]; let outcome = 'time';
+  for (let t = 0; t < MAX_STEPS; t++) {
+    const c = y * W + x, p = pi(c);
+    let r = Math.random(), a = 0; while (a < NA - 1 && r > p[a]) { r -= p[a]; a++; }
+    let nx = x + DX[a], ny = y + DY[a], rew = -0.01, done = false;
+    if (nx < 0 || ny < 0 || nx >= W || ny >= H) { nx = x; ny = y; }
+    else if (MAP[ny][nx] === '#') { rew = -0.3; done = true; outcome = 'pit'; }
+    else if (MAP[ny][nx] === '*') { rew = 1; done = true; outcome = 'star'; }
+    traj.push([c, a, rew]); x = nx; y = ny; path.push([x, y]);
+    if (done) break;
+  }
+  return { traj, path, outcome };
+}
+function learn(traj) {
+  let G = 0;
+  for (let i = traj.length - 1; i >= 0; i--) {
+    const [c, a, r] = traj[i];
+    G = r + GAMMA * G;
+    const adv = G - V[c];
+    V[c] += VLR * adv;
+    const p = pi(c);
+    for (let b = 0; b < NA; b++) L[c * NA + b] += LR * adv * ((b === a ? 1 : 0) - p[b]);
+  }
+}
+function trainOne() {
+  const ep = play(); learn(ep.traj); episodes++;
+  results.push(ep.outcome === 'star' ? 1 : 0); if (results.length > 100) results.shift();
+  if (ep.outcome === 'star') lastWin = ep.traj.length;
+  if (episodes % 10 === 0) history.push(results.reduce((s, v) => s + v, 0) / results.length);
+  return ep;
+}
+
+const cv = $('#gw'), ch = $('#gwChart');
+function size(c, h) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth;
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { x, w, h };
+}
+function drawGrid() {
+  const w0 = cv.clientWidth, cell = Math.floor(Math.min(w0 / W, 64)), h = cell * H;
+  const { x } = size(cv, h);
+  const ox = Math.floor((w0 - cell * W) / 2);
+  const ink = css('--ink'), rule = css('--rule'), panel = css('--panel'), acc = css('--acc'), hi = css('--hi'), good = css('--good'), miss = css('--miss');
+  const showV = $('#gwValue').checked;
+  let vmax = 0.01; for (let i = 0; i < V.length; i++) vmax = Math.max(vmax, Math.abs(V[i]));
+  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
+    const px = ox + xx * cell, py = y * cell, t = MAP[y][xx];
+    x.fillStyle = panel; x.fillRect(px, py, cell, cell);
+    if (t === '#') { x.fillStyle = miss; x.globalAlpha = .45; x.fillRect(px, py, cell, cell); x.globalAlpha = 1; }
+    else if (showV) {
+      const v = V[y * W + xx] / vmax;
+      x.globalAlpha = Math.min(1, Math.abs(v)) * 0.55; x.fillStyle = v >= 0 ? good : miss;
+      x.fillRect(px, py, cell, cell); x.globalAlpha = 1;
+    }
+    x.strokeStyle = rule; x.lineWidth = 1; x.strokeRect(px + .5, py + .5, cell - 1, cell - 1);
+    const cx = px + cell / 2, cy = py + cell / 2;
+    if (t === '*') { star(x, cx, cy, cell * 0.32, hi, '#14223D'); continue; }
+    if (t === '#') continue;
+    const p = pi(y * W + xx);
+    x.strokeStyle = ink; x.fillStyle = ink;
+    for (let a = 0; a < NA; a++) {
+      const len = p[a] * cell * 0.44; if (len < 2) continue;
+      const ex = cx + DX[a] * len, ey = cy + DY[a] * len;
+      x.lineWidth = 1 + p[a] * 2.5;
+      x.beginPath(); x.moveTo(cx, cy); x.lineTo(ex, ey); x.stroke();
+      const hs = 2 + p[a] * 5;
+      x.beginPath();
+      x.moveTo(ex + DX[a] * hs, ey + DY[a] * hs);
+      x.lineTo(ex - DY[a] * hs * .8, ey + DX[a] * hs * .8);
+      x.lineTo(ex + DY[a] * hs * .8, ey - DX[a] * hs * .8);
+      x.closePath(); x.fill();
+    }
+    if (t === 'S') { x.font = `500 ${Math.round(cell * .2)}px ${css('--mono')}`; x.fillStyle = css('--graphite'); x.fillText('start', px + 4, py + cell - 5); }
+  }
+  if (anim) {
+    const { path, i } = anim;
+    x.strokeStyle = acc; x.lineWidth = 3; x.globalAlpha = .55; x.beginPath();
+    for (let k = 0; k <= i && k < path.length; k++) {
+      const [ax, ay] = path[k], X = ox + ax * cell + cell / 2, Y = ay * cell + cell / 2;
+      k ? x.lineTo(X, Y) : x.moveTo(X, Y);
+    }
+    x.stroke(); x.globalAlpha = 1;
+    const [ax, ay] = path[Math.min(i, path.length - 1)];
+    x.fillStyle = acc; x.beginPath(); x.arc(ox + ax * cell + cell / 2, ay * cell + cell / 2, cell * .18, 0, 7); x.fill();
+  }
+}
+function star(x, cx, cy, r, fill, stroke) {
+  x.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r;
+    x.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+  }
+  x.closePath(); x.fillStyle = fill; x.fill(); x.strokeStyle = stroke; x.lineWidth = 1.5; x.stroke();
+}
+function drawChart() {
+  const { x, w, h } = size(ch, 160);
+  const rule = css('--rule'), g = css('--graphite'), acc = css('--acc');
+  const padL = 34, padB = 20, pw = w - padL - 6, ph = h - padB - 8;
+  x.strokeStyle = rule; x.lineWidth = 1; x.font = `11px ${css('--mono')}`; x.fillStyle = g;
+  for (const v of [0, .5, 1]) {
+    const y = 8 + ph * (1 - v);
+    x.beginPath(); x.moveTo(padL, y + .5); x.lineTo(padL + pw, y + .5); x.stroke();
+    x.fillText(Math.round(v * 100) + '%', 0, y + 4);
+  }
+  const n = Math.max(history.length, 30);
+  x.fillText('episodes', padL, h - 4);
+  x.textAlign = 'right'; x.fillText(String(n * 10), padL + pw, h - 4); x.textAlign = 'left';
+  if (!history.length) return;
+  x.strokeStyle = acc; x.lineWidth = 2; x.beginPath();
+  history.forEach((v, i) => { const X = padL + pw * (i + 1) / n, Y = 8 + ph * (1 - v); i ? x.lineTo(X, Y) : x.moveTo(X, Y); });
+  x.stroke();
+}
+function update() {
+  drawGrid(); drawChart();
+  $('#gwEp').textContent = episodes.toLocaleString();
+  $('#gwRate').textContent = results.length ? Math.round(100 * results.reduce((s, v) => s + v, 0) / results.length) + '%' : '—';
+  $('#gwSteps').textContent = lastWin == null ? '—' : lastWin;
+}
+function setBusy(b) { busy = b; ['#gwTrain', '#gwPlay', '#gwReset'].forEach(s => $(s).disabled = b); }
+$('#gwTrain').addEventListener('click', () => {
+  if (busy) return; setBusy(true); anim = null;
+  let left = 100;
+  const tick = () => {
+    for (let k = 0; k < 5 && left > 0; k++, left--) trainOne();
+    update();
+    if (left > 0) requestAnimationFrame(tick); else setBusy(false);
+  };
+  tick();
+});
+$('#gwPlay').addEventListener('click', () => {
+  if (busy) return; setBusy(true);
+  const ep = play(); anim = { path: ep.path, i: 0 };
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) { anim.i = ep.path.length - 1; update(); setBusy(false); return; }
+  const id = setInterval(() => {
+    anim.i++; drawGrid();
+    if (anim.i >= ep.path.length - 1) { clearInterval(id); setBusy(false); }
+  }, 90);
+});
+$('#gwReset').addEventListener('click', () => { if (!busy) reset(); });
+$('#gwValue').addEventListener('change', drawGrid);
+let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(update, 100); });
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', update);
+reset();
+})();
+</script>
+</body>
+</html>
