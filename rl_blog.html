@@ -154,7 +154,7 @@ footer .wrap{border-top:1.5px solid var(--ink); padding-top:1em; display:flex; j
   <div class="wrap hero">
     <figure>
       <div class="vid">
-        <video src="rl/slide-674.mp4" poster="rl/slide-674.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Mario goes down Peach's Secret Slide, jumps off the upper track, falls onto the lower one and takes the star"></video>
+        <video data-src="rl/slide-674.mp4" poster="rl/slide-674.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Mario goes down Peach's Secret Slide, jumps off the upper track, falls onto the lower one and takes the star"></video>
       </div>
       <figcaption>Peach's Secret Slide, start to star in <span class="stat">674 frames</span> (22.5 seconds), by a route training found on its own. Ten seconds in it jumps off the upper track and falls 6,750 units onto the lower one.</figcaption>
     </figure>
@@ -638,11 +638,11 @@ memset(terminals, 0, num_agents * sizeof(float));
   <div class="wide">
     <div class="vids">
       <figure>
-        <div class="vid"><video src="rl/slide-674.mp4" poster="rl/slide-674.jpg" controls muted playsinline preload="none" aria-label="Peach's Secret Slide in 674 frames"></video></div>
+        <div class="vid"><video data-src="rl/slide-674.mp4" poster="rl/slide-674.jpg" controls muted playsinline preload="none" aria-label="Peach's Secret Slide in 674 frames"></video></div>
         <figcaption><b>Peach's Secret Slide, 674 frames.</b> It takes the last turn of the upper track backwards at 72 to 81 units a frame, swings round, and jumps at frame 296. Three and a half seconds in the air, falling from 3,220 to −3,529, it lands past two turns of the lower track. 52 frames slower into the landing than the 750, and 89 faster out of it.</figcaption>
       </figure>
       <figure>
-        <div class="vid"><video src="rl/wild-blue-656.mp4" poster="rl/wild-blue-656.jpg" controls muted playsinline preload="none" aria-label="Shoot into the Wild Blue in 656 frames"></video></div>
+        <div class="vid"><video data-src="rl/wild-blue-656.mp4" poster="rl/wild-blue-656.jpg" controls muted playsinline preload="none" aria-label="Shoot into the Wild Blue in 656 frames"></video></div>
         <figcaption><b>Shoot into the Wild Blue, 656 frames, from nothing.</b> Whomp's Fortress, act 3. No cannon: Mario crosses to the foot of the outer wall, then jumps up to the ledge and takes the star from the air. Same method as the slide. The star's own config only adds where it is, a 40-second clock and respawning after a fall.</figcaption>
       </figure>
     </div>
@@ -664,6 +664,28 @@ memset(terminals, 0, num_agents * sizeof(float));
 (() => {
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const $ = s => document.querySelector(s);
+
+/* ---------- videos ----------
+ * Each one is fetched whole and played from a blob. Safari plays an mp4 from a
+ * server only by byte ranges, and a blob needs none, so this plays the same
+ * whatever the server in front does with a Range header. They're 3 to 4 MB.
+ * The hero fetches at once; the rest as they come near the screen. */
+(() => {
+  const blobs = {};
+  const load = v => {
+    const url = v.dataset.src;
+    blobs[url] = blobs[url] || fetch(url)
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.blob(); })
+      .then(b => URL.createObjectURL(b));
+    blobs[url].then(u => { v.src = u; if (v.autoplay) v.play().catch(() => {}); })
+      .catch(() => { v.src = url; });
+  };
+  const vids = [...document.querySelectorAll('video[data-src]')];
+  const io = 'IntersectionObserver' in window && new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { io.unobserve(e.target); load(e.target); }
+  }), { rootMargin: '800px 0px' });
+  vids.forEach(v => (v.autoplay || !io) ? load(v) : io.observe(v));
+})();
 
 /* ---------- the data-contract rows ---------- */
 (() => {
