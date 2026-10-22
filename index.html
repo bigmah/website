@@ -464,6 +464,7 @@
 
   /* what I am up to, sitting under the links in the same tile */
   .now { margin: 1.3rem 0 0; }
+  .now--hint { margin-top: 0.5rem; color: var(--muted); font-size: 0.85em; }
 
   .links {
     margin: 1.05rem 0 0;
@@ -556,6 +557,7 @@
 
   @media (max-width: 1260px) {
     .board:not(.board--static) .now { font-size: 0.68rem; line-height: 1.75; margin-top: 0.95rem; }
+    .board:not(.board--static) .now--hint { margin-top: 0.4rem; }
   }
 
   @keyframes reveal {
@@ -1029,6 +1031,7 @@
         </span>
       </nav>
       <p class="now">rustpilled dev interested in too many things</p>
+      <p class="now now--hint">everything here is interactive — drag the tiles, resize them, poke at stuff. go mess around</p>
       <button class="repos-toggle" type="button" aria-expanded="false" aria-controls="repos">projects ↓</button>
       <!-- each square puts its tile on the board; the tile's × takes it off again -->
       <ul class="repos" id="repos" aria-label="Games that run in the browser">
