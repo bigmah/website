@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gamecube · bigmah</title>
+<meta name="description" content="GameCube games, decompiled and rebuilt to run in the browser: Super Mario Strikers, Mario Superstar Baseball and Mario Party 4.">
+<meta name="theme-color" content="#140d33">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'><path d='M0-9 7.8-4.5 0 0-7.8-4.5Z' fill='%23a99cf0'/><path d='M-7.8-4.5 0 0V9L-7.8 4.5Z' fill='%236b5fd0'/><path d='M0 0 7.8-4.5V4.5L0 9Z' fill='%234a3fa6'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,600;0,800;0,900;1,900&display=swap">
+
+<style>
+  /* ---------- theme ---------- */
+
+  /* The console's own colours: indigo plastic, the spice-orange edition, and
+     the controller's face buttons — green A, red B, grey X/Y, yellow C, purple Z. */
+  :root {
+    --night: #0b0720;
+    --deep: #140d33;
+    --indigo: #4a3fa6;
+    --indigo-2: #6b5fd0;
+    --lilac: #a99cf0;
+    --glass: rgba(169, 156, 240, 0.08);
+    --glass-line: rgba(169, 156, 240, 0.22);
+    --spice: #f59a23;
+    --a: #1fb25a;
+    --a-ink: #04310f;
+    --b: #e0373a;
+    --c: #f6c518;
+    --z: #7b59d6;
+    --xy: #c9c6d6;
+    --fg: #f1efff;
+    --dim: #b9b2e0;
+    --muted: #8279b8;
+    --round: "Nunito", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { background: var(--night); }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--round);
+    font-weight: 600;
+    color: var(--fg);
+    background:
+      radial-gradient(120% 80% at 50% -10%, #3a2d93 0%, transparent 60%),
+      radial-gradient(90% 60% at 100% 110%, rgba(245, 154, 35, 0.16) 0%, transparent 60%),
+      linear-gradient(180deg, var(--deep), var(--night));
+    background-attachment: fixed;
+    overflow-x: hidden;
+  }
+
+  /* the IPL's faint grid floor, receding under everything */
+  .floor {
+    position: fixed;
+    inset: auto -50% -10% -50%;
+    height: 55vh;
+    pointer-events: none;
+    background-image:
+      linear-gradient(var(--glass-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--glass-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    transform: perspective(500px) rotateX(62deg);
+    transform-origin: 50% 100%;
+    mask-image: linear-gradient(to top, rgba(0,0,0,.55), transparent 80%);
+    -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,.55), transparent 80%);
+    animation: floor 6s linear infinite;
+    z-index: 0;
+  }
+  @keyframes floor { to { background-position: 0 64px, 0 0; } }
+
+  /* little cubes drifting up the back of the page */
+  .drift { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+  .drift svg {
+    position: absolute;
+    bottom: -60px;
+    opacity: 0;
+    animation: rise linear infinite;
+  }
+  @keyframes rise {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+    10%  { opacity: var(--o, .35); }
+    90%  { opacity: var(--o, .35); }
+    100% { transform: translateY(-115vh) rotate(var(--spin, 120deg)); opacity: 0; }
+  }
+
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 16px 48px;
+  }
+
+  /* ---------- header ---------- */
+
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.85rem;
+  }
+
+  .home {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--dim);
+    text-decoration: none;
+    padding: 0.35rem 0.7rem 0.35rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid var(--glass-line);
+    background: var(--glass);
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+  .home:hover, .home:focus-visible { color: var(--fg); border-color: var(--lilac); }
+
+  .pad {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+  .pad i {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    box-shadow: 0 0 0 3px rgba(130, 121, 184, 0.18);
+  }
+  .pad.is-on { color: var(--dim); }
+  .pad.is-on i { background: var(--a); box-shadow: 0 0 0 3px rgba(31, 178, 90, 0.25), 0 0 12px var(--a); }
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin: 2.6rem 0 2.8rem;
+  }
+
+  .logo {
+    width: 104px;
+    height: 104px;
+    filter: drop-shadow(0 10px 30px rgba(107, 95, 208, 0.55));
+    animation: bob 5s ease-in-out infinite;
+  }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+
+  h1 {
+    margin: 1.1rem 0 0;
+    font-weight: 900;
+    font-size: clamp(2.3rem, 7vw, 4.2rem);
+    letter-spacing: 0.02em;
+    line-height: 1;
+    text-transform: lowercase;
+    background: linear-gradient(180deg, #fff 10%, var(--lilac) 95%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  h1 span { color: var(--spice); -webkit-text-fill-color: var(--spice); }
+
+  .sub {
+    max-width: 36rem;
+    margin: 0.9rem 0 0;
+    color: var(--dim);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  /* ---------- the shelf ---------- */
+
+  .shelf {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+    gap: 72px 30px;
+    margin-top: 64px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .shelf > li { display: flex; }
+
+  /* Each game is a case: indigo plastic, the cover art behind a window, and
+     its mini disc waiting behind it to slide out when picked. */
+  .game {
+    position: relative;
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    outline: none;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    perspective: 900px;
+  }
+
+  .case {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 12px 18px;
+    border-radius: 22px;
+    background:
+      linear-gradient(160deg, rgba(255,255,255,.16), rgba(255,255,255,0) 40%),
+      linear-gradient(180deg, #5446b8, #3a2f8c 70%, #2e2574);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.35),
+      inset 0 -3px 0 rgba(0,0,0,.25),
+      0 18px 40px rgba(5, 2, 20, .55);
+    transition: transform 260ms cubic-bezier(.2,.7,.3,1), box-shadow 260ms ease;
+    transform-style: preserve-3d;
+  }
+
+  /* the picked one gets the spice-orange ring the console's menus use */
+  .case::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    border-radius: 26px;
+    border: 3px solid var(--spice);
+    opacity: 0;
+    box-shadow: 0 0 22px rgba(245, 154, 35, .55);
+    transition: opacity 180ms ease;
+    pointer-events: none;
+  }
+  .game:hover .case,
+  .game:focus-visible .case,
+  .game.is-picked .case {
+    transform: translateY(-6px) rotateX(4deg);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.35),
+      inset 0 -3px 0 rgba(0,0,0,.25),
+      0 28px 60px rgba(5, 2, 20, .7);
+  }
+  .game:focus-visible .case::after,
+  .game.is-picked .case::after { opacity: 1; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 34px rgba(245, 154, 35, .85); } }
+
+  .window {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--night);
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.08);
+  }
+  .window img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 400ms cubic-bezier(.2,.7,.3,1);
+  }
+  .game:hover .window img,
+  .game:focus-visible .window img,
+  .game.is-picked .window img { transform: scale(1.04); }
+
+  /* CRT-ish sheen and scanlines over the art, for the 480i of it all */
+  .window::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(155deg, rgba(255,255,255,.18), transparent 35%),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.12) 0 1px, transparent 1px 3px);
+    pointer-events: none;
+  }
+
+  .year {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    color: #fff;
+    background: rgba(11, 7, 32, .7);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  /* The mini disc. It sits behind the case's top edge and rises out of it,
+     spinning, when the game is picked. */
+  .disc {
+    position: absolute;
+    z-index: 0;
+    top: 6px;
+    right: 26px;
+    width: 120px;
+    height: 120px;
+    transition: transform 420ms cubic-bezier(.2,.9,.3,1.2);
+  }
+  .disc i {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle, transparent 0 9%, #dcd8f0 9.5% 12%, transparent 12.5% 27%, var(--label) 27.5% 33%, transparent 33.5%),
+      conic-gradient(from 20deg, #e9e6f7, #b7c3ff, #f6d1ff, #c6f2e6, #fff2b8, #e9e6f7, #c7b8ff, #e9e6f7);
+    -webkit-mask: radial-gradient(circle, transparent 0 9%, #000 9.5%);
+    mask: radial-gradient(circle, transparent 0 9%, #000 9.5%);
+    box-shadow: inset 0 0 0 3px rgba(255,255,255,.6), 0 6px 18px rgba(0,0,0,.4);
+  }
+  .game:hover .disc,
+  .game:focus-visible .disc,
+  .game.is-picked .disc { transform: translateY(-58px); }
+  .game:hover .disc i,
+  .game:focus-visible .disc i,
+  .game.is-picked .disc i { animation: spin 1.2s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .label {
+    display: flex;
+    flex: 1;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.8rem;
+    padding: 14px 6px 0;
+  }
+
+  .name {
+    margin: 0;
+    font-weight: 900;
+    font-size: 1.32rem;
+    line-height: 1.12;
+    letter-spacing: 0.005em;
+  }
+
+  .what {
+    margin: 0.35rem 0 0;
+    font-size: 0.86rem;
+    line-height: 1.45;
+    color: var(--dim);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .chips li {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    padding: 0.22rem 0.55rem;
+    border-radius: 999px;
+    color: var(--lilac);
+    background: rgba(11, 7, 32, .35);
+    box-shadow: inset 0 0 0 1px var(--glass-line);
+  }
+
+  /* the big green A, which is the only button you need */
+  .btn-a {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: var(--a-ink);
+    background: radial-gradient(circle at 35% 30%, #6fe39a, var(--a) 55%, #128a41);
+    box-shadow:
+      inset 0 -4px 0 rgba(0,0,0,.22),
+      inset 0 2px 0 rgba(255,255,255,.4),
+      0 6px 14px rgba(0,0,0,.45);
+    transition: transform 140ms ease;
+  }
+  .game:hover .btn-a,
+  .game:focus-visible .btn-a,
+  .game.is-picked .btn-a { transform: scale(1.08); }
+  .game:active .btn-a { transform: scale(.94) translateY(2px); box-shadow: inset 0 -1px 0 rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.45); }
+
+  /* ---------- the controller legend ---------- */
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem 1.5rem;
+    margin: 3.2rem 0 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .k {
+    display: inline-grid;
+    place-items: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 900;
+    color: #111;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,.2);
+  }
+  .k--a { background: var(--a); color: var(--a-ink); }
+  .k--b { background: var(--b); color: #fff; width: 22px; min-width: 22px; height: 22px; }
+  .k--stick { background: var(--xy); }
+
+  .fine {
+    max-width: 40rem;
+    margin: 1.4rem auto 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.78rem;
+    line-height: 1.6;
+  }
+  .fine a { color: var(--dim); }
+
+  /* ---------- the boot ---------- */
+
+  /* A cube drops in, bounces, settles into its corner-on pose, and the page
+     comes up behind it. Once a session; a click or key skips it. */
+  .boot {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at 50% 45%, #2a1f6e, var(--night) 70%);
+    animation: boot-out 500ms 2.15s ease forwards;
+    cursor: pointer;
+  }
+  .boot[hidden] { display: none; }
+  .boot.is-done { animation: boot-out 260ms ease forwards; }
+  @keyframes boot-out { to { opacity: 0; visibility: hidden; } }
+
+  .boot__stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2.2rem;
+  }
+
+  .cube3d {
+    position: relative;
+    width: 84px;
+    height: 84px;
+    transform-style: preserve-3d;
+    animation: drop 1.5s cubic-bezier(.3,.1,.3,1) both;
+  }
+  .cube3d b {
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    background: rgba(107, 95, 208, .55);
+    box-shadow: inset 0 0 0 3px var(--lilac), inset 0 0 22px rgba(255,255,255,.25);
+  }
+  .cube3d b:nth-child(1) { transform: translateZ(42px); }
+  .cube3d b:nth-child(2) { transform: rotateY(180deg) translateZ(42px); }
+  .cube3d b:nth-child(3) { transform: rotateY(90deg) translateZ(42px); background: rgba(74, 63, 166, .7); }
+  .cube3d b:nth-child(4) { transform: rotateY(-90deg) translateZ(42px); background: rgba(74, 63, 166, .7); }
+  .cube3d b:nth-child(5) { transform: rotateX(90deg) translateZ(42px); background: rgba(169, 156, 240, .6); }
+  .cube3d b:nth-child(6) { transform: rotateX(-90deg) translateZ(42px); }
+
+  @keyframes drop {
+    0%   { transform: translateY(-60vh) rotateX(-200deg) rotateY(-300deg); }
+    45%  { transform: translateY(0) rotateX(-50deg) rotateY(-90deg); }
+    60%  { transform: translateY(-46px) rotateX(-40deg) rotateY(-60deg); }
+    75%  { transform: translateY(0) rotateX(-35.26deg) rotateY(-45deg); }
+    85%  { transform: translateY(-10px) rotateX(-35.26deg) rotateY(-45deg); }
+    100% { transform: translateY(0) rotateX(-35.26deg) rotateY(-45deg); }
+  }
+
+  .boot__word {
+    font-weight: 900;
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    letter-spacing: 0.32em;
+    padding-left: 0.32em;
+    color: var(--fg);
+    opacity: 0;
+    animation: word 600ms 1.25s ease forwards;
+  }
+  .boot__word span { color: var(--spice); }
+  @keyframes word { from { opacity: 0; letter-spacing: .6em; } to { opacity: 1; letter-spacing: .32em; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .boot { display: none; }
+    .floor, .drift, .logo { animation: none; }
+    .drift { display: none; }
+    *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
+  }
+
+  @media (max-width: 520px) {
+    .hero { margin: 2rem 0 2.2rem; }
+    .logo { width: 84px; height: 84px; }
+    .shelf { gap: 26px; }
+    .disc { width: 96px; height: 96px; right: 20px; }
+    .btn-a { width: 56px; height: 56px; font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="boot" id="boot" hidden aria-hidden="true">
+  <div class="boot__stage">
+    <div class="cube3d"><b></b><b></b><b></b><b></b><b></b><b></b></div>
+    <div class="boot__word">big<span>mah</span></div>
+  </div>
+</div>
+
+<div class="floor" aria-hidden="true"></div>
+<div class="drift" id="drift" aria-hidden="true"></div>
+
+<main>
+  <header class="top">
+    <a class="home" href="/"><span class="k k--b" aria-hidden="true">B</span> bigmah</a>
+    <span class="pad" id="pad" role="status"><i></i><span>no controller</span></span>
+  </header>
+
+  <section class="hero">
+    <!-- a cube with a cube cut out of its near corner -->
+    <svg class="logo" viewBox="-50 -50 100 100" aria-hidden="true">
+      <path d="M0-46 39.8-23 0 0-39.8-23Z" fill="#a99cf0"/>
+      <path d="M-39.8-23 0 0V46L-39.8 23Z" fill="#6b5fd0"/>
+      <path d="M0 0 39.8-23V23L0 46Z" fill="#4a3fa6"/>
+      <path d="M0 0-17.3 10 0 20 17.3 10Z" fill="#8a7cdd"/>
+      <path d="M0 0-17.3 10V-10L0-20Z" fill="#3a2f8c"/>
+      <path d="M0 0V-20L17.3-10V10Z" fill="#5a4ebf"/>
+    </svg>
+    <h1>game<span>cube</span></h1>
+    <p class="sub">GameCube discs, decompiled and rebuilt for WebAssembly and WebGPU. No emulator: the games themselves, running natively in your browser tab. Pick a disc.</p>
+  </section>
+
+  <ul class="shelf" id="shelf">
+    <li>
+      <a class="game" href="https://strikers.palace-pitch.workers.dev/?password=password" style="--label:#e0373a">
+        <span class="disc" aria-hidden="true"><i></i></span>
+        <div class="case">
+          <div class="window">
+            <span class="year">2005</span>
+            <img src="strikers.jpg" width="800" height="600" alt="Super Mario Strikers main menu, Mario mid-kick beside a soccer ball">
+          </div>
+          <div class="label">
+            <div>
+              <h2 class="name">Super Mario Strikers</h2>
+              <p class="what">Five-a-side soccer with shells, bananas and super strikes.</p>
+              <ul class="chips"><li>1–4 players</li><li>online</li><li>touch</li></ul>
+            </div>
+            <span class="btn-a" aria-hidden="true">A</span>
+          </div>
+        </div>
+      </a>
+    </li>
+    <li>
+      <a class="game" href="https://mssb.palace-pitch.workers.dev/?password=password" style="--label:#1fb25a">
+        <span class="disc" aria-hidden="true"><i></i></span>
+        <div class="case">
+          <div class="window">
+            <span class="year">2005</span>
+            <img src="baseball.jpg" width="640" height="480" alt="Mario Superstar Baseball, the 'That's the game!' screen after a walk-off">
+          </div>
+          <div class="label">
+            <div>
+              <h2 class="name">Mario Superstar Baseball</h2>
+              <p class="what">Star pitches, chemistry, and Mario Stadium under the lights.</p>
+              <ul class="chips"><li>1–2 players</li><li>online</li><li>touch</li></ul>
+            </div>
+            <span class="btn-a" aria-hidden="true">A</span>
+          </div>
+        </div>
+      </a>
+    </li>
+    <li>
+      <a class="game" href="https://mp4.palace-pitch.workers.dev/?password=password" style="--label:#f6c518">
+        <span class="disc" aria-hidden="true"><i></i></span>
+        <div class="case">
+          <div class="window">
+            <span class="year">2002</span>
+            <img src="party.jpg" width="800" height="600" alt="Mario Party 4 character select: Mario, Luigi, Peach, Yoshi, Wario, Donkey Kong, Daisy and Waluigi">
+          </div>
+          <div class="label">
+            <div>
+              <h2 class="name">Mario Party 4</h2>
+              <p class="what">The board game, the minigames, and the friendships they end.</p>
+              <ul class="chips"><li>1–4 players</li><li>online</li><li>touch</li></ul>
+            </div>
+            <span class="btn-a" aria-hidden="true">A</span>
+          </div>
+        </div>
+      </a>
+    </li>
+  </ul>
+
+  <footer>
+    <div class="legend" aria-hidden="true">
+      <span><span class="k k--stick">✛</span> pick</span>
+      <span><span class="k k--a">A</span> play</span>
+      <span><span class="k k--b">B</span> back</span>
+    </div>
+    <p class="fine">Each one is the game's own code, from the community decompilations, rebuilt on <a href="https://github.com/encounter/aurora" target="_blank" rel="noopener noreferrer">aurora</a> for the web. Plug in a controller and the stick and A button work here too. Best in a recent Chrome, Edge or Safari.</p>
+  </footer>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- the boot: once a session, skippable ----
+
+  var boot = document.getElementById('boot');
+  var seen = false;
+  try { seen = sessionStorage.getItem('gc.booted') === '1'; } catch (e) {}
+  if (!seen && !reduced) {
+    boot.hidden = false;
+    try { sessionStorage.setItem('gc.booted', '1'); } catch (e) {}
+    var skip = function () { boot.classList.add('is-done'); };
+    boot.addEventListener('click', skip);
+    window.addEventListener('keydown', skip, { once: true });
+    setTimeout(function () { boot.hidden = true; }, 2800);
+  }
+
+  // ---- cubes drifting up the back ----
+
+  if (!reduced) {
+    var drift = document.getElementById('drift');
+    var CUBE = '<svg viewBox="-10 -10 20 20"><path d="M0-9 7.8-4.5 0 0-7.8-4.5Z" fill="#a99cf0"/><path d="M-7.8-4.5 0 0V9L-7.8 4.5Z" fill="#6b5fd0"/><path d="M0 0 7.8-4.5V4.5L0 9Z" fill="#4a3fa6"/></svg>';
+    for (var i = 0; i < 12; i++) {
+      var w = document.createElement('div');
+      w.innerHTML = CUBE;
+      var s = w.firstChild;
+      var size = 14 + Math.random() * 30;
+      s.setAttribute('width', size);
+      s.setAttribute('height', size);
+      s.style.left = (Math.random() * 100) + '%';
+      s.style.animationDuration = (18 + Math.random() * 22) + 's';
+      s.style.animationDelay = (-Math.random() * 40) + 's';
+      s.style.setProperty('--o', (0.12 + Math.random() * 0.25).toFixed(2));
+      s.style.setProperty('--spin', ((Math.random() < 0.5 ? -1 : 1) * (60 + Math.random() * 240)) + 'deg');
+      drift.appendChild(s);
+    }
+  }
+
+  // ---- picking a disc: arrows, or a controller's stick and d-pad ----
+
+  var games = Array.prototype.slice.call(document.querySelectorAll('.game'));
+  var picked = -1;
+
+  function pick(n, focus) {
+    n = (n + games.length) % games.length;
+    games.forEach(function (g, j) { g.classList.toggle('is-picked', j === n); });
+    picked = n;
+    if (focus) games[n].focus({ preventScroll: false });
+  }
+
+  games.forEach(function (g, j) {
+    g.addEventListener('focus', function () { pick(j, false); });
+    g.addEventListener('mouseenter', function () { pick(j, false); });
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); pick(picked + 1, true); }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); pick(picked < 0 ? games.length - 1 : picked - 1, true); }
+  });
+
+  var pad = document.getElementById('pad');
+  var padText = pad.querySelector('span');
+  var held = {};
+  var polling = false;
+
+  function pressed(gp, b) { return gp.buttons[b] && gp.buttons[b].pressed; }
+
+  // Fire once on the press, not every frame it is held.
+  function edge(key, down) {
+    var was = held[key];
+    held[key] = down;
+    return down && !was;
+  }
+
+  function poll() {
+    var gps = navigator.getGamepads ? navigator.getGamepads() : [];
+    var gp = null;
+    for (var i = 0; i < gps.length; i++) if (gps[i]) { gp = gps[i]; break; }
+    if (!gp) { polling = false; return; }
+
+    var x = gp.axes[0] || 0, y = gp.axes[1] || 0;
+    var next = pressed(gp, 15) || pressed(gp, 13) || x > 0.6 || y > 0.6;
+    var prev = pressed(gp, 14) || pressed(gp, 12) || x < -0.6 || y < -0.6;
+    if (edge('next', next)) pick(picked + 1, true);
+    if (edge('prev', prev)) pick(picked < 0 ? games.length - 1 : picked - 1, true);
+    if (edge('a', pressed(gp, 0) || pressed(gp, 9)) && picked >= 0) games[picked].click();
+    if (edge('b', pressed(gp, 1))) location.href = '/';
+
+    requestAnimationFrame(poll);
+  }
+
+  function refreshPad() {
+    var gps = navigator.getGamepads ? navigator.getGamepads() : [];
+    var gp = null;
+    for (var i = 0; i < gps.length; i++) if (gps[i]) { gp = gps[i]; break; }
+    pad.classList.toggle('is-on', !!gp);
+    padText.textContent = gp ? 'controller ready' : 'no controller';
+    if (gp && !polling) {
+      polling = true;
+      held = { a: true, b: true, next: true, prev: true };  // ignore whatever woke it up
+      if (picked < 0) pick(0, true);
+      requestAnimationFrame(poll);
+    }
+  }
+
+  window.addEventListener('gamepadconnected', refreshPad);
+  window.addEventListener('gamepaddisconnected', refreshPad);
+  refreshPad();
+})();
+</script>
+</body>
+</html>
