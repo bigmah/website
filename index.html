@@ -823,6 +823,9 @@
   .tile--btd.is-live .tile__body { background: #000; }
   .tile--btd iframe { display: block; width: 100%; height: 100%; border: 0; }
 
+  /* gamecube — its games live on their own page, so the card links there */
+  .tile--gc .tile__body { background: var(--panel); overflow: auto; }
+
   /* bike or die 2 */
 
   /* Gated the same way the model is: the card sits here saying what it is and
@@ -1035,7 +1038,7 @@
         <li><button class="repo" type="button" data-open="btd1" aria-pressed="false" title="Put bloons td 1 on the board"><span class="repo__name">bloons td 1</span><span class="repo__lang">Flash</span></button></li>
         <li><button class="repo" type="button" data-open="btd2" aria-pressed="false" title="Put bloons td 2 on the board"><span class="repo__name">bloons td 2</span><span class="repo__lang">Flash</span></button></li>
         <li><button class="repo" type="button" data-open="btd3" aria-pressed="false" title="Put bloons td 3 on the board"><span class="repo__name">bloons td 3</span><span class="repo__lang">Flash</span></button></li>
-        <li><a class="repo" href="gamecube/" title="The GameCube games: mario strikers, mario baseball and mario party 4"><span class="repo__name">gamecube in browser</span><span class="repo__lang">GameCube</span></a></li>
+        <li><button class="repo" type="button" data-open="gc" aria-pressed="false" title="Put the gamecube games on the board"><span class="repo__name">gamecube in browser</span><span class="repo__lang">GameCube</span></button></li>
       </ul>
     </div>
   </article>
@@ -1327,6 +1330,38 @@
       </div>
     </div>
   </article>
+
+  <article class="tile tile--flush tile--gc" data-id="gc">
+    <header class="tile__bar" tabindex="0" aria-label="gamecube tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
+      <span class="tile__title">gamecube in browser</span>
+      <span class="spacer"></span>
+      <a class="ln" href="gamecube/">open&nbsp;→</a>
+      <button class="tile__close" type="button" aria-label="Take the gamecube games off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="tile__body">
+      <div class="mini" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2.6 20.1 7.3 12 12 3.9 7.3Z" opacity=".95"/>
+          <path d="M3.9 7.3 12 12v9.4l-8.1-4.7Z" opacity=".55"/>
+          <path d="M12 12l8.1-4.7v9.4L12 21.4Z" opacity=".3"/>
+        </svg>
+        <span>gamecube</span>
+      </div>
+      <div class="start">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2.6 20.1 7.3 12 12 3.9 7.3Z" opacity=".95"/>
+          <path d="M3.9 7.3 12 12v9.4l-8.1-4.7Z" opacity=".55"/>
+          <path d="M12 12l8.1-4.7v9.4L12 21.4Z" opacity=".3"/>
+        </svg>
+        <span>
+          <span class="name">gamecube in browser</span>
+          <span class="what">super mario strikers, mario superstar baseball and mario party 4 — decompiled and rebuilt to run in the browser.</span>
+        </span>
+        <a class="go" href="gamecube/">go to the games →</a>
+      </div>
+    </div>
+  </article>
 </div>
 
 <script>
@@ -1362,7 +1397,7 @@
   // there come first; the games join it from their squares in the bigmah tile
   // and leave it again by their ×.
   var BASE  = ['id', 'ex'];
-  var EXTRA = ['gba', 'bike', 'btd1', 'btd2', 'btd3'];
+  var EXTRA = ['gba', 'bike', 'btd1', 'btd2', 'btd3', 'gc'];
   var TILES = BASE.slice();
 
   // where everything starts, and what the reset button goes back to: one
