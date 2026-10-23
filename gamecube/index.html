@@ -188,7 +188,47 @@
     padding: 0;
   }
 
-  .shelf > li { display: flex; }
+  .shelf > li { display: flex; flex-direction: column; gap: 14px; }
+
+  /* the disc's password, to paste into the game's Unlock screen */
+  .pw {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 14px;
+    border-radius: 999px;
+    background: rgba(11, 7, 32, .45);
+    box-shadow: inset 0 0 0 1px var(--glass-line);
+  }
+  .pw label {
+    flex: none;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pw input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: 600 0.9rem ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--fg);
+    outline: none;
+  }
+  .pw .copy {
+    flex: none;
+    padding: 0.4rem 0.9rem;
+    border: 0;
+    border-radius: 999px;
+    font: 800 0.78rem var(--round);
+    color: var(--a-ink);
+    background: var(--a);
+    cursor: pointer;
+  }
+  .pw .copy:focus-visible { outline: 2px solid var(--spice); outline-offset: 2px; }
 
   /* Each game is a case: indigo plastic, the cover art behind a window, and
      its mini disc waiting behind it to slide out when picked. */
@@ -546,7 +586,7 @@
 
   <ul class="shelf" id="shelf">
     <li>
-      <a class="game" href="https://strikers.palace-pitch.workers.dev/?password=password" style="--label:#e0373a">
+      <a class="game" href="https://strikers.palace-pitch.workers.dev/" style="--label:#e0373a">
         <span class="disc" aria-hidden="true"><i></i></span>
         <div class="case">
           <div class="window">
@@ -563,9 +603,14 @@
           </div>
         </div>
       </a>
+      <div class="pw">
+        <label for="pw-strikers">password</label>
+        <input id="pw-strikers" type="text" value="77brypwpqkvk9sa8ctty" readonly spellcheck="false" autocomplete="off">
+        <button type="button" class="copy" data-for="pw-strikers">copy</button>
+      </div>
     </li>
     <li>
-      <a class="game" href="https://mssb.palace-pitch.workers.dev/?password=password" style="--label:#1fb25a">
+      <a class="game" href="https://mssb.palace-pitch.workers.dev/" style="--label:#1fb25a">
         <span class="disc" aria-hidden="true"><i></i></span>
         <div class="case">
           <div class="window">
@@ -582,9 +627,14 @@
           </div>
         </div>
       </a>
+      <div class="pw">
+        <label for="pw-mssb">password</label>
+        <input id="pw-mssb" type="text" value="wr8pdqrnvxjgsxtgkzwr" readonly spellcheck="false" autocomplete="off">
+        <button type="button" class="copy" data-for="pw-mssb">copy</button>
+      </div>
     </li>
     <li>
-      <a class="game" href="https://mp4.palace-pitch.workers.dev/?password=password" style="--label:#f6c518">
+      <a class="game" href="https://mp4.palace-pitch.workers.dev/" style="--label:#f6c518">
         <span class="disc" aria-hidden="true"><i></i></span>
         <div class="case">
           <div class="window">
@@ -601,6 +651,11 @@
           </div>
         </div>
       </a>
+      <div class="pw">
+        <label for="pw-mp4">password</label>
+        <input id="pw-mp4" type="text" value="uhedhgagn3qcm6wy2v68" readonly spellcheck="false" autocomplete="off">
+        <button type="button" class="copy" data-for="pw-mp4">copy</button>
+      </div>
     </li>
   </ul>
 
@@ -673,9 +728,25 @@
   });
 
   document.addEventListener('keydown', function (e) {
-    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.altKey || e.ctrlKey || e.metaKey || e.target.tagName === 'INPUT') return;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); pick(picked + 1, true); }
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); pick(picked < 0 ? games.length - 1 : picked - 1, true); }
+  });
+
+  // ---- copying a disc's password ----
+
+  Array.prototype.forEach.call(document.querySelectorAll('.pw .copy'), function (btn) {
+    var field = document.getElementById(btn.getAttribute('data-for'));
+    field.addEventListener('focus', function () { field.select(); });
+    btn.addEventListener('click', function () {
+      var done = function () {
+        btn.textContent = 'copied';
+        setTimeout(function () { btn.textContent = 'copy'; }, 1500);
+      };
+      field.select();
+      if (navigator.clipboard) navigator.clipboard.writeText(field.value).then(done, function () { document.execCommand('copy'); done(); });
+      else { document.execCommand('copy'); done(); }
+    });
   });
 
   var pad = document.getElementById('pad');
