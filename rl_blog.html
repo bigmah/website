@@ -634,6 +634,7 @@ memset(terminals, 0, num_agents * sizeof(float));
     </table>
     </div>
     <p>Times are from the moment the course starts to the frame Mario touches the star. About a hundred of those frames on the slide are a cutscene while the star comes out, which no run can shorten.</p>
+    <p>Every time in the table is a route: a list of pad inputs the archive put together from episodes that began partway there, which replays from the real start to the star. That isn't the same as a policy that gets there on its own, and none does yet. The log keeps the two apart. <code>perf</code> counts stars from every start, archive starts included, and <code>start_perf</code> counts only episodes from the real start. It has read 0 in every run, on both stars. Folding them into one success rate would hide the part that's still unsolved.</p>
   </div>
   <div class="wide">
     <div class="vids">
