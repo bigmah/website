@@ -296,68 +296,92 @@
     96%           { opacity: 0; translate: 0 5px; scale: 1; }
   }
 
-  /* ---------- the size picker: four squares, one per size ---------- */
+  /* ---------- the size picker: three traffic lights, one per size ---------- */
 
-  /* Each square is drawn at the size it stands for, bottom-aligned so the row
-     reads as a ramp, and the one the tile is at now is filled in. */
+  /* Red, yellow, green, macOS style, for 1×1, 2×2 and 4×4. The one the tile is
+     at now carries a dark pip in its middle, the way a window's glyphs show. */
   .sizes {
     flex: none;
     display: flex;
-    align-items: flex-end;
-    gap: 1px;
+    align-items: center;
+    gap: 0;
     margin: 0;
   }
 
   .sizes button {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
-    padding: 0.4rem 0.18rem;
+    padding: 0.4rem 0.2rem;
     margin: 0;
     background: none;
     border: 0;
-    border-radius: 4px;
+    border-radius: 50%;
     cursor: pointer;
     touch-action: manipulation;
   }
 
   .sizes i {
-    display: block;
-    border: 1px solid var(--faint);
-    border-radius: 2px;
-    transition: background-color 160ms ease, border-color 160ms ease;
+    --light: #ff5f57;
+    --rim: #e0443e;
+    display: grid;
+    place-items: center;
+    width: 11px;
+    height: 11px;
+    background: var(--light);
+    border: 0.5px solid var(--rim);
+    border-radius: 50%;
+    transition: filter 160ms ease;
   }
 
-  .sizes button:nth-child(1) i { width: 5px;  height: 5px; }
-  .sizes button:nth-child(2) i { width: 8px;  height: 8px; }
-  .sizes button:nth-child(3) i { width: 11px; height: 11px; }
+  .sizes button:nth-child(2) i { --light: #febc2e; --rim: #dea123; }
+  .sizes button:nth-child(3) i { --light: #28c840; --rim: #1aab29; }
 
-  .tile:hover .sizes i { border-color: var(--icon); }
-  .sizes [aria-pressed="true"] i,
-  .tile:hover .sizes [aria-pressed="true"] i {
-    background: var(--accent-soft);
-    border-color: var(--accent-soft);
+  .sizes i::after {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 160ms ease;
   }
 
-  /* the square under the pointer is the size a click would make it */
+  .sizes [aria-pressed="true"] i::after { opacity: 1; }
+
+  /* the light under the pointer is the size a click would make it */
   .tile .sizes button:hover i,
-  .tile .sizes button:focus-visible i { border-color: var(--accent); }
-  .tile .sizes [aria-pressed="true"]:hover i { background: var(--accent); border-color: var(--accent); }
+  .tile .sizes button:focus-visible i { filter: brightness(0.85); }
+  .tile .sizes button:hover i::after { opacity: 0.6; }
+  .tile .sizes [aria-pressed="true"]:hover i::after { opacity: 1; }
+
+  /* On a tile that was put on the board from a square, red takes it off
+     again, and shows an × under the pointer instead of a pip. */
+  .sizes [data-close] i::after {
+    content: "×";
+    width: auto;
+    height: auto;
+    background: none;
+    color: rgba(0, 0, 0, 0.6);
+    font: 700 10px/1 system-ui, sans-serif;
+  }
+  .tile .sizes [data-close]:hover i::after,
+  .tile .sizes [data-close]:focus-visible i::after { opacity: 1; }
 
   .sizes button:focus-visible {
     outline: 1px solid var(--accent);
     outline-offset: -1px;
   }
 
-  /* Until someone has actually used them, the squares light up smallest to
-     largest every few seconds to show what they do. First use retires it. */
+  /* Until someone has actually used them, the lights blink red to green every
+     few seconds to show they do something. First use retires it. */
   .board--hint .sizes i { animation: size-hint 6s cubic-bezier(.4, 0, .2, 1) infinite; }
   .board--hint .sizes button:nth-child(2) i { animation-delay: 0.12s; }
   .board--hint .sizes button:nth-child(3) i { animation-delay: 0.24s; }
 
   @keyframes size-hint {
-    0%, 70%, 100% { border-color: var(--faint); }
-    76%, 84%      { border-color: var(--accent); }
+    0%, 70%, 100% { filter: none; }
+    76%, 84%      { filter: brightness(1.25) saturate(1.2); }
   }
 
   /* hovering, or hauling a tile around, takes precedence over the hint */
@@ -385,27 +409,6 @@
     white-space: nowrap;
     cursor: pointer;
   }
-
-  /* the red × on a tile that was put on the board from a square, and can go */
-  .tile__close {
-    flex: none;
-    display: inline-grid;
-    place-items: center;
-    width: 1.1rem;
-    height: 1.1rem;
-    margin-right: -0.25rem;
-    padding: 0;
-    background: none;
-    border: 0;
-    border-radius: 4px;
-    color: var(--danger);
-    opacity: 0.7;
-    cursor: pointer;
-    transition: opacity 160ms ease, background-color 160ms ease;
-  }
-  .tile__close svg { width: 0.75rem; height: 0.75rem; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
-  .tile__close:hover,
-  .tile__close:focus-visible { opacity: 1; background: color-mix(in srgb, var(--danger) 14%, transparent); outline: none; }
 
   /* off the board until its square is clicked */
   .tile[hidden] { display: none !important; }
@@ -932,7 +935,8 @@
   .board--static .cells { display: none; }
   /* stacked, every tile is as wide as the column and shows all it has, so
      there is no size to pick */
-  .board--static .sizes { display: none; }
+  /* stacked there are no sizes, but a tile that can go still has its red light */
+  .board--static .sizes button[data-size] { display: none; }
   .board--static .ph,
   .board--static::before { display: none; }
   /* stacked, the tiles size to their content — an iframe filling one has no
@@ -946,8 +950,6 @@
 
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
-    /* no nudge, so the squares just sit a little brighter until they are used */
-    .board--hint .sizes:not(:hover) i { border-color: var(--icon); }
   }
 </style>
 <noscript><style>
@@ -959,7 +961,7 @@
   /* nothing ever resizes a tile, so it shows all it has from the start */
   .post time, .post .what { display: block; }
   /* the squares and the × only move tiles on and off a board there is no script to run */
-  .repos, .tile__close { display: none; }
+  .repos { display: none; }
   /* no script to swap the iframe in, so the button is just the link it already is */
   .start .go { text-decoration: underline; }
   /* ...and its rows are links from the start */
@@ -1097,11 +1099,10 @@
 
   <article class="tile tile--flush tile--gba" data-id="gba">
     <header class="tile__bar" tabindex="0" aria-label="connect 4 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
-      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-close aria-label="Take connect 4 off the board" title="Close"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
       <span class="tile__title">connect 4</span>
       <span class="spacer"></span>
       <a class="ln" href="gba/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
-      <button class="tile__close" type="button" aria-label="Take connect 4 off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
     <div class="tile__body">
       <div class="mini" aria-hidden="true">
@@ -1189,11 +1190,10 @@
 
   <article class="tile tile--flush tile--bike" data-id="bike">
     <header class="tile__bar" tabindex="0" aria-label="bike or die 2 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
-      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-close aria-label="Take bike or die 2 off the board" title="Close"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
       <span class="tile__title">bike or die 2</span>
       <span class="spacer"></span>
       <a class="ln" href="bike/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
-      <button class="tile__close" type="button" aria-label="Take bike or die 2 off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
     <div class="tile__body">
       <div class="mini" aria-hidden="true">
@@ -1228,11 +1228,10 @@
 
   <article class="tile tile--flush tile--btd" data-id="btd3">
     <header class="tile__bar" tabindex="0" aria-label="bloons td 3 tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
-      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-close aria-label="Take bloons td 3 off the board" title="Close"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
       <span class="tile__title">bloons td 3</span>
       <span class="spacer"></span>
       <a class="ln" href="bloons/" target="_blank" rel="noopener noreferrer">open&nbsp;↗</a>
-      <button class="tile__close" type="button" aria-label="Take bloons td 3 off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
     <div class="tile__body">
       <div class="mini" aria-hidden="true">
@@ -1263,11 +1262,10 @@
 
   <article class="tile tile--flush tile--gc" data-id="gc">
     <header class="tile__bar" tabindex="0" aria-label="gamecube tile — arrow keys nudge it half a cell, shift for a whole one, + and − resize it">
-      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-size="0" aria-pressed="false" aria-label="1×1" title="1×1"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
+      <span class="sizes" role="group" aria-label="Tile size"><button type="button" data-close aria-label="Take the gamecube games off the board" title="Close"><i></i></button><button type="button" data-size="1" aria-pressed="false" aria-label="2×2" title="2×2"><i></i></button><button type="button" data-size="2" aria-pressed="false" aria-label="4×4" title="4×4"><i></i></button></span>
       <span class="tile__title">gamecube in browser</span>
       <span class="spacer"></span>
       <a class="ln" href="gamecube/">open&nbsp;→</a>
-      <button class="tile__close" type="button" aria-label="Take the gamecube games off the board" title="Remove"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
     <div class="tile__body">
       <div class="mini" aria-hidden="true">
@@ -1796,7 +1794,7 @@
       el.classList.toggle('tile--xs', !isStatic && n === 0);
       el.classList.toggle('tile--big', isStatic || n >= BIG);
       var name = el.querySelector('.tile__title').textContent;
-      Array.prototype.forEach.call(el.querySelectorAll('.sizes button'), function (b) {
+      Array.prototype.forEach.call(el.querySelectorAll('.sizes [data-size]'), function (b) {
         var k = +b.dataset.size;
         b.setAttribute('aria-pressed', k === n ? 'true' : 'false');
         b.setAttribute('aria-label', SIZE_NAMES[k] + ' ' + name + ' tile');
@@ -1984,7 +1982,7 @@
     var open = e.target.closest('[data-open]');
     if (open) { openTile(open.dataset.open); return; }
 
-    var close = e.target.closest('.tile__close');
+    var close = e.target.closest('.sizes [data-close]');
     if (close) { closeTile(close.closest('.tile').dataset.id); return; }
 
     // Without script these links open the standalone page, which is the
